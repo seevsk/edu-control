@@ -21,15 +21,15 @@ export default async function LoginPage({
 
   return (
     <div className="grid min-h-dvh md:grid-cols-2">
-      <section className="hidden flex-col justify-center gap-8 bg-text px-12 text-white md:flex">
+      <section className="hidden flex-col justify-center gap-8 border-r border-brand-ink-border bg-brand-ink px-12 text-white md:flex">
         <div>
-          <p className="text-lg font-semibold">EduControl</p>
-          <h1 className="mt-3 max-w-sm text-2xl font-semibold text-balance">
+          <p className="text-lg font-semibold text-white">EduControl</p>
+          <h1 className="mt-3 max-w-sm text-2xl font-semibold text-balance text-white">
             El avance del grupo, con datos, no con la palabra de cada uno.
           </h1>
         </div>
 
-        <div className="max-w-sm rounded-md border border-white/15 bg-white/5 p-4">
+        <div className="max-w-sm rounded-md border border-brand-ink-border bg-white/5 p-4">
           <p className="text-xs text-white/60">Avance del grupo</p>
           <ul className="mt-3 flex flex-col gap-2.5">
             {vistaPrevia.map((fila) => (

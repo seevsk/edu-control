@@ -1,10 +1,5 @@
-import Image from "next/image";
 import { IconBuscar, IconCampana } from "@/components/icons";
-
-function iniciales(nombre: string, apellidos: string | null) {
-  const segunda = apellidos?.trim()[0] ?? "";
-  return `${nombre.trim()[0] ?? ""}${segunda}`.toUpperCase();
-}
+import { Avatar } from "@/components/avatar";
 
 export function Header({
   usuario,
@@ -15,33 +10,23 @@ export function Header({
     <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface px-4">
       <span className="text-[15px] font-semibold tracking-tight">EduControl</span>
 
-      <div className="ml-4 hidden flex-1 items-center gap-2 rounded-md border border-border bg-bg px-3 py-1.5 text-sm text-text-muted sm:flex">
-        <IconBuscar className="size-4 shrink-0" aria-hidden />
-        <input
-          type="search"
-          placeholder="Buscar"
-          disabled
-          className="w-full bg-transparent placeholder:text-text-muted focus:outline-none disabled:cursor-not-allowed"
-        />
+      <div className="hidden flex-1 items-center justify-end pr-2 sm:flex">
+        <div className="flex w-full max-w-64 items-center gap-2 rounded-md border border-border bg-bg px-2.5 py-1 text-sm text-text-muted">
+          <IconBuscar className="size-4 shrink-0" aria-hidden />
+          <input
+            type="search"
+            placeholder="Buscar"
+            disabled
+            className="w-full bg-transparent text-sm placeholder:text-text-muted focus:outline-none disabled:cursor-not-allowed"
+          />
+        </div>
       </div>
 
-      <div className="ml-auto flex items-center gap-3">
+      <div className="ml-auto flex items-center gap-3 sm:ml-0">
         <IconCampana className="size-5 text-text-muted" aria-hidden />
 
         <div className="flex items-center gap-2">
-          {usuario.fotoUrl ? (
-            <Image
-              src={usuario.fotoUrl}
-              alt=""
-              width={28}
-              height={28}
-              className="size-7 rounded-full"
-            />
-          ) : (
-            <span className="flex size-7 items-center justify-center rounded-full bg-primary-soft text-xs font-medium text-primary">
-              {iniciales(usuario.nombre, usuario.apellidos)}
-            </span>
-          )}
+          <Avatar nombre={usuario.nombre} apellidos={usuario.apellidos} fotoUrl={usuario.fotoUrl} />
           <span className="hidden text-sm font-medium md:inline">{usuario.nombre}</span>
         </div>
 

@@ -8,6 +8,8 @@ import {
   invitarIntegranteAction,
   retirarIntegranteAction,
 } from "../actions";
+import { Avatar } from "@/components/avatar";
+import { SubmitButton } from "@/components/submit-button";
 
 const ETIQUETAS_INVITACION: Record<string, string> = {
   pendiente: "Invitacion pendiente",
@@ -45,7 +47,7 @@ export default async function GrupoDetallePage({
   const invitarConId = invitarIntegranteAction.bind(null, idGrupo);
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-8">
+    <div className="animate-page-in mx-auto flex max-w-2xl flex-col gap-8">
       <div>
         <Link href="/grupos" className="text-sm text-primary hover:underline">
           Grupos
@@ -86,18 +88,26 @@ export default async function GrupoDetallePage({
               key={integrante.idIntegrante}
               className="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-sm"
             >
-              <div>
-                <p className="font-medium">
-                  {integrante.usuario.nombre} {integrante.usuario.apellidos ?? ""}
-                  {integrante.rol === "lider" ? (
-                    <span className="ml-2 text-xs text-text-muted">Lider</span>
-                  ) : integrante.rol === "observador" ? (
-                    <span className="ml-2 text-xs text-text-muted">Observador</span>
-                  ) : null}
-                </p>
-                <p className="text-xs text-text-muted">
-                  {ETIQUETAS_INVITACION[integrante.estadoInvitacion]}
-                </p>
+              <div className="flex items-center gap-2.5">
+                <Avatar
+                  nombre={integrante.usuario.nombre}
+                  apellidos={integrante.usuario.apellidos}
+                  fotoUrl={integrante.usuario.fotoUrl}
+                  tamano="sm"
+                />
+                <div>
+                  <p className="font-medium">
+                    {integrante.usuario.nombre} {integrante.usuario.apellidos ?? ""}
+                    {integrante.rol === "lider" ? (
+                      <span className="ml-2 text-xs text-text-muted">Lider</span>
+                    ) : integrante.rol === "observador" ? (
+                      <span className="ml-2 text-xs text-text-muted">Observador</span>
+                    ) : null}
+                  </p>
+                  <p className="text-xs text-text-muted">
+                    {ETIQUETAS_INVITACION[integrante.estadoInvitacion]}
+                  </p>
+                </div>
               </div>
               {esLider &&
               integrante.rol !== "lider" &&
@@ -139,9 +149,15 @@ export default async function GrupoDetallePage({
                   key={persona.idUsuario}
                   className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm"
                 >
-                  <span>
+                  <span className="flex items-center gap-2.5">
+                    <Avatar
+                      nombre={persona.nombre}
+                      apellidos={persona.apellidos}
+                      fotoUrl={persona.fotoUrl}
+                      tamano="sm"
+                    />
                     {persona.nombre} {persona.apellidos ?? ""}
-                    <span className="ml-2 text-xs text-text-muted">{persona.correo}</span>
+                    <span className="text-xs text-text-muted">{persona.correo}</span>
                   </span>
                   {idsYaEnGrupo.has(persona.idUsuario) ? (
                     <span className="text-xs text-text-muted">Ya invitado</span>
@@ -206,12 +222,9 @@ export default async function GrupoDetallePage({
                 <option value="finalizado">Finalizado</option>
               </select>
             </label>
-            <button
-              type="submit"
-              className="mt-1 w-fit rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover"
-            >
+            <SubmitButton className="mt-1 w-fit rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover">
               Guardar cambios
-            </button>
+            </SubmitButton>
           </form>
         </section>
       ) : null}

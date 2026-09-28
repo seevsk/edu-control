@@ -216,7 +216,7 @@ Reglas de arquitectura:
 ### 8.2 Cursos, horarios, evaluaciones y calendario
 
 - Cada usuario registra **sus propios cursos** a mano. No hay importación externa. `modalidad`: `presencial` | `remoto`. `activo = false` cuando termina el ciclo.
-- `horario_curso` es un patrón **semanal** (día 1 = lunes … 7 = domingo). Un curso puede tener varias sesiones.
+- `horario_curso` es un patrón **semanal** (día 1 = lunes … 7 = domingo), pero en la práctica los cursos no dictan clase en domingo: la UI y la validación limitan `horario_curso` a **1-6 (lunes a sábado)**. `bloque_ocupado` sí usa el rango completo 1-7. Un curso puede tener varias sesiones.
 - `bloque_ocupado` es un patrón semanal **personal**: `laboral` | `familiar` | `personal`. `dia_semana` es el día en que **empieza** el bloque. Si `hora_fin < hora_inicio`, el bloque cruza la medianoche (turno nocturno). Valida que `hora_inicio != hora_fin`.
 - **Tiempo ocupado** de un usuario = `horario_curso` de sus cursos activos + sus `bloque_ocupado`. **El tiempo libre se calcula restando; nunca se guarda.** Los solapes se calculan en TypeScript.
 - `evaluacion`: pertenece a un curso. `fecha_cierre` es obligatoria. `fecha_apertura` es opcional (una evaluación presencial no tiene ventana). Si el usuario solo indica el día, usa **23:59 (America/Lima)** como hora de cierre. `requiere_entrega` indica si se sube algo; `fecha_entrega` la marca el propio usuario (`NULL` = aún no entrega) y es autodeclarada, no verificada.
@@ -248,7 +248,7 @@ Reglas de arquitectura:
 |---|---|
 | `pendiente` → `en_progreso` | El asignado (o el líder) |
 | `en_progreso` → `en_revision` | El asignado. Significa "terminé". Se llena `fecha_terminada` |
-| `en_revision` → `completada` | Otro integrante (ver decisiones pendientes) |
+| `en_revision` → `completada` | Cualquier integrante aceptado (no observador) que no sea el asignado (confirmado) |
 | `en_revision` → `en_progreso` | Otro integrante, al devolverla. Se borra `fecha_terminada` |
 
   Rechaza cualquier otra transición. Si el equipo pide más flexibilidad, se amplía esta tabla. La revisión del trabajo real ocurre fuera de la app (el revisor abre el documento del grupo); la app solo registra quién confirmó y cuándo.
@@ -405,7 +405,6 @@ Datos de ejemplo (`prisma/seed.ts`, **solo desarrollo**): varios usuarios de pru
 
 ## 13. Decisiones pendientes (pregunta antes de implementar)
 
-- **Quién confirma una tarea en `en_revision`:** cualquier integrante aceptado que no sea el asignado (supuesto actual) o solo el líder.
 - **Política de correos:** todos los cambios a todos, solo lo importante (supuesto actual) o lo importante más un resumen periódico.
 - **Dominio y Resend:** aún no hay dominio verificado. Mientras tanto, los correos se registran en consola.
 - **Reapertura** de una tarea `completada` y transiciones de estado adicionales.

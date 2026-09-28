@@ -7,7 +7,7 @@ export default async function InvitacionesPage() {
   const invitaciones = await listarInvitacionesPendientes(sesion.idUsuario);
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-6">
+    <div className="animate-page-in mx-auto flex max-w-2xl flex-col gap-6">
       <h1 className="text-xl font-semibold">Invitaciones</h1>
 
       <ul className="flex flex-col gap-3">

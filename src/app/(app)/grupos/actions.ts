@@ -33,7 +33,8 @@ export async function actualizarGrupoAction(idGrupo: number, formData: FormData)
 
   await grupoService.actualizarGrupo(sesion.idUsuario, idGrupo, parseo.data);
   revalidatePath(`/grupos/${idGrupo}`);
-  redirect(`/grupos/${idGrupo}`);
+  revalidatePath("/grupos");
+  redirect("/grupos");
 }
 
 export async function invitarIntegranteAction(idGrupo: number, formData: FormData) {
