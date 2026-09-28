@@ -1,9 +1,16 @@
 import Link from "next/link";
 
-export function TabsGrupo({ idGrupo, activa }: { idGrupo: number; activa: "resumen" | "tareas" }) {
+export function TabsGrupo({
+  idGrupo,
+  activa,
+}: {
+  idGrupo: number;
+  activa: "resumen" | "tareas" | "actividad";
+}) {
   const tabs = [
     { key: "resumen", label: "Resumen", href: `/grupos/${idGrupo}` },
     { key: "tareas", label: "Tareas", href: `/grupos/${idGrupo}/tareas` },
+    { key: "actividad", label: "Actividad", href: `/grupos/${idGrupo}/actividad` },
   ] as const;
 
   return (

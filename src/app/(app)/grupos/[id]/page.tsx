@@ -11,6 +11,7 @@ import {
 import { Avatar } from "@/components/avatar";
 import { SubmitButton } from "@/components/submit-button";
 import { TabsGrupo } from "./_components/tabs-grupo";
+import { obtenerMetricasGrupo } from "@/server/services/metricas";
 
 const ETIQUETAS_INVITACION: Record<string, string> = {
   pendiente: "Invitacion pendiente",
@@ -43,6 +44,7 @@ export default async function GrupoDetallePage({
   const esLider = rolActual === "lider";
   const resultadosBusqueda = q ? await buscarUsuarios(sesion.idUsuario, q) : [];
   const idsYaEnGrupo = new Set(grupo.integrantes.map((i) => i.idUsuario));
+  const { avance, porIntegrante } = await obtenerMetricasGrupo(sesion.idUsuario, idGrupo);
 
   const actualizarConId = actualizarGrupoAction.bind(null, idGrupo);
   const invitarConId = invitarIntegranteAction.bind(null, idGrupo);
@@ -82,6 +84,65 @@ export default async function GrupoDetallePage({
           Ver el trabajo
         </a>
       ) : null}
+
+      <section className="rounded-md border border-border bg-surface p-4">
+        <h2 className="text-sm font-medium">Avance del grupo</h2>
+        {avance === null ? (
+          <p className="mt-2 text-sm text-text-muted">Sin tareas todavia.</p>
+        ) : (
+          <div className="mt-2 flex items-center gap-3">
+            <div className="h-2 flex-1 overflow-hidden rounded-full bg-bg">
+              <div
+                className="h-full rounded-full bg-estado-completada"
+                style={{ width: `${Math.round(avance * 100)}%` }}
+              />
+            </div>
+            <span className="text-sm font-medium">{Math.round(avance * 100)}%</span>
+          </div>
+        )}
+
+        {porIntegrante.length > 0 ? (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="border-b border-border text-xs text-text-muted">
+                <tr>
+                  <th className="py-1.5 pr-3 font-medium">Integrante</th>
+                  <th className="py-1.5 pr-3 font-medium">Carga</th>
+                  <th className="py-1.5 pr-3 font-medium">Cumplimiento</th>
+                  <th className="py-1.5 font-medium">Puntualidad</th>
+                </tr>
+              </thead>
+              <tbody>
+                {porIntegrante.map((m) => (
+                  <tr key={m.idUsuario} className="border-b border-border last:border-0">
+                    <td className="py-1.5 pr-3">
+                      <span className="flex items-center gap-2">
+                        <Avatar nombre={m.nombre} apellidos={m.apellidos} fotoUrl={m.fotoUrl} tamano="sm" />
+                        {m.nombre}
+                      </span>
+                    </td>
+                    <td className="py-1.5 pr-3">{Math.round(m.carga * 100)}%</td>
+                    <td className="py-1.5 pr-3">
+                      {m.cumplimiento === null ? (
+                        <span className="text-text-muted">Sin tareas asignadas</span>
+                      ) : (
+                        `${Math.round(m.cumplimiento * 100)}%`
+                      )}
+                    </td>
+                    <td className="py-1.5">
+                      {m.puntualidad === null ? (
+                        <span className="text-text-muted">-</span>
+                      ) : (
+                        `${Math.round(m.puntualidad * 100)}%`
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+      </section>
 
       <section className="rounded-md border border-border bg-surface p-4">
         <h2 className="text-sm font-medium">Integrantes</h2>
