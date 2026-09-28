@@ -8,6 +8,14 @@ import type {
 } from "@/lib/validation/curso";
 import type { z } from "zod";
 
+export async function listarEvaluacionesDelUsuario(idUsuario: number) {
+  return prisma.evaluacion.findMany({
+    where: { curso: { idUsuario } },
+    include: { curso: true },
+    orderBy: { fechaCierre: "asc" },
+  });
+}
+
 export async function listarCursos(idUsuario: number) {
   return prisma.curso.findMany({
     where: { idUsuario },
