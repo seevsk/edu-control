@@ -1,5 +1,6 @@
 import { prisma } from "@/server/db/client";
 import { crearNotificacion } from "@/server/notifications/crear-notificacion";
+import { plantillasNotificacion } from "@/server/notifications/templates";
 import { finDeDiaLimaAUtc } from "@/lib/dates";
 import type { crearTareaSchema } from "@/lib/validation/tarea";
 import type { z } from "zod";
@@ -101,9 +102,8 @@ export async function crearTarea(
     await crearNotificacion({
       idUsuario: idAsignado,
       tipo: "tarea_asignada",
-      mensaje: `Se te asigno "${tarea.titulo}".`,
-      enlace: `/grupos/${idGrupo}/tareas`,
       idGrupo,
+      ...plantillasNotificacion.tareaAsignada(tarea.titulo, idGrupo),
     });
   }
 
@@ -143,9 +143,8 @@ export async function reasignarTarea(
     await crearNotificacion({
       idUsuario: nuevoIdAsignado,
       tipo: "tarea_asignada",
-      mensaje: `Se te asigno "${tarea.titulo}".`,
-      enlace: `/grupos/${idGrupo}/tareas`,
       idGrupo,
+      ...plantillasNotificacion.tareaAsignada(tarea.titulo, idGrupo),
     });
   }
 
@@ -199,26 +198,23 @@ export async function cambiarEstadoTarea(
       await crearNotificacion({
         idUsuario: destino.idUsuario,
         tipo: "tarea_en_revision",
-        mensaje: `"${tarea.titulo}" esta en revision.`,
-        enlace: `/grupos/${idGrupo}/tareas`,
         idGrupo,
+        ...plantillasNotificacion.tareaEnRevision(tarea.titulo, idGrupo),
       });
     }
   } else if (nuevoEstado === "en_progreso" && estadoAnterior === "en_revision" && tarea.idAsignado) {
     await crearNotificacion({
       idUsuario: tarea.idAsignado,
       tipo: "tarea_devuelta",
-      mensaje: `Te devolvieron "${tarea.titulo}".`,
-      enlace: `/grupos/${idGrupo}/tareas`,
       idGrupo,
+      ...plantillasNotificacion.tareaDevuelta(tarea.titulo, idGrupo),
     });
   } else if (nuevoEstado === "completada" && tarea.idAsignado) {
     await crearNotificacion({
       idUsuario: tarea.idAsignado,
       tipo: "tarea_completada",
-      mensaje: `"${tarea.titulo}" quedo completada.`,
-      enlace: `/grupos/${idGrupo}/tareas`,
       idGrupo,
+      ...plantillasNotificacion.tareaCompletada(tarea.titulo, idGrupo),
     });
   }
 }

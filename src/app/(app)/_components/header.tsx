@@ -1,10 +1,13 @@
+import Link from "next/link";
 import { IconBuscar, IconCampana } from "@/components/icons";
 import { Avatar } from "@/components/avatar";
 
 export function Header({
   usuario,
+  notificacionesNoLeidas = 0,
 }: {
   usuario: { nombre: string; apellidos: string | null; fotoUrl: string | null };
+  notificacionesNoLeidas?: number;
 }) {
   return (
     <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface px-4">
@@ -23,7 +26,14 @@ export function Header({
       </div>
 
       <div className="ml-auto flex items-center gap-3 sm:ml-0">
-        <IconCampana className="size-5 text-text-muted" aria-hidden />
+        <Link href="/notificaciones" className="relative" aria-label="Notificaciones">
+          <IconCampana className="size-5 text-text-muted" aria-hidden />
+          {notificacionesNoLeidas > 0 ? (
+            <span className="absolute -right-1.5 -top-1.5 flex size-3.5 items-center justify-center rounded-full bg-primary text-[8px] text-white">
+              {notificacionesNoLeidas > 9 ? "9+" : notificacionesNoLeidas}
+            </span>
+          ) : null}
+        </Link>
 
         <div className="flex items-center gap-2">
           <Avatar nombre={usuario.nombre} apellidos={usuario.apellidos} fotoUrl={usuario.fotoUrl} />
