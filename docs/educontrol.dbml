@@ -199,7 +199,7 @@ COMMENT ON COLUMN "notificacion"."enlace" IS 'Ruta relativa, ej: /grupos/12/tare
 
 COMMENT ON COLUMN "notificacion"."estado_correo" IS 'no_aplica | pendiente | enviado | fallido';
 
-ALTER TABLE "usuario" ADD FOREIGN KEY ("id_usuario") REFERENCES "perfil" ("id_usuario") DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE "perfil" ADD FOREIGN KEY ("id_usuario") REFERENCES "usuario" ("id_usuario") ON DELETE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "bloque_ocupado" ADD FOREIGN KEY ("id_usuario") REFERENCES "usuario" ("id_usuario") DEFERRABLE INITIALLY IMMEDIATE;
 
