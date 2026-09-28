@@ -205,6 +205,7 @@ Reglas de arquitectura:
 
 - `dominio_correo` es el texto después de `@`, en minúsculas, **calculado en el backend**. Se recalcula junto con `correo` en cada login.
 - Haz *upsert* **por `google_id`**, no por correo (el correo de una cuenta de Workspace puede cambiar).
+- **Nombre y foto (confirmado):** `correo` y `dominio_correo` se refrescan siempre; `nombre`, `apellidos` y `foto_url` solo se fijan al crear la cuenta (después el usuario los podrá editar desde su perfil).
 - En el primer login crea `usuario` y `perfil` (con `tipo_cuenta = 'estudiante'`) en una sola transacción.
 - Tras el login el servidor emite **su propia sesión**. **El id del usuario autenticado sale siempre de la sesión en el servidor, nunca de un parámetro que envíe el cliente.**
 - Sugerir compañeros por dominio de correo solo tiene sentido si el dominio **no es genérico** (gmail.com, hotmail.com, outlook.com, live.com, yahoo.com, icloud.com, etc.). Guarda esa lista en un archivo de constantes.
@@ -407,7 +408,6 @@ Datos de ejemplo (`prisma/seed.ts`, **solo desarrollo**): varios usuarios de pru
 - **Quién confirma una tarea en `en_revision`:** cualquier integrante aceptado que no sea el asignado (supuesto actual) o solo el líder.
 - **Política de correos:** todos los cambios a todos, solo lo importante (supuesto actual) o lo importante más un resumen periódico.
 - **Dominio y Resend:** aún no hay dominio verificado. Mientras tanto, los correos se registran en consola.
-- **Nombre y foto:** si se refrescan desde Google en cada login o se cargan solo al crear la cuenta y luego el usuario puede editarlos. Supuesto actual: `correo` y `dominio_correo` se refrescan siempre; nombre, apellidos y foto solo al crear.
 - **Reapertura** de una tarea `completada` y transiciones de estado adicionales.
 - **Framework de pruebas**, librería de formularios, librería de componentes e íconos, y React Compiler.
 - **Privacidad:** con usuarios reales aplica la Ley 29733 de Protección de Datos Personales (Perú). Antes de abrir la app hacen falta política de privacidad, términos y consentimiento; lo decide el equipo, no lo improvises.
@@ -425,3 +425,13 @@ Datos de ejemplo (`prisma/seed.ts`, **solo desarrollo**): varios usuarios de pru
 - No hardcodees URLs, dominios ni secretos; no subas `.env` a Git.
 - No agregues dependencias, columnas o tablas fuera de lo definido sin preguntar.
 - No hagas commit ni push sin que el usuario lo pida. tomate tu tiempo en leer todo el plan, si necesitas dudas en algo avisame.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
