@@ -1,4 +1,5 @@
 import { prisma } from "@/server/db/client";
+import { crearNotificacion } from "@/server/notifications/crear-notificacion";
 import type { crearGrupoSchema, actualizarGrupoSchema } from "@/lib/validation/grupo";
 import type { z } from "zod";
 
@@ -150,13 +151,11 @@ export async function invitarIntegrante(idActor: number, idGrupo: number, idUsua
     data: { idGrupo, idUsuario: idUsuarioInvitado, rol: "miembro", estadoInvitacion: "pendiente" },
   });
 
-  await prisma.notificacion.create({
-    data: {
-      idUsuario: idUsuarioInvitado,
-      tipo: "invitacion_grupo",
-      mensaje: `Te invitaron al grupo "${grupo.nombre}".`,
-      enlace: `/invitaciones`,
-    },
+  await crearNotificacion({
+    idUsuario: idUsuarioInvitado,
+    tipo: "invitacion_grupo",
+    mensaje: `Te invitaron al grupo "${grupo.nombre}".`,
+    enlace: `/invitaciones`,
   });
 
   return integrante;
@@ -180,13 +179,11 @@ export async function responderInvitacion(
     data: { estadoInvitacion: respuesta, fechaRespuesta: new Date() },
   });
 
-  await prisma.notificacion.create({
-    data: {
-      idUsuario: integrante.grupo.idCreador,
-      tipo: "invitacion_respondida",
-      mensaje: `Respondieron tu invitacion al grupo "${integrante.grupo.nombre}": ${respuesta}.`,
-      enlace: `/grupos/${idGrupo}`,
-    },
+  await crearNotificacion({
+    idUsuario: integrante.grupo.idCreador,
+    tipo: "invitacion_respondida",
+    mensaje: `Respondieron tu invitacion al grupo "${integrante.grupo.nombre}": ${respuesta}.`,
+    enlace: `/grupos/${idGrupo}`,
   });
 }
 

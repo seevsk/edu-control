@@ -10,6 +10,7 @@ import {
 } from "../actions";
 import { Avatar } from "@/components/avatar";
 import { SubmitButton } from "@/components/submit-button";
+import { TabsGrupo } from "./_components/tabs-grupo";
 
 const ETIQUETAS_INVITACION: Record<string, string> = {
   pendiente: "Invitacion pendiente",
@@ -57,6 +58,8 @@ export default async function GrupoDetallePage({
           <p className="mt-1 text-sm text-text-muted">{grupo.descripcion}</p>
         ) : null}
       </div>
+
+      <TabsGrupo idGrupo={idGrupo} activa="resumen" />
 
       {error ? (
         <p className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
