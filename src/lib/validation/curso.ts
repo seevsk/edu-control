@@ -1,7 +1,8 @@
 import { z } from "zod";
 
 const horaHHMM = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Hora invalida (HH:mm)");
-const diaSemana = z.number().int().min(1, "Dia invalido").max(7, "Dia invalido");
+// Los cursos no dictan clase en domingo (7): ver src/lib/dates.ts DIAS_SEMANA_CURSO.
+const diaSemana = z.number().int().min(1, "Dia invalido").max(6, "Los cursos no se dictan en domingo");
 
 export const crearCursoSchema = z.object({
   nombre: z.string().trim().min(1, "El nombre es obligatorio").max(120),

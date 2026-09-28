@@ -44,7 +44,7 @@ export async function actualizarCursoAction(idCurso: number, formData: FormData)
   await cursoService.actualizarCurso(sesion.idUsuario, idCurso, parseo.data);
   revalidatePath(`/cursos/${idCurso}`);
   revalidatePath("/cursos");
-  redirect(`/cursos/${idCurso}`);
+  redirect("/cursos");
 }
 
 export async function agregarHorarioAction(idCurso: number, formData: FormData) {

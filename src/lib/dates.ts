@@ -41,3 +41,6 @@ export const DIAS_SEMANA = [
   { valor: 6, nombre: "Sabado" },
   { valor: 7, nombre: "Domingo" },
 ] as const;
+
+/** Los cursos no dictan clase en domingo: horario_curso solo usa 1-6 (bloque_ocupado si usa 1-7). */
+export const DIAS_SEMANA_CURSO = DIAS_SEMANA.filter((dia) => dia.valor !== 7);

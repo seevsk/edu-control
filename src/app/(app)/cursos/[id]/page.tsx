@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requerirSesion } from "@/server/auth/session";
 import { obtenerCursoDelUsuario } from "@/server/services/curso";
-import { formatearFechaLima, timeAHora, DIAS_SEMANA } from "@/lib/dates";
+import { formatearFechaLima, timeAHora, DIAS_SEMANA, DIAS_SEMANA_CURSO } from "@/lib/dates";
 import {
   actualizarCursoAction,
   agregarHorarioAction,
@@ -11,6 +11,7 @@ import {
   eliminarEvaluacionAction,
   marcarEvaluacionEntregadaAction,
 } from "../actions";
+import { SubmitButton } from "@/components/submit-button";
 
 export default async function CursoDetallePage({
   params,
@@ -38,7 +39,7 @@ export default async function CursoDetallePage({
   const agregarEvaluacionConId = agregarEvaluacionAction.bind(null, idCurso);
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-8">
+    <div className="animate-page-in mx-auto flex max-w-3xl flex-col gap-8">
       <div>
         <Link href="/cursos" className="text-sm text-primary hover:underline">
           Cursos
@@ -99,12 +100,9 @@ export default async function CursoDetallePage({
             <input type="checkbox" name="activo" defaultChecked={curso.activo} />
             Curso activo este ciclo
           </label>
-          <button
-            type="submit"
-            className="mt-1 w-fit rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover sm:col-span-2"
-          >
+          <SubmitButton className="mt-1 w-fit rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover sm:col-span-2">
             Guardar cambios
-          </button>
+          </SubmitButton>
         </form>
       </section>
 
@@ -140,7 +138,7 @@ export default async function CursoDetallePage({
               required
               className="rounded-md border border-border-strong bg-surface px-3 py-1.5 text-sm"
             >
-              {DIAS_SEMANA.map((dia) => (
+              {DIAS_SEMANA_CURSO.map((dia) => (
                 <option key={dia.valor} value={dia.valor}>
                   {dia.nombre}
                 </option>
@@ -247,7 +245,7 @@ export default async function CursoDetallePage({
           </label>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" name="requiereEntrega" defaultChecked />
-            Requiere entrega
+            Requiere entrega presencial
           </label>
           <button
             type="submit"

@@ -4,6 +4,7 @@ import { listarCursos } from "@/server/services/curso";
 import { colorCurso, inicialesCurso } from "@/lib/color-curso";
 import { formatearFechaLima, timeAHora, DIAS_SEMANA } from "@/lib/dates";
 import { crearCursoAction } from "./actions";
+import { SubmitButton } from "@/components/submit-button";
 
 function proximaClase(horarios: { diaSemana: number; horaInicio: Date }[]) {
   if (horarios.length === 0) return null;
@@ -22,7 +23,7 @@ export default async function CursosPage({
   const cursos = await listarCursos(sesion.idUsuario);
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-6">
+    <div className="animate-page-in mx-auto flex max-w-4xl flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Cursos</h1>
       </div>
@@ -130,12 +131,9 @@ export default async function CursosPage({
               <option value="remoto">Remoto</option>
             </select>
           </label>
-          <button
-            type="submit"
-            className="mt-1 w-fit rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover sm:col-span-2"
-          >
+          <SubmitButton className="mt-1 w-fit rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover sm:col-span-2">
             Guardar curso
-          </button>
+          </SubmitButton>
         </form>
       </details>
     </div>

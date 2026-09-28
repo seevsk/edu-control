@@ -3,6 +3,7 @@ import { requerirSesion } from "@/server/auth/session";
 import { listarMisGrupos } from "@/server/services/grupo";
 import { listarEvaluacionesDelUsuario } from "@/server/services/curso";
 import { crearGrupoAction } from "./actions";
+import { SubmitButton } from "@/components/submit-button";
 
 export default async function GruposPage({
   searchParams,
@@ -15,7 +16,7 @@ export default async function GruposPage({
   const evaluaciones = await listarEvaluacionesDelUsuario(sesion.idUsuario);
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6">
+    <div className="animate-page-in mx-auto flex max-w-3xl flex-col gap-6">
       <h1 className="text-xl font-semibold">Grupos</h1>
 
       {error ? (
@@ -99,12 +100,9 @@ export default async function GruposPage({
               </select>
             </label>
           ) : null}
-          <button
-            type="submit"
-            className="mt-1 w-fit rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover"
-          >
+          <SubmitButton className="mt-1 w-fit rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover">
             Crear grupo
-          </button>
+          </SubmitButton>
         </form>
       </details>
     </div>
