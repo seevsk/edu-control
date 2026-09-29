@@ -15,6 +15,21 @@ function leerFormData(formData: FormData) {
   return Object.fromEntries(formData.entries());
 }
 
+export async function importarCursoAction(idGrupo: number, volverA: string) {
+  const sesion = await requerirSesion();
+
+  try {
+    await cursoService.importarCursoDesdeGrupo(sesion.idUsuario, idGrupo);
+  } catch (error) {
+    const mensaje = error instanceof Error ? error.message : "No se pudo importar el curso";
+    redirect(`${volverA}?error=${encodeURIComponent(mensaje)}`);
+  }
+
+  revalidatePath("/cursos");
+  revalidatePath(volverA);
+  redirect(volverA);
+}
+
 export async function crearCursoAction(formData: FormData) {
   const sesion = await requerirSesion();
   const datos = leerFormData(formData);

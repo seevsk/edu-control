@@ -163,7 +163,7 @@ Reglas de arquitectura:
 | `usuario` | Identidad que viene de Google (`google_id` es el ancla). Se anonimiza en vez de borrarse (`eliminado_en`) |
 | `perfil` | 1:1 con `usuario`. Datos que edita la persona: `tipo_cuenta`, institución, carrera, ciclo, biografía, `trabaja`, `visible_en_busqueda` |
 | `bloque_ocupado` | Patrón semanal de tiempo no disponible (laboral, familiar, personal) |
-| `curso` | Cursos que cada usuario registra para sí mismo |
+| `curso` | Cursos que cada usuario registra para sí mismo (puede ser una copia sincronizada, ver 8.2) |
 | `horario_curso` | Sesiones semanales de un curso (un curso puede tener varias) |
 | `evaluacion` | Evaluaciones de un curso, con ventana de apertura y cierre |
 | `grupo` | Trabajo grupal, con su propia fecha límite y enlace del trabajo |
@@ -215,7 +215,8 @@ Reglas de arquitectura:
 
 ### 8.2 Cursos, horarios, evaluaciones y calendario
 
-- Cada usuario registra **sus propios cursos** a mano. No hay importación externa. `modalidad`: `presencial` | `remoto`. `activo = false` cuando termina el ciclo.
+- Cada usuario registra **sus propios cursos** a mano (no hay importación de Moodle ni de ningún sistema externo). `modalidad`: `presencial` | `remoto`. `activo = false` cuando termina el ciclo.
+- **Importar curso desde un grupo (confirmado):** si un grupo nace de la evaluación de otro usuario (`grupo.id_evaluacion` -> `evaluacion.id_curso`), un integrante invitado (nunca el dueño del curso) puede traerse ese curso a los suyos con una acción explícita, no automática. Si ya tiene un curso propio con el mismo `codigo`, se **sobrescriben** `nombre`/`docente`/`modalidad` en vez de duplicar la fila (cada quien conserva su propio `id_curso`, no hay colisión de PK posible). El curso resultante queda enlazado vía `importado_de_id_curso`, y esa sincronización es **automática y continua**: cuando el dueño edita su curso, `nombre`/`docente`/`modalidad` se propagan solos a todas las copias importadas (nunca `activo`, que es de cada quien).
 - `horario_curso` es un patrón **semanal** (día 1 = lunes … 7 = domingo), pero en la práctica los cursos no dictan clase en domingo: la UI y la validación limitan `horario_curso` a **1-6 (lunes a sábado)**. `bloque_ocupado` sí usa el rango completo 1-7. Un curso puede tener varias sesiones.
 - `bloque_ocupado` es un patrón semanal **personal**: `laboral` | `familiar` | `personal`. `dia_semana` es el día en que **empieza** el bloque. Si `hora_fin < hora_inicio`, el bloque cruza la medianoche (turno nocturno). Valida que `hora_inicio != hora_fin`.
 - **Tiempo ocupado** de un usuario = `horario_curso` de sus cursos activos + sus `bloque_ocupado`. **El tiempo libre se calcula restando; nunca se guarda.** Los solapes se calculan en TypeScript.

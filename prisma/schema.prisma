@@ -135,18 +135,24 @@ model BloqueOcupado {
 
 /// Cursos que cada usuario registra para si mismo.
 model Curso {
-  idCurso       Int        @id @default(autoincrement()) @map("id_curso")
-  idUsuario     Int        @map("id_usuario")
-  nombre        String
-  modalidad     Modalidad?
-  codigo        String?
-  docente       String?
-  activo        Boolean    @default(true)
-  fechaCreacion DateTime   @default(now()) @map("fecha_creacion")
+  idCurso            Int        @id @default(autoincrement()) @map("id_curso")
+  idUsuario          Int        @map("id_usuario")
+  nombre             String
+  modalidad          Modalidad?
+  codigo             String?
+  docente            String?
+  activo             Boolean    @default(true)
+  fechaCreacion      DateTime   @default(now()) @map("fecha_creacion")
+  /// Si este curso se importo desde el de otro usuario (grupo -> evaluacion -> curso), el original.
+  /// nombre/docente/modalidad se sincronizan automaticamente cuando el original cambia.
+  importadoDeIdCurso Int?       @map("importado_de_id_curso")
 
-  usuario     Usuario         @relation(fields: [idUsuario], references: [idUsuario])
-  horarios    HorarioCurso[]
+  usuario      Usuario        @relation(fields: [idUsuario], references: [idUsuario])
+  horarios     HorarioCurso[]
   evaluaciones Evaluacion[]
+
+  importadoDe   Curso?  @relation("ImportacionCurso", fields: [importadoDeIdCurso], references: [idCurso], onDelete: SetNull)
+  importaciones Curso[] @relation("ImportacionCurso")
 
   @@map("curso")
 }

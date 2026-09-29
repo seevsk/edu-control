@@ -12,6 +12,8 @@ import { Avatar } from "@/components/avatar";
 import { SubmitButton } from "@/components/submit-button";
 import { TabsGrupo } from "./_components/tabs-grupo";
 import { obtenerMetricasGrupo } from "@/server/services/metricas";
+import { yaImportoCurso } from "@/server/services/curso";
+import { importarCursoAction } from "../../cursos/actions";
 
 const ETIQUETAS_INVITACION: Record<string, string> = {
   pendiente: "Invitacion pendiente",
@@ -45,6 +47,12 @@ export default async function GrupoDetallePage({
   const resultadosBusqueda = q ? await buscarUsuarios(sesion.idUsuario, q) : [];
   const idsYaEnGrupo = new Set(grupo.integrantes.map((i) => i.idUsuario));
   const { avance, porIntegrante } = await obtenerMetricasGrupo(sesion.idUsuario, idGrupo);
+
+  const curso = grupo.evaluacion?.curso ?? null;
+  const puedeImportarCurso =
+    curso !== null &&
+    curso.idUsuario !== sesion.idUsuario &&
+    !(await yaImportoCurso(sesion.idUsuario, curso.idCurso));
 
   const actualizarConId = actualizarGrupoAction.bind(null, idGrupo);
   const invitarConId = invitarIntegranteAction.bind(null, idGrupo);
@@ -83,6 +91,19 @@ export default async function GrupoDetallePage({
         >
           Ver el trabajo
         </a>
+      ) : null}
+
+      {curso ? (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-text-muted">Curso: {curso.nombre}</span>
+          {puedeImportarCurso ? (
+            <form action={importarCursoAction.bind(null, idGrupo, `/grupos/${idGrupo}`)}>
+              <SubmitButton className="text-xs text-primary hover:underline" pendingText="Importando...">
+                Traer a mis cursos
+              </SubmitButton>
+            </form>
+          ) : null}
+        </div>
       ) : null}
 
       <section className="rounded-md border border-border bg-surface p-4">
