@@ -1,5 +1,6 @@
 import { prisma } from "@/server/db/client";
 import { horaATime, finDeDiaLimaAUtc, inicioDeDiaLimaAUtc } from "@/lib/dates";
+import { ErrorDeNegocio } from "@/lib/errores";
 import type {
   crearCursoSchema,
   actualizarCursoSchema,
@@ -38,7 +39,7 @@ export async function obtenerCursoDelUsuario(idUsuario: number, idCurso: number)
     where: { idCurso, idUsuario },
     include: { horarios: true, evaluaciones: { orderBy: { fechaCierre: "asc" } } },
   });
-  if (!curso) throw new Error("Curso no encontrado");
+  if (!curso) throw new ErrorDeNegocio("Curso no encontrado");
   return curso;
 }
 
@@ -91,7 +92,7 @@ export async function importarCursoDesdeGrupo(idUsuario: number, idGrupo: number
     where: { idGrupo_idUsuario: { idGrupo, idUsuario } },
   });
   if (!integrante || integrante.estadoInvitacion !== "aceptada") {
-    throw new Error("No eres integrante de este grupo");
+    throw new ErrorDeNegocio("No eres integrante de este grupo");
   }
 
   const grupo = await prisma.grupo.findUnique({
@@ -99,8 +100,8 @@ export async function importarCursoDesdeGrupo(idUsuario: number, idGrupo: number
     include: { evaluacion: { include: { curso: true } } },
   });
   const cursoFuente = grupo?.evaluacion?.curso;
-  if (!cursoFuente) throw new Error("Este grupo no tiene un curso vinculado");
-  if (cursoFuente.idUsuario === idUsuario) throw new Error("Ya es tu curso");
+  if (!cursoFuente) throw new ErrorDeNegocio("Este grupo no tiene un curso vinculado");
+  if (cursoFuente.idUsuario === idUsuario) throw new ErrorDeNegocio("Ya es tu curso");
 
   const existente = cursoFuente.codigo
     ? await prisma.curso.findFirst({
@@ -237,7 +238,7 @@ export async function hayActualizacionesDeCursoImportado(idCursoLocal: number) {
 /** Boton "traer actualizaciones" del invitado: trae lo nuevo/cambiado de horario y evaluaciones. */
 export async function sincronizarCursoImportado(idUsuario: number, idCursoLocal: number) {
   const local = await obtenerCursoDelUsuario(idUsuario, idCursoLocal);
-  if (!local.importadoDeIdCurso) throw new Error("Este curso no esta importado de otro");
+  if (!local.importadoDeIdCurso) throw new ErrorDeNegocio("Este curso no esta importado de otro");
   await sincronizarListasDeCurso(local.importadoDeIdCurso, idCursoLocal);
 }
 
