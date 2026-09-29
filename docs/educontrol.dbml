@@ -50,7 +50,8 @@ CREATE TABLE "horario_curso" (
   "id_curso" integer NOT NULL,
   "dia_semana" smallint NOT NULL,
   "hora_inicio" time NOT NULL,
-  "hora_fin" time NOT NULL
+  "hora_fin" time NOT NULL,
+  "importado_de_id_horario" integer
 );
 
 CREATE TABLE "evaluacion" (
@@ -61,7 +62,8 @@ CREATE TABLE "evaluacion" (
   "fecha_cierre" timestamp NOT NULL,
   "requiere_entrega" boolean DEFAULT true,
   "fecha_entrega" timestamp,
-  "fecha_creacion" timestamp DEFAULT (now())
+  "fecha_creacion" timestamp DEFAULT (now()),
+  "importado_de_id_evaluacion" integer
 );
 
 CREATE TABLE "grupo" (
@@ -212,7 +214,11 @@ ALTER TABLE "curso" ADD FOREIGN KEY ("importado_de_id_curso") REFERENCES "curso"
 
 ALTER TABLE "horario_curso" ADD FOREIGN KEY ("id_curso") REFERENCES "curso" ("id_curso") ON DELETE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
 
+ALTER TABLE "horario_curso" ADD FOREIGN KEY ("importado_de_id_horario") REFERENCES "horario_curso" ("id_horario") ON DELETE SET NULL DEFERRABLE INITIALLY IMMEDIATE;
+
 ALTER TABLE "evaluacion" ADD FOREIGN KEY ("id_curso") REFERENCES "curso" ("id_curso") ON DELETE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "evaluacion" ADD FOREIGN KEY ("importado_de_id_evaluacion") REFERENCES "evaluacion" ("id_evaluacion") ON DELETE SET NULL DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "grupo" ADD FOREIGN KEY ("id_creador") REFERENCES "usuario" ("id_usuario") DEFERRABLE INITIALLY IMMEDIATE;
 

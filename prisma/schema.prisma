@@ -159,30 +159,40 @@ model Curso {
 
 /// Sesiones semanales de un curso (un curso puede tener varias).
 model HorarioCurso {
-  idHorario  Int      @id @default(autoincrement()) @map("id_horario")
-  idCurso    Int      @map("id_curso")
-  diaSemana  Int      @map("dia_semana") @db.SmallInt
-  horaInicio DateTime @map("hora_inicio") @db.Time()
-  horaFin    DateTime @map("hora_fin") @db.Time()
+  idHorario           Int      @id @default(autoincrement()) @map("id_horario")
+  idCurso             Int      @map("id_curso")
+  diaSemana           Int      @map("dia_semana") @db.SmallInt
+  horaInicio          DateTime @map("hora_inicio") @db.Time()
+  horaFin             DateTime @map("hora_fin") @db.Time()
+  /// Si esta sesion se trajo del horario de un curso importado, la sesion original.
+  importadoDeIdHorario Int?    @map("importado_de_id_horario")
 
   curso Curso @relation(fields: [idCurso], references: [idCurso], onDelete: Cascade)
+
+  importadoDe   HorarioCurso?  @relation("ImportacionHorario", fields: [importadoDeIdHorario], references: [idHorario], onDelete: SetNull)
+  importaciones HorarioCurso[] @relation("ImportacionHorario")
 
   @@map("horario_curso")
 }
 
 /// Evaluaciones de un curso, con ventana de apertura y cierre.
 model Evaluacion {
-  idEvaluacion     Int       @id @default(autoincrement()) @map("id_evaluacion")
-  idCurso          Int       @map("id_curso")
-  nombre           String
-  fechaApertura    DateTime? @map("fecha_apertura")
-  fechaCierre      DateTime  @map("fecha_cierre")
-  requiereEntrega  Boolean   @default(true) @map("requiere_entrega")
-  fechaEntrega     DateTime? @map("fecha_entrega")
-  fechaCreacion    DateTime  @default(now()) @map("fecha_creacion")
+  idEvaluacion            Int       @id @default(autoincrement()) @map("id_evaluacion")
+  idCurso                 Int       @map("id_curso")
+  nombre                  String
+  fechaApertura           DateTime? @map("fecha_apertura")
+  fechaCierre             DateTime  @map("fecha_cierre")
+  requiereEntrega         Boolean   @default(true) @map("requiere_entrega")
+  fechaEntrega            DateTime? @map("fecha_entrega")
+  fechaCreacion           DateTime  @default(now()) @map("fecha_creacion")
+  /// Si esta evaluacion se trajo de un curso importado, la evaluacion original.
+  importadoDeIdEvaluacion Int?      @map("importado_de_id_evaluacion")
 
   curso  Curso   @relation(fields: [idCurso], references: [idCurso], onDelete: Cascade)
   grupos Grupo[]
+
+  importadoDe   Evaluacion?  @relation("ImportacionEvaluacion", fields: [importadoDeIdEvaluacion], references: [idEvaluacion], onDelete: SetNull)
+  importaciones Evaluacion[] @relation("ImportacionEvaluacion")
 
   @@map("evaluacion")
 }

@@ -15,6 +15,20 @@ function leerFormData(formData: FormData) {
   return Object.fromEntries(formData.entries());
 }
 
+export async function sincronizarCursoAction(idCurso: number) {
+  const sesion = await requerirSesion();
+
+  try {
+    await cursoService.sincronizarCursoImportado(sesion.idUsuario, idCurso);
+  } catch (error) {
+    const mensaje = error instanceof Error ? error.message : "No se pudo actualizar";
+    redirect(`/cursos/${idCurso}?error=${encodeURIComponent(mensaje)}`);
+  }
+
+  revalidatePath(`/cursos/${idCurso}`);
+  redirect(`/cursos/${idCurso}`);
+}
+
 export async function importarCursoAction(idGrupo: number, volverA: string) {
   const sesion = await requerirSesion();
 
