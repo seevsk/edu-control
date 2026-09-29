@@ -115,13 +115,130 @@ export async function importarCursoDesdeGrupo(idUsuario: number, idGrupo: number
     importadoDeIdCurso: cursoFuente.idCurso,
   };
 
-  if (existente) {
-    return prisma.curso.update({ where: { idCurso: existente.idCurso }, data: datosSincronizados });
+  const cursoLocal = existente
+    ? await prisma.curso.update({ where: { idCurso: existente.idCurso }, data: datosSincronizados })
+    : await prisma.curso.create({ data: { idUsuario, codigo: cursoFuente.codigo, ...datosSincronizados } });
+
+  await sincronizarListasDeCurso(cursoFuente.idCurso, cursoLocal.idCurso);
+
+  return cursoLocal;
+}
+
+/**
+ * Trae del curso original lo que falte en horario_curso/evaluacion (por el id importado, nunca
+ * por nombre) y actualiza lo que ya existe. Nunca borra nada ni toca fecha_entrega: es personal.
+ */
+async function sincronizarListasDeCurso(idCursoFuente: number, idCursoLocal: number) {
+  const [horariosFuente, evaluacionesFuente, horariosLocales, evaluacionesLocales] = await Promise.all([
+    prisma.horarioCurso.findMany({ where: { idCurso: idCursoFuente } }),
+    prisma.evaluacion.findMany({ where: { idCurso: idCursoFuente } }),
+    prisma.horarioCurso.findMany({ where: { idCurso: idCursoLocal } }),
+    prisma.evaluacion.findMany({ where: { idCurso: idCursoLocal } }),
+  ]);
+
+  for (const horario of horariosFuente) {
+    const local = horariosLocales.find((h) => h.importadoDeIdHorario === horario.idHorario);
+    if (local) {
+      if (
+        local.diaSemana !== horario.diaSemana ||
+        local.horaInicio.getTime() !== horario.horaInicio.getTime() ||
+        local.horaFin.getTime() !== horario.horaFin.getTime()
+      ) {
+        await prisma.horarioCurso.update({
+          where: { idHorario: local.idHorario },
+          data: { diaSemana: horario.diaSemana, horaInicio: horario.horaInicio, horaFin: horario.horaFin },
+        });
+      }
+    } else {
+      await prisma.horarioCurso.create({
+        data: {
+          idCurso: idCursoLocal,
+          diaSemana: horario.diaSemana,
+          horaInicio: horario.horaInicio,
+          horaFin: horario.horaFin,
+          importadoDeIdHorario: horario.idHorario,
+        },
+      });
+    }
   }
 
-  return prisma.curso.create({
-    data: { idUsuario, codigo: cursoFuente.codigo, ...datosSincronizados },
+  for (const evaluacion of evaluacionesFuente) {
+    const local = evaluacionesLocales.find((e) => e.importadoDeIdEvaluacion === evaluacion.idEvaluacion);
+    if (local) {
+      if (
+        local.nombre !== evaluacion.nombre ||
+        local.fechaCierre.getTime() !== evaluacion.fechaCierre.getTime() ||
+        (local.fechaApertura?.getTime() ?? null) !== (evaluacion.fechaApertura?.getTime() ?? null) ||
+        local.requiereEntrega !== evaluacion.requiereEntrega
+      ) {
+        await prisma.evaluacion.update({
+          where: { idEvaluacion: local.idEvaluacion },
+          data: {
+            nombre: evaluacion.nombre,
+            fechaCierre: evaluacion.fechaCierre,
+            fechaApertura: evaluacion.fechaApertura,
+            requiereEntrega: evaluacion.requiereEntrega,
+          },
+        });
+      }
+    } else {
+      await prisma.evaluacion.create({
+        data: {
+          idCurso: idCursoLocal,
+          nombre: evaluacion.nombre,
+          fechaCierre: evaluacion.fechaCierre,
+          fechaApertura: evaluacion.fechaApertura,
+          requiereEntrega: evaluacion.requiereEntrega,
+          importadoDeIdEvaluacion: evaluacion.idEvaluacion,
+        },
+      });
+    }
+  }
+}
+
+/** Para mostrar el aviso de "hay actualizaciones" sin traerlas todavia. */
+export async function hayActualizacionesDeCursoImportado(idCursoLocal: number) {
+  const local = await prisma.curso.findUnique({
+    where: { idCurso: idCursoLocal },
+    include: { horarios: true, evaluaciones: true },
   });
+  if (!local?.importadoDeIdCurso) return false;
+
+  const fuente = await prisma.curso.findUnique({
+    where: { idCurso: local.importadoDeIdCurso },
+    include: { horarios: true, evaluaciones: true },
+  });
+  if (!fuente) return false;
+
+  const horarioPendiente = fuente.horarios.some((h) => {
+    const l = local.horarios.find((x) => x.importadoDeIdHorario === h.idHorario);
+    if (!l) return true;
+    return (
+      l.diaSemana !== h.diaSemana ||
+      l.horaInicio.getTime() !== h.horaInicio.getTime() ||
+      l.horaFin.getTime() !== h.horaFin.getTime()
+    );
+  });
+
+  const evaluacionPendiente = fuente.evaluaciones.some((e) => {
+    const l = local.evaluaciones.find((x) => x.importadoDeIdEvaluacion === e.idEvaluacion);
+    if (!l) return true;
+    return (
+      l.nombre !== e.nombre ||
+      l.fechaCierre.getTime() !== e.fechaCierre.getTime() ||
+      (l.fechaApertura?.getTime() ?? null) !== (e.fechaApertura?.getTime() ?? null) ||
+      l.requiereEntrega !== e.requiereEntrega
+    );
+  });
+
+  return horarioPendiente || evaluacionPendiente;
+}
+
+/** Boton "traer actualizaciones" del invitado: trae lo nuevo/cambiado de horario y evaluaciones. */
+export async function sincronizarCursoImportado(idUsuario: number, idCursoLocal: number) {
+  const local = await obtenerCursoDelUsuario(idUsuario, idCursoLocal);
+  if (!local.importadoDeIdCurso) throw new Error("Este curso no esta importado de otro");
+  await sincronizarListasDeCurso(local.importadoDeIdCurso, idCursoLocal);
 }
 
 export async function agregarHorario(

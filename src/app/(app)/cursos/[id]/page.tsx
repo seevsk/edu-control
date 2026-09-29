@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requerirSesion } from "@/server/auth/session";
-import { obtenerCursoDelUsuario } from "@/server/services/curso";
+import { obtenerCursoDelUsuario, hayActualizacionesDeCursoImportado } from "@/server/services/curso";
 import { formatearFechaLima, timeAHora, DIAS_SEMANA, DIAS_SEMANA_CURSO } from "@/lib/dates";
 import {
   actualizarCursoAction,
@@ -10,6 +10,7 @@ import {
   agregarEvaluacionAction,
   eliminarEvaluacionAction,
   marcarEvaluacionEntregadaAction,
+  sincronizarCursoAction,
 } from "../actions";
 import { SubmitButton } from "@/components/submit-button";
 
@@ -37,6 +38,9 @@ export default async function CursoDetallePage({
   const actualizarConId = actualizarCursoAction.bind(null, idCurso);
   const agregarHorarioConId = agregarHorarioAction.bind(null, idCurso);
   const agregarEvaluacionConId = agregarEvaluacionAction.bind(null, idCurso);
+  const hayActualizaciones = curso.importadoDeIdCurso
+    ? await hayActualizacionesDeCursoImportado(idCurso)
+    : false;
 
   return (
     <div className="animate-page-in mx-auto flex max-w-3xl flex-col gap-8">
@@ -51,6 +55,17 @@ export default async function CursoDetallePage({
         <p className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
           {error}
         </p>
+      ) : null}
+
+      {curso.importadoDeIdCurso && hayActualizaciones ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/30 bg-primary-soft px-3 py-2 text-sm">
+          <span>Hay actualizaciones en el horario o las evaluaciones del curso original.</span>
+          <form action={sincronizarCursoAction.bind(null, idCurso)}>
+            <SubmitButton className="text-xs font-medium text-primary hover:underline" pendingText="Actualizando...">
+              Traer actualizaciones
+            </SubmitButton>
+          </form>
+        </div>
       ) : null}
 
       <section className="rounded-md border border-border bg-surface p-4">
