@@ -1,10 +1,12 @@
 import { prisma } from "@/server/db/client";
 import { horaATime } from "@/lib/dates";
 import { cerrarSesion } from "@/server/auth/session";
+import { requerirUsuarioValido } from "@/server/services/usuario";
 import type { actualizarPerfilSchema, crearBloqueOcupadoSchema } from "@/lib/validation/perfil";
 import type { z } from "zod";
 
 export async function obtenerPerfilCompleto(idUsuario: number) {
+  await requerirUsuarioValido(idUsuario);
   return prisma.usuario.findUniqueOrThrow({
     where: { idUsuario },
     include: { perfil: true, bloquesOcupados: { orderBy: [{ diaSemana: "asc" }, { horaInicio: "asc" }] } },

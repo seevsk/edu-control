@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { prisma } from "@/server/db/client";
 import type { ClaimsGoogle } from "@/server/auth/google";
 
@@ -34,6 +35,20 @@ export async function iniciarSesionConGoogle(claims: ClaimsGoogle) {
   return usuario;
 }
 
+/**
+ * Si la sesion apunta a un usuario que ya no existe (por ejemplo, se reseedeo la base en
+ * desarrollo), manda a limpiar la cookie y loguear de nuevo en vez de tirar un error.
+ * Las cookies no se pueden modificar durante el render de una pagina, por eso el redirect pasa
+ * por un Route Handler (/api/auth/sesion-invalida) en vez de cerrar la sesion aqui mismo.
+ */
+export async function requerirUsuarioValido(idUsuario: number) {
+  const usuario = await prisma.usuario.findUnique({ where: { idUsuario } });
+  if (!usuario) {
+    redirect("/api/auth/sesion-invalida");
+  }
+  return usuario;
+}
+
 export async function obtenerUsuarioActual(idUsuario: number) {
-  return prisma.usuario.findUniqueOrThrow({ where: { idUsuario } });
+  return requerirUsuarioValido(idUsuario);
 }
