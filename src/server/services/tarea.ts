@@ -57,6 +57,18 @@ export function verificarTransicion(params: {
   throw new Error(`No se puede pasar de "${estadoActual}" a "${nuevoEstado}"`);
 }
 
+/** Para el "Inicio": tareas activas asignadas al usuario en cualquiera de sus grupos. */
+export async function listarTareasAsignadasAlUsuario(idUsuario: number, limite = 8) {
+  return prisma.tarea.findMany({
+    where: { idAsignado: idUsuario, estado: { not: "completada" } },
+    include: {
+      grupo: { include: { evaluacion: { include: { curso: true } } } },
+    },
+    orderBy: [{ fechaLimite: "asc" }, { fechaCreacion: "desc" }],
+    take: limite,
+  });
+}
+
 export async function listarTareasDelGrupo(
   idUsuario: number,
   idGrupo: number,
