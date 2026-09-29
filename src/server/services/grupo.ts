@@ -1,6 +1,7 @@
 import { prisma } from "@/server/db/client";
 import { crearNotificacion } from "@/server/notifications/crear-notificacion";
 import { plantillasNotificacion } from "@/server/notifications/templates";
+import { ErrorDeNegocio } from "@/lib/errores";
 import type { crearGrupoSchema, actualizarGrupoSchema } from "@/lib/validation/grupo";
 import type { z } from "zod";
 
@@ -37,7 +38,7 @@ export async function obtenerGrupoDelUsuario(idUsuario: number, idGrupo: number)
   const integrante = grupo?.integrantes.find(
     (i) => i.idUsuario === idUsuario && i.estadoInvitacion === "aceptada",
   );
-  if (!grupo || !integrante) throw new Error("Grupo no encontrado");
+  if (!grupo || !integrante) throw new ErrorDeNegocio("Grupo no encontrado");
 
   return { grupo, rolActual: integrante.rol };
 }
@@ -48,7 +49,7 @@ async function requerirLiderDelGrupo(idUsuario: number, idGrupo: number) {
     include: { grupo: true },
   });
   if (!integrante || integrante.estadoInvitacion !== "aceptada" || integrante.rol !== "lider") {
-    throw new Error("Solo el lider del grupo puede hacer esto");
+    throw new ErrorDeNegocio("Solo el lider del grupo puede hacer esto");
   }
   return integrante.grupo;
 }
@@ -128,7 +129,7 @@ export async function buscarUsuarios(idUsuarioActual: number, consulta: string) 
 
 export async function invitarIntegrante(idActor: number, idGrupo: number, idUsuarioInvitado: number) {
   const grupo = await requerirLiderDelGrupo(idActor, idGrupo);
-  if (grupo.estado !== "activo") throw new Error("El grupo esta finalizado");
+  if (grupo.estado !== "activo") throw new ErrorDeNegocio("El grupo esta finalizado");
 
   const invitacionesUltimaHora = await prisma.grupoIntegrante.count({
     where: {
@@ -137,16 +138,16 @@ export async function invitarIntegrante(idActor: number, idGrupo: number, idUsua
     },
   });
   if (invitacionesUltimaHora >= LIMITE_INVITACIONES_POR_HORA) {
-    throw new Error("Llegaste al limite de invitaciones por hora, intenta mas tarde");
+    throw new ErrorDeNegocio("Llegaste al limite de invitaciones por hora, intenta mas tarde");
   }
 
   const invitado = await prisma.usuario.findUnique({ where: { idUsuario: idUsuarioInvitado } });
-  if (!invitado || invitado.eliminadoEn) throw new Error("Usuario no encontrado");
+  if (!invitado || invitado.eliminadoEn) throw new ErrorDeNegocio("Usuario no encontrado");
 
   const yaEsIntegrante = await prisma.grupoIntegrante.findUnique({
     where: { idGrupo_idUsuario: { idGrupo, idUsuario: idUsuarioInvitado } },
   });
-  if (yaEsIntegrante) throw new Error("Esa persona ya fue invitada a este grupo antes");
+  if (yaEsIntegrante) throw new ErrorDeNegocio("Esa persona ya fue invitada a este grupo antes");
 
   const integrante = await prisma.grupoIntegrante.create({
     data: { idGrupo, idUsuario: idUsuarioInvitado, rol: "miembro", estadoInvitacion: "pendiente" },
@@ -171,7 +172,7 @@ export async function responderInvitacion(
     include: { grupo: true },
   });
   if (!integrante || integrante.estadoInvitacion !== "pendiente") {
-    throw new Error("No tienes una invitacion pendiente a ese grupo");
+    throw new ErrorDeNegocio("No tienes una invitacion pendiente a ese grupo");
   }
 
   await prisma.grupoIntegrante.update({
@@ -193,9 +194,9 @@ export async function retirarIntegrante(idActor: number, idGrupo: number, idUsua
     where: { idGrupo_idUsuario: { idGrupo, idUsuario: idUsuarioObjetivo } },
   });
   if (!objetivo || objetivo.estadoInvitacion === "retirado") {
-    throw new Error("Esa persona no es integrante del grupo");
+    throw new ErrorDeNegocio("Esa persona no es integrante del grupo");
   }
-  if (objetivo.rol === "lider") throw new Error("El lider no se puede retirar a si mismo");
+  if (objetivo.rol === "lider") throw new ErrorDeNegocio("El lider no se puede retirar a si mismo");
 
   await prisma.$transaction([
     prisma.grupoIntegrante.update({

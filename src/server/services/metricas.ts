@@ -1,12 +1,13 @@
 import { prisma } from "@/server/db/client";
 import { calcularAvanceGrupo, calcularMetricasPorIntegrante, calcularPuntualidad } from "@/lib/metricas";
+import { ErrorDeNegocio } from "@/lib/errores";
 
 async function requerirIntegranteActivo(idUsuario: number, idGrupo: number) {
   const integrante = await prisma.grupoIntegrante.findUnique({
     where: { idGrupo_idUsuario: { idGrupo, idUsuario } },
   });
   if (!integrante || integrante.estadoInvitacion !== "aceptada") {
-    throw new Error("No eres integrante de este grupo");
+    throw new ErrorDeNegocio("No eres integrante de este grupo");
   }
 }
 

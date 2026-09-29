@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requerirSesion } from "@/server/auth/session";
 import { crearTareaSchema } from "@/lib/validation/tarea";
 import * as tareaService from "@/server/services/tarea";
+import { mensajeParaUsuario } from "@/lib/errores";
 
 function leerFormData(formData: FormData) {
   return Object.fromEntries(formData.entries());
@@ -23,7 +24,7 @@ export async function crearTareaAction(idGrupo: number, formData: FormData) {
   try {
     await tareaService.crearTarea(sesion.idUsuario, idGrupo, parseo.data);
   } catch (error) {
-    redirigirConError(idGrupo, error instanceof Error ? error.message : "No se pudo crear la tarea");
+    redirigirConError(idGrupo, mensajeParaUsuario(error, "No se pudo crear la tarea"));
   }
 
   revalidatePath(`/grupos/${idGrupo}/tareas`);
@@ -37,7 +38,7 @@ export async function reasignarTareaAction(idGrupo: number, idTarea: number, for
   try {
     await tareaService.reasignarTarea(sesion.idUsuario, idGrupo, idTarea, idAsignado);
   } catch (error) {
-    redirigirConError(idGrupo, error instanceof Error ? error.message : "No se pudo reasignar");
+    redirigirConError(idGrupo, mensajeParaUsuario(error, "No se pudo reasignar"));
   }
 
   revalidatePath(`/grupos/${idGrupo}/tareas`);
@@ -54,7 +55,7 @@ export async function cambiarEstadoTareaAction(
   try {
     await tareaService.cambiarEstadoTarea(sesion.idUsuario, idGrupo, idTarea, nuevoEstado);
   } catch (error) {
-    redirigirConError(idGrupo, error instanceof Error ? error.message : "No se pudo cambiar el estado");
+    redirigirConError(idGrupo, mensajeParaUsuario(error, "No se pudo cambiar el estado"));
   }
 
   revalidatePath(`/grupos/${idGrupo}/tareas`);

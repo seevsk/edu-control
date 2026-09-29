@@ -2,6 +2,7 @@ import { prisma } from "@/server/db/client";
 import { crearNotificacion } from "@/server/notifications/crear-notificacion";
 import { plantillasNotificacion } from "@/server/notifications/templates";
 import { finDeDiaLimaAUtc } from "@/lib/dates";
+import { ErrorDeNegocio } from "@/lib/errores";
 import type { crearTareaSchema } from "@/lib/validation/tarea";
 import type { z } from "zod";
 
@@ -13,7 +14,7 @@ async function requerirIntegranteActivo(idUsuario: number, idGrupo: number) {
     where: { idGrupo_idUsuario: { idGrupo, idUsuario } },
   });
   if (!integrante || integrante.estadoInvitacion !== "aceptada") {
-    throw new Error("No eres integrante de este grupo");
+    throw new ErrorDeNegocio("No eres integrante de este grupo");
   }
   return integrante;
 }
@@ -23,7 +24,7 @@ async function validarAsignable(idGrupo: number, idUsuario: number) {
     where: { idGrupo_idUsuario: { idGrupo, idUsuario } },
   });
   if (!integrante || integrante.estadoInvitacion !== "aceptada" || integrante.rol === "observador") {
-    throw new Error("Esa persona no puede ser asignada en este grupo");
+    throw new ErrorDeNegocio("Esa persona no puede ser asignada en este grupo");
   }
 }
 
@@ -35,26 +36,26 @@ export function verificarTransicion(params: {
   actorRol: RolDb;
 }) {
   const { estadoActual, nuevoEstado, actorEsAsignado, actorRol } = params;
-  if (actorRol === "observador") throw new Error("Los observadores no pueden cambiar tareas");
+  if (actorRol === "observador") throw new ErrorDeNegocio("Los observadores no pueden cambiar tareas");
 
   if (estadoActual === "pendiente" && nuevoEstado === "en_progreso") {
     if (!actorEsAsignado && actorRol !== "lider") {
-      throw new Error("Solo el asignado o el lider pueden empezarla");
+      throw new ErrorDeNegocio("Solo el asignado o el lider pueden empezarla");
     }
     return;
   }
   if (estadoActual === "en_progreso" && nuevoEstado === "en_revision") {
-    if (!actorEsAsignado) throw new Error("Solo el asignado puede pasarla a revision");
+    if (!actorEsAsignado) throw new ErrorDeNegocio("Solo el asignado puede pasarla a revision");
     return;
   }
   if (
     estadoActual === "en_revision" &&
     (nuevoEstado === "completada" || nuevoEstado === "en_progreso")
   ) {
-    if (actorEsAsignado) throw new Error("El asignado no puede confirmar ni devolverse su propia tarea");
+    if (actorEsAsignado) throw new ErrorDeNegocio("El asignado no puede confirmar ni devolverse su propia tarea");
     return;
   }
-  throw new Error(`No se puede pasar de "${estadoActual}" a "${nuevoEstado}"`);
+  throw new ErrorDeNegocio(`No se puede pasar de "${estadoActual}" a "${nuevoEstado}"`);
 }
 
 /** Para el "Inicio": tareas activas asignadas al usuario en cualquiera de sus grupos. */
@@ -92,7 +93,7 @@ export async function crearTarea(
   datos: z.infer<typeof crearTareaSchema>,
 ) {
   const integrante = await requerirIntegranteActivo(idActor, idGrupo);
-  if (integrante.rol === "observador") throw new Error("Los observadores no pueden crear tareas");
+  if (integrante.rol === "observador") throw new ErrorDeNegocio("Los observadores no pueden crear tareas");
 
   const idAsignado = datos.idAsignado ? Number(datos.idAsignado) : null;
   if (idAsignado) await validarAsignable(idGrupo, idAsignado);
@@ -129,10 +130,10 @@ export async function reasignarTarea(
   nuevoIdAsignadoRaw: string,
 ) {
   const integrante = await requerirIntegranteActivo(idActor, idGrupo);
-  if (integrante.rol === "observador") throw new Error("Los observadores no pueden reasignar tareas");
+  if (integrante.rol === "observador") throw new ErrorDeNegocio("Los observadores no pueden reasignar tareas");
 
   const tarea = await prisma.tarea.findFirst({ where: { idTarea, idGrupo } });
-  if (!tarea) throw new Error("Tarea no encontrada");
+  if (!tarea) throw new ErrorDeNegocio("Tarea no encontrada");
 
   const nuevoIdAsignado = nuevoIdAsignadoRaw ? Number(nuevoIdAsignadoRaw) : null;
   if (nuevoIdAsignado === tarea.idAsignado) return tarea;
@@ -171,7 +172,7 @@ export async function cambiarEstadoTarea(
 ) {
   const integrante = await requerirIntegranteActivo(idActor, idGrupo);
   const tarea = await prisma.tarea.findFirst({ where: { idTarea, idGrupo } });
-  if (!tarea) throw new Error("Tarea no encontrada");
+  if (!tarea) throw new ErrorDeNegocio("Tarea no encontrada");
 
   verificarTransicion({
     estadoActual: tarea.estado,

@@ -10,6 +10,7 @@ import {
   crearEvaluacionSchema,
 } from "@/lib/validation/curso";
 import * as cursoService from "@/server/services/curso";
+import { mensajeParaUsuario } from "@/lib/errores";
 
 function leerFormData(formData: FormData) {
   return Object.fromEntries(formData.entries());
@@ -21,7 +22,7 @@ export async function sincronizarCursoAction(idCurso: number) {
   try {
     await cursoService.sincronizarCursoImportado(sesion.idUsuario, idCurso);
   } catch (error) {
-    const mensaje = error instanceof Error ? error.message : "No se pudo actualizar";
+    const mensaje = mensajeParaUsuario(error, "No se pudo actualizar");
     redirect(`/cursos/${idCurso}?error=${encodeURIComponent(mensaje)}`);
   }
 
@@ -35,7 +36,7 @@ export async function importarCursoAction(idGrupo: number, volverA: string) {
   try {
     await cursoService.importarCursoDesdeGrupo(sesion.idUsuario, idGrupo);
   } catch (error) {
-    const mensaje = error instanceof Error ? error.message : "No se pudo importar el curso";
+    const mensaje = mensajeParaUsuario(error, "No se pudo importar el curso");
     redirect(`${volverA}?error=${encodeURIComponent(mensaje)}`);
   }
 

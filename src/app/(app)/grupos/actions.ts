@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requerirSesion } from "@/server/auth/session";
 import { crearGrupoSchema, actualizarGrupoSchema } from "@/lib/validation/grupo";
 import * as grupoService from "@/server/services/grupo";
+import { mensajeParaUsuario } from "@/lib/errores";
 
 function leerFormData(formData: FormData) {
   return Object.fromEntries(formData.entries());
@@ -48,7 +49,7 @@ export async function invitarIntegranteAction(idGrupo: number, formData: FormDat
   try {
     await grupoService.invitarIntegrante(sesion.idUsuario, idGrupo, idUsuarioInvitado);
   } catch (error) {
-    const mensaje = error instanceof Error ? error.message : "No se pudo invitar";
+    const mensaje = mensajeParaUsuario(error, "No se pudo invitar");
     redirect(`/grupos/${idGrupo}?error=${encodeURIComponent(mensaje)}`);
   }
 
@@ -70,7 +71,7 @@ export async function retirarIntegranteAction(idGrupo: number, idUsuarioObjetivo
   try {
     await grupoService.retirarIntegrante(sesion.idUsuario, idGrupo, idUsuarioObjetivo);
   } catch (error) {
-    const mensaje = error instanceof Error ? error.message : "No se pudo retirar";
+    const mensaje = mensajeParaUsuario(error, "No se pudo retirar");
     redirect(`/grupos/${idGrupo}?error=${encodeURIComponent(mensaje)}`);
   }
 
