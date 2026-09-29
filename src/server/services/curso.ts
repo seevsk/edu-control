@@ -16,6 +16,14 @@ export async function listarEvaluacionesDelUsuario(idUsuario: number) {
   });
 }
 
+export async function yaImportoCurso(idUsuario: number, idCursoFuente: number) {
+  const existente = await prisma.curso.findFirst({
+    where: { idUsuario, importadoDeIdCurso: idCursoFuente },
+    select: { idCurso: true },
+  });
+  return existente !== null;
+}
+
 export async function listarCursos(idUsuario: number) {
   return prisma.curso.findMany({
     where: { idUsuario },
@@ -52,7 +60,7 @@ export async function actualizarCurso(
   datos: z.infer<typeof actualizarCursoSchema>,
 ) {
   await obtenerCursoDelUsuario(idUsuario, idCurso);
-  return prisma.curso.update({
+  const curso = await prisma.curso.update({
     where: { idCurso },
     data: {
       nombre: datos.nombre,
@@ -61,6 +69,58 @@ export async function actualizarCurso(
       modalidad: datos.modalidad,
       activo: datos.activo,
     },
+  });
+
+  // Sincroniza las copias que otros integrantes importaron de este curso (nunca "activo": es de cada quien).
+  await prisma.curso.updateMany({
+    where: { importadoDeIdCurso: idCurso },
+    data: { nombre: curso.nombre, docente: curso.docente, modalidad: curso.modalidad },
+  });
+
+  return curso;
+}
+
+/**
+ * El invitado a un grupo que nace de un curso del anfitrion puede traerse ese curso a los suyos.
+ * Nunca aplica al propio dueño del curso. Si ya tiene uno con el mismo codigo, lo sobrescribe
+ * (nombre/docente/modalidad) en vez de duplicarlo; si no, crea uno nuevo. Queda enlazado para
+ * que futuras ediciones del anfitrion se sincronicen solas.
+ */
+export async function importarCursoDesdeGrupo(idUsuario: number, idGrupo: number) {
+  const integrante = await prisma.grupoIntegrante.findUnique({
+    where: { idGrupo_idUsuario: { idGrupo, idUsuario } },
+  });
+  if (!integrante || integrante.estadoInvitacion !== "aceptada") {
+    throw new Error("No eres integrante de este grupo");
+  }
+
+  const grupo = await prisma.grupo.findUnique({
+    where: { idGrupo },
+    include: { evaluacion: { include: { curso: true } } },
+  });
+  const cursoFuente = grupo?.evaluacion?.curso;
+  if (!cursoFuente) throw new Error("Este grupo no tiene un curso vinculado");
+  if (cursoFuente.idUsuario === idUsuario) throw new Error("Ya es tu curso");
+
+  const existente = cursoFuente.codigo
+    ? await prisma.curso.findFirst({
+        where: { idUsuario, codigo: { equals: cursoFuente.codigo, mode: "insensitive" } },
+      })
+    : null;
+
+  const datosSincronizados = {
+    nombre: cursoFuente.nombre,
+    docente: cursoFuente.docente,
+    modalidad: cursoFuente.modalidad,
+    importadoDeIdCurso: cursoFuente.idCurso,
+  };
+
+  if (existente) {
+    return prisma.curso.update({ where: { idCurso: existente.idCurso }, data: datosSincronizados });
+  }
+
+  return prisma.curso.create({
+    data: { idUsuario, codigo: cursoFuente.codigo, ...datosSincronizados },
   });
 }
 

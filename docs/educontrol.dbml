@@ -41,7 +41,8 @@ CREATE TABLE "curso" (
   "codigo" varchar,
   "docente" varchar,
   "activo" boolean DEFAULT true,
-  "fecha_creacion" timestamp DEFAULT (now())
+  "fecha_creacion" timestamp DEFAULT (now()),
+  "importado_de_id_curso" integer
 );
 
 CREATE TABLE "horario_curso" (
@@ -155,6 +156,8 @@ COMMENT ON COLUMN "curso"."modalidad" IS 'presencial | remoto';
 
 COMMENT ON COLUMN "curso"."activo" IS 'false = ciclo terminado; sus horarios ya no cuentan como ocupados';
 
+COMMENT ON COLUMN "curso"."importado_de_id_curso" IS 'NULL = curso propio. Si no, es una copia sincronizada del curso de otro usuario, traida desde un grupo (grupo -> evaluacion -> curso). nombre/docente/modalidad se sincronizan cuando el original cambia';
+
 COMMENT ON COLUMN "horario_curso"."dia_semana" IS '1 = lunes ... 7 = domingo';
 
 COMMENT ON COLUMN "evaluacion"."fecha_apertura" IS 'Opcional. Desde cuándo se puede entregar o rendir';
@@ -204,6 +207,8 @@ ALTER TABLE "perfil" ADD FOREIGN KEY ("id_usuario") REFERENCES "usuario" ("id_us
 ALTER TABLE "bloque_ocupado" ADD FOREIGN KEY ("id_usuario") REFERENCES "usuario" ("id_usuario") DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "curso" ADD FOREIGN KEY ("id_usuario") REFERENCES "usuario" ("id_usuario") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "curso" ADD FOREIGN KEY ("importado_de_id_curso") REFERENCES "curso" ("id_curso") ON DELETE SET NULL DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "horario_curso" ADD FOREIGN KEY ("id_curso") REFERENCES "curso" ("id_curso") ON DELETE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
 

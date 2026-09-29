@@ -30,7 +30,7 @@ export async function obtenerGrupoDelUsuario(idUsuario: number, idGrupo: number)
     where: { idGrupo },
     include: {
       integrantes: { include: { usuario: true }, orderBy: { fechaInvitacion: "asc" } },
-      evaluacion: true,
+      evaluacion: { include: { curso: true } },
     },
   });
 
