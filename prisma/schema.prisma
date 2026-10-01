@@ -1,0 +1,292 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------- Enums ----------
+// Los valores conservan exactamente lo definido en docs/educontrol.dbml.
+
+enum TipoCuenta {
+  estudiante
+  profesor
+}
+
+enum Modalidad {
+  presencial
+  remoto
+}
+
+enum TipoBloque {
+  laboral
+  familiar
+  personal
+}
+
+enum RolIntegrante {
+  lider
+  miembro
+  observador
+}
+
+enum EstadoInvitacion {
+  pendiente
+  aceptada
+  rechazada
+  retirado
+}
+
+enum EstadoGrupo {
+  activo
+  finalizado
+}
+
+enum EstadoTarea {
+  pendiente
+  en_progreso
+  en_revision
+  completada
+}
+
+enum AccionHistorial {
+  creada
+  estado
+  reasignada
+}
+
+enum TipoNotificacion {
+  invitacion_grupo
+  invitacion_respondida
+  tarea_asignada
+  tarea_en_revision
+  tarea_devuelta
+  tarea_completada
+}
+
+enum EstadoCorreo {
+  no_aplica
+  pendiente
+  enviado
+  fallido
+}
+
+// ---------- Modelos ----------
+
+/// Identidad que viene de Google (googleId es el ancla). Se anonimiza en vez de borrarse (eliminadoEn).
+model Usuario {
+  idUsuario     Int       @id @default(autoincrement()) @map("id_usuario")
+  googleId      String    @unique @map("google_id")
+  correo        String    @unique
+  dominioCorreo String?   @map("dominio_correo")
+  nombre        String
+  apellidos     String?
+  fotoUrl       String?   @map("foto_url")
+  eliminadoEn   DateTime? @map("eliminado_en")
+  fechaRegistro DateTime  @default(now()) @map("fecha_registro")
+
+  perfil          Perfil?
+  bloquesOcupados BloqueOcupado[]
+  cursos          Curso[]
+  gruposCreados   Grupo[]           @relation("GrupoCreador")
+  integraciones   GrupoIntegrante[]
+  tareasCreadas   Tarea[]           @relation("TareaCreador")
+  tareasAsignadas Tarea[]           @relation("TareaAsignado")
+  historial       TareaHistorial[]
+  notificaciones  Notificacion[]
+
+  @@map("usuario")
+}
+
+/// 1:1 con Usuario. Datos que edita la persona.
+model Perfil {
+  idPerfil           Int        @id @default(autoincrement()) @map("id_perfil")
+  idUsuario          Int        @unique @map("id_usuario")
+  tipoCuenta         TipoCuenta @default(estudiante) @map("tipo_cuenta")
+  institucion        String?
+  carrera            String?
+  ciclo              Int?
+  biografia          String?    @db.VarChar(300)
+  trabaja            Boolean    @default(false)
+  visibleEnBusqueda  Boolean    @default(true) @map("visible_en_busqueda")
+  fechaActualizacion DateTime?  @updatedAt @map("fecha_actualizacion")
+
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
+
+  @@map("perfil")
+}
+
+/// Patron semanal de tiempo no disponible (laboral, familiar, personal).
+model BloqueOcupado {
+  idBloqueOcupado Int        @id @default(autoincrement()) @map("id_bloque_ocupado")
+  idUsuario       Int        @map("id_usuario")
+  tipo            TipoBloque
+  diaSemana       Int        @map("dia_semana") @db.SmallInt
+  horaInicio      DateTime   @map("hora_inicio") @db.Time()
+  horaFin         DateTime   @map("hora_fin") @db.Time()
+  fechaCreacion   DateTime   @default(now()) @map("fecha_creacion")
+
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario])
+
+  @@map("bloque_ocupado")
+}
+
+/// Cursos que cada usuario registra para si mismo.
+model Curso {
+  idCurso            Int        @id @default(autoincrement()) @map("id_curso")
+  idUsuario          Int        @map("id_usuario")
+  nombre             String
+  modalidad          Modalidad?
+  codigo             String?
+  docente            String?
+  activo             Boolean    @default(true)
+  fechaCreacion      DateTime   @default(now()) @map("fecha_creacion")
+  /// Si este curso se importo desde el de otro usuario (grupo -> evaluacion -> curso), el original.
+  /// nombre/docente/modalidad se sincronizan automaticamente cuando el original cambia.
+  importadoDeIdCurso Int?       @map("importado_de_id_curso")
+
+  usuario      Usuario        @relation(fields: [idUsuario], references: [idUsuario])
+  horarios     HorarioCurso[]
+  evaluaciones Evaluacion[]
+
+  importadoDe   Curso?  @relation("ImportacionCurso", fields: [importadoDeIdCurso], references: [idCurso], onDelete: SetNull)
+  importaciones Curso[] @relation("ImportacionCurso")
+
+  @@map("curso")
+}
+
+/// Sesiones semanales de un curso (un curso puede tener varias).
+model HorarioCurso {
+  idHorario           Int      @id @default(autoincrement()) @map("id_horario")
+  idCurso             Int      @map("id_curso")
+  diaSemana           Int      @map("dia_semana") @db.SmallInt
+  horaInicio          DateTime @map("hora_inicio") @db.Time()
+  horaFin             DateTime @map("hora_fin") @db.Time()
+  /// Si esta sesion se trajo del horario de un curso importado, la sesion original.
+  importadoDeIdHorario Int?    @map("importado_de_id_horario")
+
+  curso Curso @relation(fields: [idCurso], references: [idCurso], onDelete: Cascade)
+
+  importadoDe   HorarioCurso?  @relation("ImportacionHorario", fields: [importadoDeIdHorario], references: [idHorario], onDelete: SetNull)
+  importaciones HorarioCurso[] @relation("ImportacionHorario")
+
+  @@map("horario_curso")
+}
+
+/// Evaluaciones de un curso, con ventana de apertura y cierre.
+model Evaluacion {
+  idEvaluacion            Int       @id @default(autoincrement()) @map("id_evaluacion")
+  idCurso                 Int       @map("id_curso")
+  nombre                  String
+  fechaApertura           DateTime? @map("fecha_apertura")
+  fechaCierre             DateTime  @map("fecha_cierre")
+  requiereEntrega         Boolean   @default(true) @map("requiere_entrega")
+  fechaEntrega            DateTime? @map("fecha_entrega")
+  fechaCreacion           DateTime  @default(now()) @map("fecha_creacion")
+  /// Si esta evaluacion se trajo de un curso importado, la evaluacion original.
+  importadoDeIdEvaluacion Int?      @map("importado_de_id_evaluacion")
+
+  curso  Curso   @relation(fields: [idCurso], references: [idCurso], onDelete: Cascade)
+  grupos Grupo[]
+
+  importadoDe   Evaluacion?  @relation("ImportacionEvaluacion", fields: [importadoDeIdEvaluacion], references: [idEvaluacion], onDelete: SetNull)
+  importaciones Evaluacion[] @relation("ImportacionEvaluacion")
+
+  @@map("evaluacion")
+}
+
+/// Trabajo grupal, con su propia fecha limite y enlace del trabajo.
+model Grupo {
+  idGrupo        Int         @id @default(autoincrement()) @map("id_grupo")
+  idCreador      Int         @map("id_creador")
+  nombre         String
+  descripcion    String?
+  idEvaluacion   Int?        @map("id_evaluacion")
+  fechaLimite    DateTime?   @map("fecha_limite")
+  enlaceTrabajo  String?     @map("enlace_trabajo")
+  estado         EstadoGrupo @default(activo)
+  fechaCreacion  DateTime    @default(now()) @map("fecha_creacion")
+
+  creador     Usuario           @relation("GrupoCreador", fields: [idCreador], references: [idUsuario])
+  evaluacion  Evaluacion?       @relation(fields: [idEvaluacion], references: [idEvaluacion], onDelete: SetNull)
+  integrantes GrupoIntegrante[]
+  tareas      Tarea[]
+
+  @@map("grupo")
+}
+
+/// Pertenencia a un grupo: rol, estado de invitacion, preferencia de correo.
+model GrupoIntegrante {
+  idIntegrante     Int              @id @default(autoincrement()) @map("id_integrante")
+  idGrupo          Int              @map("id_grupo")
+  idUsuario        Int              @map("id_usuario")
+  rol              RolIntegrante    @default(miembro)
+  estadoInvitacion EstadoInvitacion @default(pendiente) @map("estado_invitacion")
+  correoActividad  Boolean          @default(true) @map("correo_actividad")
+  fechaInvitacion  DateTime         @default(now()) @map("fecha_invitacion")
+  fechaRespuesta   DateTime?        @map("fecha_respuesta")
+
+  grupo   Grupo   @relation(fields: [idGrupo], references: [idGrupo], onDelete: Cascade)
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario])
+
+  @@unique([idGrupo, idUsuario])
+  @@map("grupo_integrante")
+}
+
+/// Tareas de un grupo, con responsable, estado y peso.
+model Tarea {
+  idTarea        Int         @id @default(autoincrement()) @map("id_tarea")
+  idGrupo        Int         @map("id_grupo")
+  idCreador      Int         @map("id_creador")
+  idAsignado     Int?        @map("id_asignado")
+  titulo         String
+  descripcion    String?
+  estado         EstadoTarea @default(pendiente)
+  peso           Int         @default(1) @db.SmallInt
+  fechaLimite    DateTime?   @map("fecha_limite")
+  fechaTerminada DateTime?   @map("fecha_terminada")
+  fechaCreacion  DateTime    @default(now()) @map("fecha_creacion")
+
+  grupo     Grupo            @relation(fields: [idGrupo], references: [idGrupo], onDelete: Cascade)
+  creador   Usuario          @relation("TareaCreador", fields: [idCreador], references: [idUsuario])
+  asignado  Usuario?         @relation("TareaAsignado", fields: [idAsignado], references: [idUsuario])
+  historial TareaHistorial[]
+
+  @@index([idGrupo, estado])
+  @@map("tarea")
+}
+
+/// Registro inmutable de cambios de cada tarea.
+model TareaHistorial {
+  idHistorial    Int             @id @default(autoincrement()) @map("id_historial")
+  idTarea        Int             @map("id_tarea")
+  idUsuario      Int             @map("id_usuario")
+  accion         AccionHistorial
+  valorAnterior  String?         @map("valor_anterior")
+  valorNuevo     String?         @map("valor_nuevo")
+  fecha          DateTime        @default(now())
+
+  tarea   Tarea   @relation(fields: [idTarea], references: [idTarea], onDelete: Cascade)
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario])
+
+  @@map("tarea_historial")
+}
+
+/// Avisos por destinatario, con estado de envio de correo.
+model Notificacion {
+  idNotificacion Int              @id @default(autoincrement()) @map("id_notificacion")
+  idUsuario      Int              @map("id_usuario")
+  tipo           TipoNotificacion
+  mensaje        String
+  enlace         String?
+  leida          Boolean          @default(false)
+  estadoCorreo   EstadoCorreo     @default(no_aplica) @map("estado_correo")
+  fechaCreacion  DateTime         @default(now()) @map("fecha_creacion")
+
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
+
+  @@index([idUsuario, leida])
+  @@map("notificacion")
+}

@@ -1,0 +1,17 @@
+services:
+  db:
+    image: postgres:17
+    container_name: educontrol-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: educontrol
+      POSTGRES_PASSWORD: educontrol_dev
+      POSTGRES_DB: educontrol
+    ports:
+      # 5433 en el host porque el 5432 ya lo usa otro Postgres local (ver AGENTS.md, seccion 11)
+      - "5433:5432"
+    volumes:
+      - educontrol_pgdata:/var/lib/postgresql/data
+
+volumes:
+  educontrol_pgdata:
