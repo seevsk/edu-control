@@ -1,9 +1,15 @@
 import Link from "next/link";
 import { requerirSesion } from "@/server/auth/session";
-import { listarCursos } from "@/server/services/curso";
+import { listarCursos, listarCursosImportables } from "@/server/services/curso";
 import { colorCurso, inicialesCurso } from "@/lib/color-curso";
 import { formatearFechaLima, timeAHora, DIAS_SEMANA } from "@/lib/dates";
-import { crearCursoAction, alternarActivoCursoAction, eliminarCursoAction } from "./actions";
+import {
+  crearCursoAction,
+  alternarActivoCursoAction,
+  eliminarCursoAction,
+  importarCursoAction,
+  sincronizarCursoAction,
+} from "./actions";
 import { SubmitButton } from "@/components/submit-button";
 import { MenuAcciones } from "@/components/menu-acciones";
 import { IconReloj, IconCalendario } from "@/components/icons";
@@ -25,6 +31,7 @@ export default async function CursosPage({
   const { error, toast, vista } = await searchParams;
   const verInactivos = vista === "inactivos";
   const cursos = await listarCursos(sesion.idUsuario, !verInactivos);
+  const importables = verInactivos ? [] : await listarCursosImportables(sesion.idUsuario);
 
   return (
     <div className="animate-page-in mx-auto flex max-w-4xl flex-col gap-6">
@@ -52,6 +59,51 @@ export default async function CursosPage({
         <p className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
           {error}
         </p>
+      ) : null}
+
+      {importables.length > 0 ? (
+        <section className="flex flex-col gap-2 rounded-md border border-primary/30 bg-primary-soft p-4">
+          <h2 className="text-sm font-medium">Disponibles de tus grupos</h2>
+          <p className="text-xs text-text-muted">
+            Estos cursos son de alguien que te invito a un grupo. Traelos para no escribirlos de
+            nuevo a mano.
+          </p>
+          <ul className="flex flex-col gap-2">
+            {importables.map(({ cursoFuente, idGrupo, idCursoLocal, hayActualizaciones }) => (
+              <li
+                key={cursoFuente.idCurso}
+                className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-3 py-2 text-sm"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{cursoFuente.nombre}</p>
+                  <p className="truncate text-xs text-text-muted">
+                    {[cursoFuente.codigo, cursoFuente.docente].filter(Boolean).join(" · ") ||
+                      "Sin detalles"}
+                  </p>
+                </div>
+                {idCursoLocal && hayActualizaciones ? (
+                  <form action={sincronizarCursoAction.bind(null, idCursoLocal)}>
+                    <SubmitButton
+                      className="shrink-0 text-xs font-medium text-primary hover:underline"
+                      pendingText="Actualizando..."
+                    >
+                      Traer actualizaciones
+                    </SubmitButton>
+                  </form>
+                ) : (
+                  <form action={importarCursoAction.bind(null, idGrupo, "/cursos")}>
+                    <SubmitButton
+                      className="shrink-0 text-xs font-medium text-primary hover:underline"
+                      pendingText="Importando..."
+                    >
+                      Importar
+                    </SubmitButton>
+                  </form>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -143,7 +195,7 @@ export default async function CursosPage({
                 name="nombre"
                 required
                 maxLength={120}
-                className="rounded-md border border-border-strong px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className="rounded-md border border-border-strong px-3 py-1.5 text-sm"
               />
             </label>
             <label className="flex flex-col gap-1 text-sm">
@@ -151,7 +203,7 @@ export default async function CursosPage({
               <input
                 name="codigo"
                 maxLength={30}
-                className="rounded-md border border-border-strong px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className="rounded-md border border-border-strong px-3 py-1.5 text-sm"
               />
             </label>
             <label className="flex flex-col gap-1 text-sm">
@@ -159,7 +211,7 @@ export default async function CursosPage({
               <input
                 name="docente"
                 maxLength={120}
-                className="rounded-md border border-border-strong px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className="rounded-md border border-border-strong px-3 py-1.5 text-sm"
               />
             </label>
             <label className="flex flex-col gap-1 text-sm">
@@ -167,7 +219,7 @@ export default async function CursosPage({
               <select
                 name="modalidad"
                 defaultValue=""
-                className="rounded-md border border-border-strong bg-surface px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className="rounded-md border border-border-strong bg-surface px-3 py-1.5 text-sm"
               >
                 <option value="">Sin especificar</option>
                 <option value="presencial">Presencial</option>
