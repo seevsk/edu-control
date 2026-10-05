@@ -7,10 +7,14 @@ export function horaATime(hhmm: string): Date {
 }
 
 /** Lee una columna `time` de Prisma y la formatea como "HH:mm" (24h). */
+/** Lee una columna `time` de Prisma y la formatea en 12h (ej. "7:00 PM"). Solo cambia como se
+ * muestra: la columna sigue siendo un `time` normal, nada de esto toca la base de datos. */
 export function timeAHora(fecha: Date): string {
-  const horas = fecha.getUTCHours().toString().padStart(2, "0");
+  const horas24 = fecha.getUTCHours();
   const minutos = fecha.getUTCMinutes().toString().padStart(2, "0");
-  return `${horas}:${minutos}`;
+  const sufijo = horas24 < 12 ? "AM" : "PM";
+  const horas12 = horas24 % 12 === 0 ? 12 : horas24 % 12;
+  return `${horas12}:${minutos} ${sufijo}`;
 }
 
 /** "2026-10-05" (America/Lima, sin hora) -> 23:59 hora Lima, como instante UTC. */
