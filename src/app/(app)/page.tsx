@@ -2,25 +2,27 @@ import Link from "next/link";
 import { requerirSesion } from "@/server/auth/session";
 import { obtenerUsuarioActual } from "@/server/services/usuario";
 import { listarTareasAsignadasAlUsuario } from "@/server/services/tarea";
-import { yaImportoCurso } from "@/server/services/curso";
+import { listarEvaluacionesProximas, yaImportoCurso } from "@/server/services/curso";
 import { formatearFechaLima } from "@/lib/dates";
 import { ETIQUETA_ESTADO_TAREA, COLOR_ESTADO_TAREA } from "@/lib/estado-tarea";
 import { SubmitButton } from "@/components/submit-button";
+import { Toast } from "@/components/toast";
 import { importarCursoAction } from "./cursos/actions";
 
 export default async function InicioPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; toast?: string }>;
 }) {
   const sesion = await requerirSesion();
-  const { error } = await searchParams;
-  const [usuario, tareas] = await Promise.all([
+  const { error, toast } = await searchParams;
+  const [usuario, evaluaciones, tareas] = await Promise.all([
     obtenerUsuarioActual(sesion.idUsuario),
+    listarEvaluacionesProximas(sesion.idUsuario),
     listarTareasAsignadasAlUsuario(sesion.idUsuario),
   ]);
 
-  const tarjetas = await Promise.all(
+  const tarjetasTareas = await Promise.all(
     tareas.map(async (tarea) => {
       const curso = tarea.grupo.evaluacion?.curso ?? null;
       const puedeImportar =
@@ -32,10 +34,12 @@ export default async function InicioPage({
   );
 
   return (
-    <div className="animate-page-in mx-auto flex max-w-2xl flex-col gap-6">
+    <div className="animate-page-in mx-auto flex max-w-2xl flex-col gap-8">
+      <Toast mensaje={toast} />
+
       <div>
         <h1 className="text-xl font-semibold">Hola, {usuario.nombre}</h1>
-        <p className="mt-1 text-sm text-text-muted">Esto es lo que tenes pendiente en tus grupos.</p>
+        <p className="mt-1 text-sm text-text-muted">Esto es lo que tenes pendiente.</p>
       </div>
 
       {error ? (
@@ -45,9 +49,34 @@ export default async function InicioPage({
       ) : null}
 
       <section>
+        <h2 className="text-sm font-medium text-text-muted">Mis evaluaciones</h2>
+        <div className="mt-2 grid gap-3 sm:grid-cols-2">
+          {evaluaciones.map((evaluacion) => (
+            <Link
+              key={evaluacion.idEvaluacion}
+              href={`/cursos/${evaluacion.idCurso}`}
+              className="flex flex-col gap-1 rounded-md border border-border bg-surface p-3 text-sm hover:border-border-strong"
+            >
+              <p className="font-medium">{evaluacion.nombre}</p>
+              <p className="truncate text-xs text-text-muted">{evaluacion.curso.nombre}</p>
+              <p className="text-xs text-text-muted">
+                Cierra: {formatearFechaLima(evaluacion.fechaCierre)}
+              </p>
+            </Link>
+          ))}
+          {evaluaciones.length === 0 ? (
+            <p className="text-sm text-text-muted sm:col-span-2">
+              No tenes evaluaciones proximas. En cuanto registres una en un curso, va a aparecer
+              aqui.
+            </p>
+          ) : null}
+        </div>
+      </section>
+
+      <section>
         <h2 className="text-sm font-medium text-text-muted">Mis tareas asignadas</h2>
         <div className="mt-2 grid gap-3 sm:grid-cols-2">
-          {tarjetas.map(({ tarea, curso, puedeImportar }) => (
+          {tarjetasTareas.map(({ tarea, curso, puedeImportar }) => (
             <div
               key={tarea.idTarea}
               className="flex flex-col gap-2 rounded-md border border-border bg-surface p-3 text-sm"

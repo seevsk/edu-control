@@ -82,7 +82,15 @@ export default async function TareasGrupoPage({
               "Sin asignar"
             )}
           </span>
-          <span>{"●".repeat(tarea.peso)}</span>
+          <span className="flex items-center gap-1" aria-label={`Peso ${tarea.peso} de 3`}>
+            {[1, 2, 3].map((nivel) => (
+              <span
+                key={nivel}
+                className={`size-1.5 rounded-full ${nivel <= tarea.peso ? "bg-primary" : "bg-border-strong"}`}
+                aria-hidden
+              />
+            ))}
+          </span>
         </div>
         {tarea.fechaLimite ? (
           <p className="text-xs text-text-muted">Limite: {formatearFechaLima(tarea.fechaLimite)}</p>
