@@ -85,6 +85,25 @@ export function IconBuscar(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function IconReloj(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="10" cy="10" r="6.75" />
+      <path d="M10 6.5V10l2.6 1.6" />
+    </svg>
+  );
+}
+
+export function IconMas(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)} fill="currentColor" stroke="none">
+      <circle cx="10" cy="4.5" r="1.4" />
+      <circle cx="10" cy="10" r="1.4" />
+      <circle cx="10" cy="15.5" r="1.4" />
+    </svg>
+  );
+}
+
 export function IconGoogle(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 20 20" {...props}>
