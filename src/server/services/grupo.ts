@@ -127,6 +127,27 @@ export async function buscarUsuarios(idUsuarioActual: number, consulta: string) 
   });
 }
 
+/** Buscador general de personas: mismas reglas que buscarUsuarios, pero sin correo (perfil publico). */
+export async function buscarPersonas(idUsuarioActual: number, consulta: string) {
+  const encontrados = await buscarUsuarios(idUsuarioActual, consulta);
+  if (encontrados.length === 0) return [];
+
+  const perfiles = await prisma.perfil.findMany({
+    where: { idUsuario: { in: encontrados.map((u) => u.idUsuario) } },
+    select: { idUsuario: true, carrera: true, institucion: true },
+  });
+  const porUsuario = new Map(perfiles.map((p) => [p.idUsuario, p]));
+
+  return encontrados.map(({ idUsuario, nombre, apellidos, fotoUrl }) => ({
+    idUsuario,
+    nombre,
+    apellidos,
+    fotoUrl,
+    carrera: porUsuario.get(idUsuario)?.carrera ?? null,
+    institucion: porUsuario.get(idUsuario)?.institucion ?? null,
+  }));
+}
+
 export async function invitarIntegrante(idActor: number, idGrupo: number, idUsuarioInvitado: number) {
   const grupo = await requerirLiderDelGrupo(idActor, idGrupo);
   if (grupo.estado !== "activo") throw new ErrorDeNegocio("El grupo esta finalizado");
