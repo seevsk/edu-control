@@ -15,6 +15,8 @@ import { MenuAcciones } from "@/components/menu-acciones";
 import { Toast } from "@/components/toast";
 import { IconoCurso } from "@/components/icono-curso";
 import { DatosTarjeta } from "@/components/datos-tarjeta";
+import { ChipModalidad } from "@/components/chip-modalidad";
+import { EncabezadoTarjeta } from "@/components/encabezado-tarjeta";
 
 function proximaClase(horarios: { diaSemana: number; horaInicio: Date }[]) {
   if (horarios.length === 0) return null;
@@ -123,20 +125,15 @@ export default async function CursosPage({
               className="flex flex-col gap-3 rounded-md border border-border bg-surface p-4"
             >
               <div className="flex items-start gap-2">
-                <Link
-                  href={`/cursos/${curso.idCurso}`}
-                  className="flex min-w-0 flex-1 items-start gap-3 hover:opacity-90"
-                >
-                  <IconoCurso nombre={curso.nombre} codigo={curso.codigo} />
-                  <p className="min-w-0 pt-0.5 text-sm font-medium leading-snug">{curso.nombre}</p>
+                <Link href={`/cursos/${curso.idCurso}`} className="min-w-0 flex-1 text-sm hover:opacity-90">
+                  <EncabezadoTarjeta
+                    etiqueta="Nombre del curso"
+                    titulo={curso.nombre}
+                    icono={<IconoCurso nombre={curso.nombre} codigo={curso.codigo} />}
+                  />
                 </Link>
 
                 <div className="flex shrink-0 items-center gap-1">
-                  {curso.modalidad ? (
-                    <span className="rounded-sm border border-border px-1.5 py-0.5 text-[11px] text-text-muted">
-                      {curso.modalidad}
-                    </span>
-                  ) : null}
                   <MenuAcciones etiqueta={`Mas opciones de ${curso.nombre}`}>
                     <Link href={`/cursos/${curso.idCurso}`} className="px-3 py-1.5 text-left text-sm hover:bg-bg">
                       Editar
@@ -159,6 +156,7 @@ export default async function CursosPage({
                 datos={[
                   { etiqueta: "Código", valor: curso.codigo },
                   { etiqueta: "Docente", valor: curso.docente },
+                  { etiqueta: "Modalidad", valor: curso.modalidad ? <ChipModalidad modalidad={curso.modalidad} /> : null },
                 ]}
               />
 

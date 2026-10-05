@@ -11,6 +11,8 @@ import { Toast } from "@/components/toast";
 import { IconoCurso } from "@/components/icono-curso";
 import { AvataresGrupo } from "@/components/avatares-grupo";
 import { DatosTarjeta } from "@/components/datos-tarjeta";
+import { ChipModalidad } from "@/components/chip-modalidad";
+import { EncabezadoTarjeta } from "@/components/encabezado-tarjeta";
 import { importarCursoAction } from "./cursos/actions";
 
 const TARJETA = "flex flex-col gap-3 rounded-md border border-border bg-surface p-3.5 text-sm transition-colors duration-150";
@@ -61,20 +63,27 @@ export default async function InicioPage({
               href={`/cursos/${evaluacion.idCurso}`}
               className={`${TARJETA} hover:border-border-strong`}
             >
-              <div className="flex items-start gap-3">
-                <IconoCurso nombre={evaluacion.curso.nombre} codigo={evaluacion.curso.codigo} />
-                <p className="min-w-0 pt-0.5 font-medium leading-snug">{evaluacion.nombre}</p>
-              </div>
-              <DatosTarjeta
-                datos={[
-                  { etiqueta: "Curso", valor: evaluacion.curso.nombre },
-                  {
-                    etiqueta: "Finaliza",
-                    valor: etiquetaRelativa(evaluacion.fechaCierre),
-                    titulo: formatearFechaLima(evaluacion.fechaCierre),
-                  },
-                ]}
+              <EncabezadoTarjeta
+                etiqueta="Nombre de la evaluación"
+                titulo={evaluacion.nombre}
+                icono={<IconoCurso nombre={evaluacion.curso.nombre} codigo={evaluacion.curso.codigo} />}
               />
+              <div className="border-t border-border pt-2.5">
+                <DatosTarjeta
+                  datos={[
+                    { etiqueta: "Nombre del curso", valor: evaluacion.curso.nombre },
+                    {
+                      etiqueta: "Modalidad",
+                      valor: evaluacion.curso.modalidad ? <ChipModalidad modalidad={evaluacion.curso.modalidad} /> : null,
+                    },
+                    {
+                      etiqueta: "Finaliza",
+                      valor: etiquetaRelativa(evaluacion.fechaCierre),
+                      titulo: formatearFechaLima(evaluacion.fechaCierre),
+                    },
+                  ]}
+                />
+              </div>
             </Link>
           ))}
           {evaluaciones.length === 0 ? (
@@ -91,7 +100,8 @@ export default async function InicioPage({
           {tarjetasTareas.map(({ tarea, curso, puedeImportar }) => (
             <div key={tarea.idTarea} className={TARJETA}>
               <Link href={`/grupos/${tarea.idGrupo}/tareas`} className="flex flex-1 flex-col gap-3 hover:opacity-90">
-                <p className="font-medium leading-snug">{tarea.titulo}</p>
+                <EncabezadoTarjeta etiqueta="Asignación de tarea" titulo={tarea.titulo} />
+                <div className="border-t border-border pt-2.5">
                 <DatosTarjeta
                   datos={[
                     {
@@ -108,8 +118,9 @@ export default async function InicioPage({
                       ),
                       titulo: ETIQUETA_ESTADO_TAREA[tarea.estado],
                     },
-                    { etiqueta: "Grupo", valor: tarea.grupo.nombre },
-                    { etiqueta: "Curso", valor: curso?.nombre },
+                    { etiqueta: "Nombre del grupo", valor: tarea.grupo.nombre },
+                    { etiqueta: "Nombre del curso", valor: curso?.nombre },
+                    { etiqueta: "Modalidad", valor: curso?.modalidad ? <ChipModalidad modalidad={curso.modalidad} /> : null },
                     {
                       etiqueta: "Finaliza",
                       valor: tarea.fechaLimite ? etiquetaRelativa(tarea.fechaLimite) : null,
@@ -117,6 +128,7 @@ export default async function InicioPage({
                     },
                   ]}
                 />
+                </div>
               </Link>
 
               <div className="flex items-end justify-between gap-2 border-t border-border pt-2.5">

@@ -9,6 +9,8 @@ import { SubmitButton } from "@/components/submit-button";
 import { IconoCurso } from "@/components/icono-curso";
 import { AvataresGrupo } from "@/components/avatares-grupo";
 import { DatosTarjeta } from "@/components/datos-tarjeta";
+import { ChipModalidad } from "@/components/chip-modalidad";
+import { EncabezadoTarjeta } from "@/components/encabezado-tarjeta";
 
 export default async function GruposPage({
   searchParams,
@@ -41,13 +43,16 @@ export default async function GruposPage({
                 href={`/grupos/${grupo.idGrupo}`}
                 className="flex h-full flex-col gap-3 rounded-md border border-border bg-surface p-3.5 text-sm transition-colors duration-150 hover:border-border-strong"
               >
-                <div className="flex items-start gap-3">
-                  <IconoCurso nombre={curso?.nombre ?? grupo.nombre} codigo={curso?.codigo} />
-                  <p className="min-w-0 pt-0.5 font-medium leading-snug">{grupo.nombre}</p>
-                </div>
+                <EncabezadoTarjeta
+                  etiqueta="Nombre del grupo"
+                  titulo={grupo.nombre}
+                  icono={<IconoCurso nombre={curso?.nombre ?? grupo.nombre} codigo={curso?.codigo} />}
+                />
+                <div className="border-t border-border pt-2.5">
                 <DatosTarjeta
                   datos={[
-                    { etiqueta: "Curso", valor: curso?.nombre },
+                    { etiqueta: "Nombre del curso", valor: curso?.nombre },
+                    { etiqueta: "Modalidad", valor: curso?.modalidad ? <ChipModalidad modalidad={curso.modalidad} /> : null },
                     {
                       etiqueta: "Finaliza",
                       valor: grupo.fechaLimite ? etiquetaRelativa(grupo.fechaLimite) : null,
@@ -68,9 +73,11 @@ export default async function GruposPage({
                     },
                   ]}
                 />
-                <div className="mt-auto flex items-center justify-between gap-2 border-t border-border pt-2.5 text-xs text-text-muted">
+                </div>
+                <div className="mt-auto flex items-center justify-between gap-2 border-t border-border pt-2.5 text-xs">
                   <span>
-                    {activos.length} integrante{activos.length === 1 ? "" : "s"}
+                    <span className="text-text-muted">Número de integrantes:</span>{" "}
+                    <span className="font-medium tabular-nums">{activos.length}</span>
                   </span>
                   <AvataresGrupo personas={activos.map((i) => i.usuario)} />
                 </div>
