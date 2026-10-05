@@ -85,6 +85,17 @@ export function IconBuscar(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function IconBuscarPersonas(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="7.5" cy="6.5" r="2.7" />
+      <path d="M2.5 16c.5-3 2.4-4.6 5-4.6 1 0 1.9.2 2.6.6" />
+      <circle cx="14" cy="13" r="2.6" />
+      <path d="m16 15 1.8 1.8" />
+    </svg>
+  );
+}
+
 export function IconReloj(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base(props)}>

@@ -182,7 +182,15 @@ export default async function GrupoDetallePage({
                 />
                 <div>
                   <p className="font-medium">
-                    {integrante.usuario.nombre} {integrante.usuario.apellidos ?? ""}
+                    {integrante.idUsuario === sesion.idUsuario ? (
+                      <>
+                        {integrante.usuario.nombre} {integrante.usuario.apellidos ?? ""}
+                      </>
+                    ) : (
+                      <Link href={`/usuarios/${integrante.idUsuario}`} className="hover:text-primary hover:underline">
+                        {integrante.usuario.nombre} {integrante.usuario.apellidos ?? ""}
+                      </Link>
+                    )}
                     {integrante.rol === "lider" ? (
                       <span className="ml-2 text-xs text-text-muted">Lider</span>
                     ) : integrante.rol === "observador" ? (
@@ -241,7 +249,9 @@ export default async function GrupoDetallePage({
                       fotoUrl={persona.fotoUrl}
                       tamano="sm"
                     />
-                    {persona.nombre} {persona.apellidos ?? ""}
+                    <Link href={`/usuarios/${persona.idUsuario}`} className="hover:text-primary hover:underline">
+                      {persona.nombre} {persona.apellidos ?? ""}
+                    </Link>
                     <span className="text-xs text-text-muted">{persona.correo}</span>
                   </span>
                   {idsYaEnGrupo.has(persona.idUsuario) ? (

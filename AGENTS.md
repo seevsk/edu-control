@@ -211,6 +211,7 @@ Reglas de arquitectura:
 - Sugerir compañeros por dominio de correo solo tiene sentido si el dominio **no es genérico** (gmail.com, hotmail.com, outlook.com, live.com, yahoo.com, icloud.com, etc.). Guarda esa lista en un archivo de constantes.
 - `perfil.tipo_cuenta` (`estudiante` | `profesor`) es **solo una etiqueta autodeclarada, sin ningún permiso**. Los permisos salen únicamente de `grupo_integrante.rol`. No la muestres como insignia de "verificado".
 - **Búsqueda de compañeros:** solo usuarios registrados, no eliminados y con `visible_en_busqueda = true`. Exige correo exacto o un mínimo de caracteres, limita la cantidad de resultados y limita las invitaciones por hora. Nunca muestres datos de disponibilidad en los resultados.
+- **Perfil de otros usuarios (`/usuarios/[id]`, confirmado):** muestra primero los datos básicos: `tipo_cuenta` (como texto, no como insignia), nombres, apellidos, institución, carrera, ciclo, `trabaja` (Sí/No) y biografía, más los grupos en común. Nunca el correo. Lo ve cualquier usuario solo si la persona tiene `visible_en_busqueda = true`; sus compañeros de grupo (ambos `aceptada`) lo ven siempre. Arriba, el botón **"Ver disponibilidad"** lleva a `/usuarios/[id]/disponibilidad` solo si son compañeros (ver 8.2); si no, aparece deshabilitado. El buscador de la barra superior (`/usuarios?q=`) sigue las mismas reglas que la búsqueda para invitar y tampoco muestra el correo.
 - **Eliminar cuenta = anonimizar:** poner `eliminado_en`, vaciar nombre, apellidos, correo y foto, borrar `perfil` y `bloque_ocupado`, y conservar `tarea` y `tarea_historial` (para no romper los grupos).
 
 ### 8.2 Cursos, horarios, evaluaciones y calendario
@@ -224,7 +225,7 @@ Reglas de arquitectura:
 - `evaluacion`: pertenece a un curso. `fecha_cierre` es obligatoria. `fecha_apertura` es opcional (una evaluación presencial no tiene ventana). Si el usuario solo indica el día, usa **23:59 (America/Lima)** como hora de cierre. `requiere_entrega` indica si se sube algo; `fecha_entrega` la marca el propio usuario (`NULL` = aún no entrega) y es autodeclarada, no verificada.
 - **El calendario es una vista, no una tabla.** Eventos con fecha: cierres de evaluaciones y fechas límite de tareas de grupo. Patrones semanales (`horario_curso` y `bloque_ocupado`): franjas de fondo proyectadas sobre los días de la semana mostrada. Un bloque que cruza la medianoche se dibuja hasta las 24:00 de un día y desde las 00:00 del siguiente.
 - **Fechas:** se guardan en UTC y se muestran en `America/Lima` (UTC-5, sin horario de verano). Centraliza la conversión en `src/lib/dates`.
-- La disponibilidad es información sensible: a otros integrantes del grupo solo se les puede mostrar **ocupado/libre**, nunca el tipo de bloque ni el curso.
+- La disponibilidad es información sensible (decisión del usuario, 2026-10-05): un **compañero** (comparten un grupo donde ambos están `aceptada` y ninguno es observador) puede ver el horario semanal del otro en `/usuarios/[id]/disponibilidad`, con la misma segmentación y colores del Calendario: clases con el nombre del curso y bloques con su categoría (Laboral / Familiar-Personal). **Nunca el `detalle` de un bloque** ni las entregas. En la pestaña "Horarios" del grupo se sigue mostrando solo ocupado/libre por persona. Nadie fuera de esa condición ve la disponibilidad.
 
 ### 8.3 Grupos e invitaciones
 
@@ -422,7 +423,7 @@ Datos de ejemplo (`prisma/seed.ts`, **solo desarrollo**): varios usuarios de pru
 - No crees tareas personales ni subida de archivos.
 - No borres filas de `usuario`, `grupo_integrante` ni `tarea_historial`.
 - No confíes en un id de usuario que venga del cliente; no dejes rutas de grupo sin verificar membresía.
-- No expongas a otros usuarios el tipo de un bloque ocupado ni el detalle de la disponibilidad.
+- No expongas el `detalle` de un bloque ocupado a nadie más que su dueño, ni la disponibilidad a quien no sea compañero (ver 8.2).
 - No guardes cifras derivadas (avance, carga, cumplimiento, tiempo libre) en la base de datos.
 - No hardcodees URLs, dominios ni secretos; no subas `.env` a Git.
 - No agregues dependencias, columnas o tablas fuera de lo definido sin preguntar.
