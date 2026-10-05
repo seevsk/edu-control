@@ -323,7 +323,7 @@ Usa **Azure DevOps** como referencia visual: se siente profesional, densa en inf
 
 - Tema claro primero; deja preparados los tokens para un tema oscuro futuro.
 - Color primario azul cercano a `#0078D4`; superficies blancas; neutros muy claros para el fondo; bordes finos y sombras sutiles.
-- Radios pequeños (2–4 px), texto base de 14 px, tipografía `"Segoe UI", system-ui, sans-serif`.
+- Radios pequeños (2–4 px), texto base de 14 px, tipografía **IBM Plex Sans** (via `next/font/google`, self-hosted) con fallback a `"Segoe UI", system-ui, sans-serif`. Elegida por distintiva (no es Inter/Roboto/el default genérico) y por calzar con el tono "herramienta técnica" del producto.
 - Componentes densos y compactos, con estados de carga (*skeletons*), estados vacíos y mensajes de error claros.
 
 **Reglas transversales**

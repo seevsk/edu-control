@@ -48,7 +48,7 @@
   --color-brand-ink: var(--color-brand-ink);
   --color-brand-ink-border: var(--color-brand-ink-border);
 
-  --font-sans: "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-sans: var(--font-ibm-plex-sans), "Segoe UI", system-ui, -apple-system, sans-serif;
 
   --radius-sm: 4px;
   --radius-md: 6px;
