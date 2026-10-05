@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { requerirSesion } from "@/server/auth/session";
 import { obtenerPerfilCompleto } from "@/server/services/perfil";
 import { formatearFechaLima } from "@/lib/dates";
@@ -113,20 +112,6 @@ export default async function PerfilPage({
             Guardar cambios
           </SubmitButton>
         </form>
-      </section>
-
-      <section className="rounded-md border border-border bg-surface p-4">
-        <h2 className="text-sm font-medium">Disponibilidad</h2>
-        <p className="mt-1 text-xs text-text-muted">
-          Tus bloques de tiempo ocupado (laboral, familiar, personal) ahora se administran desde el
-          Calendario, junto a tus horarios de clase.
-        </p>
-        <Link
-          href="/calendario"
-          className="mt-3 inline-block text-sm text-primary hover:underline"
-        >
-          Ir al Calendario →
-        </Link>
       </section>
 
       <section className="rounded-md border border-danger/30 bg-danger/5 p-4">

@@ -4,10 +4,16 @@ import { obtenerUsuarioActual } from "@/server/services/usuario";
 import { listarTareasAsignadasAlUsuario } from "@/server/services/tarea";
 import { listarEvaluacionesProximas, yaImportoCurso } from "@/server/services/curso";
 import { formatearFechaLima } from "@/lib/dates";
+import { etiquetaRelativa } from "@/lib/calendario";
 import { ETIQUETA_ESTADO_TAREA, COLOR_ESTADO_TAREA } from "@/lib/estado-tarea";
 import { SubmitButton } from "@/components/submit-button";
 import { Toast } from "@/components/toast";
+import { IconoCurso } from "@/components/icono-curso";
+import { AvataresGrupo } from "@/components/avatares-grupo";
+import { DatosTarjeta } from "@/components/datos-tarjeta";
 import { importarCursoAction } from "./cursos/actions";
+
+const TARJETA = "flex flex-col gap-3 rounded-md border border-border bg-surface p-3.5 text-sm transition-colors duration-150";
 
 export default async function InicioPage({
   searchParams,
@@ -34,7 +40,7 @@ export default async function InicioPage({
   );
 
   return (
-    <div className="animate-page-in mx-auto flex max-w-2xl flex-col gap-8">
+    <div className="animate-page-in mx-auto flex max-w-3xl flex-col gap-8">
       <Toast mensaje={toast} />
 
       <div>
@@ -43,9 +49,7 @@ export default async function InicioPage({
       </div>
 
       {error ? (
-        <p className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
-          {error}
-        </p>
+        <p className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>
       ) : null}
 
       <section>
@@ -55,19 +59,27 @@ export default async function InicioPage({
             <Link
               key={evaluacion.idEvaluacion}
               href={`/cursos/${evaluacion.idCurso}`}
-              className="flex flex-col gap-1 rounded-md border border-border bg-surface p-3 text-sm hover:border-border-strong"
+              className={`${TARJETA} hover:border-border-strong`}
             >
-              <p className="font-medium">{evaluacion.nombre}</p>
-              <p className="truncate text-xs text-text-muted">{evaluacion.curso.nombre}</p>
-              <p className="text-xs text-text-muted">
-                Cierra: {formatearFechaLima(evaluacion.fechaCierre)}
-              </p>
+              <div className="flex items-start gap-3">
+                <IconoCurso nombre={evaluacion.curso.nombre} codigo={evaluacion.curso.codigo} />
+                <p className="min-w-0 pt-0.5 font-medium leading-snug">{evaluacion.nombre}</p>
+              </div>
+              <DatosTarjeta
+                datos={[
+                  { etiqueta: "Curso", valor: evaluacion.curso.nombre },
+                  {
+                    etiqueta: "Finaliza",
+                    valor: etiquetaRelativa(evaluacion.fechaCierre),
+                    titulo: formatearFechaLima(evaluacion.fechaCierre),
+                  },
+                ]}
+              />
             </Link>
           ))}
           {evaluaciones.length === 0 ? (
             <p className="text-sm text-text-muted sm:col-span-2">
-              No tenes evaluaciones proximas. En cuanto registres una en un curso, va a aparecer
-              aqui.
+              No tenes evaluaciones proximas. En cuanto registres una en un curso, va a aparecer aqui.
             </p>
           ) : null}
         </div>
@@ -77,52 +89,53 @@ export default async function InicioPage({
         <h2 className="text-sm font-medium text-text-muted">Mis tareas asignadas</h2>
         <div className="mt-2 grid gap-3 sm:grid-cols-2">
           {tarjetasTareas.map(({ tarea, curso, puedeImportar }) => (
-            <div
-              key={tarea.idTarea}
-              className="flex flex-col gap-2 rounded-md border border-border bg-surface p-3 text-sm"
-            >
-              <Link
-                href={`/grupos/${tarea.idGrupo}/tareas`}
-                className="flex flex-col gap-2 hover:opacity-90"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <p className="font-medium">{tarea.titulo}</p>
-                  <span className="flex shrink-0 items-center gap-1.5 text-xs text-text-muted">
-                    <span
-                      className="size-2 rounded-full"
-                      style={{ backgroundColor: COLOR_ESTADO_TAREA[tarea.estado] }}
-                      aria-hidden
-                    />
-                    {ETIQUETA_ESTADO_TAREA[tarea.estado]}
-                  </span>
-                </div>
-                <p className="truncate text-xs text-text-muted">
-                  {tarea.grupo.nombre}
-                  {curso ? ` · ${curso.nombre}` : ""}
-                </p>
-                {tarea.fechaLimite ? (
-                  <p className="text-xs text-text-muted">
-                    Limite: {formatearFechaLima(tarea.fechaLimite)}
-                  </p>
-                ) : null}
+            <div key={tarea.idTarea} className={TARJETA}>
+              <Link href={`/grupos/${tarea.idGrupo}/tareas`} className="flex flex-1 flex-col gap-3 hover:opacity-90">
+                <p className="font-medium leading-snug">{tarea.titulo}</p>
+                <DatosTarjeta
+                  datos={[
+                    {
+                      etiqueta: "Estado",
+                      valor: (
+                        <span className="inline-flex items-center gap-1.5">
+                          <span
+                            className="size-2 rounded-full"
+                            style={{ backgroundColor: COLOR_ESTADO_TAREA[tarea.estado] }}
+                            aria-hidden
+                          />
+                          {ETIQUETA_ESTADO_TAREA[tarea.estado]}
+                        </span>
+                      ),
+                      titulo: ETIQUETA_ESTADO_TAREA[tarea.estado],
+                    },
+                    { etiqueta: "Grupo", valor: tarea.grupo.nombre },
+                    { etiqueta: "Curso", valor: curso?.nombre },
+                    {
+                      etiqueta: "Finaliza",
+                      valor: tarea.fechaLimite ? etiquetaRelativa(tarea.fechaLimite) : null,
+                      titulo: tarea.fechaLimite ? formatearFechaLima(tarea.fechaLimite) : undefined,
+                    },
+                  ]}
+                />
               </Link>
 
-              {puedeImportar ? (
-                <form action={importarCursoAction.bind(null, tarea.idGrupo, "/")}>
-                  <SubmitButton
-                    className="text-xs text-primary hover:underline"
-                    pendingText="Importando..."
-                  >
-                    Traer &quot;{curso!.nombre}&quot; a mis cursos
-                  </SubmitButton>
-                </form>
-              ) : null}
+              <div className="flex items-end justify-between gap-2 border-t border-border pt-2.5">
+                {puedeImportar ? (
+                  <form action={importarCursoAction.bind(null, tarea.idGrupo, "/")}>
+                    <SubmitButton className="text-xs text-primary hover:underline" pendingText="Importando...">
+                      Traer &quot;{curso!.nombre}&quot; a mis cursos
+                    </SubmitButton>
+                  </form>
+                ) : (
+                  <span />
+                )}
+                <AvataresGrupo personas={tarea.grupo.integrantes.map((i) => i.usuario)} />
+              </div>
             </div>
           ))}
           {tareas.length === 0 ? (
             <p className="text-sm text-text-muted sm:col-span-2">
-              No tenes tareas asignadas por ahora. Cuando te asignen una en un grupo, va a
-              aparecer aqui.
+              No tenes tareas asignadas por ahora. Cuando te asignen una en un grupo, va a aparecer aqui.
             </p>
           ) : null}
         </div>

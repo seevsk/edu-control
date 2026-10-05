@@ -12,7 +12,10 @@ const LIMITE_INVITACIONES_POR_HORA = 20;
 export async function listarMisGrupos(idUsuario: number) {
   return prisma.grupo.findMany({
     where: { integrantes: { some: { idUsuario, estadoInvitacion: "aceptada" } } },
-    include: { integrantes: { include: { usuario: true } } },
+    include: {
+      integrantes: { include: { usuario: true }, orderBy: { fechaInvitacion: "asc" } },
+      evaluacion: { include: { curso: { select: { nombre: true, codigo: true } } } },
+    },
     orderBy: { fechaCreacion: "desc" },
   });
 }
