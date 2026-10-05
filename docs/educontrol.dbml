@@ -30,6 +30,7 @@ CREATE TABLE "bloque_ocupado" (
   "dia_semana" smallint NOT NULL,
   "hora_inicio" time NOT NULL,
   "hora_fin" time NOT NULL,
+  "detalle" varchar(120),
   "fecha_creacion" timestamp DEFAULT (now())
 );
 
@@ -151,6 +152,8 @@ COMMENT ON COLUMN "bloque_ocupado"."tipo" IS 'laboral | familiar | personal';
 COMMENT ON COLUMN "bloque_ocupado"."dia_semana" IS '1 = lunes ... 7 = domingo. Es el día en que EMPIEZA el bloque';
 
 COMMENT ON COLUMN "bloque_ocupado"."hora_fin" IS 'Si hora_fin < hora_inicio, el bloque cruza la medianoche';
+
+COMMENT ON COLUMN "bloque_ocupado"."detalle" IS 'Descripcion opcional y libre del bloque (ej. "Turno en la tienda"). Nunca se muestra a otros integrantes de un grupo';
 
 COMMENT ON COLUMN "curso"."id_usuario" IS 'Cada usuario registra sus propios cursos';
 

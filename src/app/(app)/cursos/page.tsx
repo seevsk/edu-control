@@ -25,10 +25,10 @@ function proximaClase(horarios: { diaSemana: number; horaInicio: Date }[]) {
 export default async function CursosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; toast?: string; vista?: string }>;
+  searchParams: Promise<{ error?: string; toast?: string; vista?: string; nuevo?: string }>;
 }) {
   const sesion = await requerirSesion();
-  const { error, toast, vista } = await searchParams;
+  const { error, toast, vista, nuevo } = await searchParams;
   const verInactivos = vista === "inactivos";
   const cursos = await listarCursos(sesion.idUsuario, !verInactivos);
   const importables = verInactivos ? [] : await listarCursosImportables(sesion.idUsuario);
@@ -186,7 +186,11 @@ export default async function CursosPage({
       ) : null}
 
       {!verInactivos ? (
-        <details className="rounded-md border border-border bg-surface p-4" open={cursos.length === 0}>
+        <details
+          id="agregar-curso"
+          className="scroll-mt-4 rounded-md border border-border bg-surface p-4"
+          open={cursos.length === 0 || nuevo === "1"}
+        >
           <summary className="cursor-pointer text-sm font-medium">Agregar curso</summary>
           <form action={crearCursoAction} className="mt-4 grid gap-3 sm:grid-cols-2">
             <label className="flex flex-col gap-1 text-sm sm:col-span-2">

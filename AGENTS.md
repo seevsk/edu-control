@@ -329,7 +329,7 @@ Usa **Azure DevOps** como referencia visual: se siente profesional, densa en inf
 **Reglas transversales**
 
 - **Responsivo y móvil primero:** los estudiantes consultarán desde el celular.
-- Textos de la interfaz **en español (Perú)**. Fechas `dd/mm/aaaa`, horas en formato de 24 h (evita ambigüedades con turnos nocturnos).
+- Textos de la interfaz **en español (Perú)**. Fechas `dd/mm/aaaa`, horas en formato de 12 h con AM/PM (`src/lib/dates.ts#timeAHora`); los turnos que cruzan la medianoche se distinguen por contexto (bloque dibujado hasta las 12:00 AM y desde las 12:00 AM del día siguiente), no por el formato de hora.
 - Accesibilidad básica: contraste suficiente, navegación por teclado y foco visible.
 - No agregues una librería de componentes ni de íconos sin consultarlo.
 

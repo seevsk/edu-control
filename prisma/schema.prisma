@@ -126,6 +126,7 @@ model BloqueOcupado {
   diaSemana       Int        @map("dia_semana") @db.SmallInt
   horaInicio      DateTime   @map("hora_inicio") @db.Time()
   horaFin         DateTime   @map("hora_fin") @db.Time()
+  detalle         String?    @db.VarChar(120)
   fechaCreacion   DateTime   @default(now()) @map("fecha_creacion")
 
   usuario Usuario @relation(fields: [idUsuario], references: [idUsuario])

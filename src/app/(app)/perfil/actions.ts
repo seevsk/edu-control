@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requerirSesion } from "@/server/auth/session";
-import { actualizarPerfilSchema, crearBloqueOcupadoSchema, eliminarCuentaSchema } from "@/lib/validation/perfil";
+import { actualizarPerfilSchema, eliminarCuentaSchema } from "@/lib/validation/perfil";
 import { mensajeParaUsuario } from "@/lib/errores";
 import * as perfilService from "@/server/services/perfil";
 
@@ -30,26 +30,6 @@ export async function actualizarPerfilAction(formData: FormData) {
     redirect(`/perfil?error=${encodeURIComponent(mensajeParaUsuario(error))}`);
   }
 
-  revalidatePath("/perfil");
-  redirect("/perfil");
-}
-
-export async function crearBloqueOcupadoAction(formData: FormData) {
-  const sesion = await requerirSesion();
-  const parseo = crearBloqueOcupadoSchema.safeParse(leerFormData(formData));
-
-  if (!parseo.success) {
-    redirect(`/perfil?error=${encodeURIComponent(parseo.error.issues[0].message)}`);
-  }
-
-  await perfilService.crearBloqueOcupado(sesion.idUsuario, parseo.data);
-  revalidatePath("/perfil");
-  redirect("/perfil");
-}
-
-export async function eliminarBloqueOcupadoAction(idBloqueOcupado: number) {
-  const sesion = await requerirSesion();
-  await perfilService.eliminarBloqueOcupado(sesion.idUsuario, idBloqueOcupado);
   revalidatePath("/perfil");
   redirect("/perfil");
 }

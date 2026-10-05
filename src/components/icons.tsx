@@ -94,6 +94,30 @@ export function IconReloj(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function IconChevronIzquierda(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 4.5 6.5 10l5.5 5.5" />
+    </svg>
+  );
+}
+
+export function IconChevronDerecha(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="M8 4.5 13.5 10 8 15.5" />
+    </svg>
+  );
+}
+
+export function IconAgregar(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="M10 4.5v11M4.5 10h11" />
+    </svg>
+  );
+}
+
 export function IconMas(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base(props)} fill="currentColor" stroke="none">
