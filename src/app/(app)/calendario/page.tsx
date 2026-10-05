@@ -2,171 +2,137 @@ import Link from "next/link";
 import { requerirSesion } from "@/server/auth/session";
 import { obtenerSemanaCalendario } from "@/server/services/calendario";
 import {
-  lunesDeSemanaISO,
-  sumarDiasISO,
-  segmentosDelBloque,
-  posicionEnGrid,
+  etiquetaSemana,
   fechaEnZonaLimaISO,
-  HORA_INICIO_GRID,
-  HORA_FIN_GRID,
+  lunesDeSemanaISO,
+  minutosDelDiaLima,
+  sumarDiasISO,
+  type CategoriaCalendario,
 } from "@/lib/calendario";
-import { formatearFechaLima } from "@/lib/dates";
+import { IconAgregar, IconChevronDerecha, IconChevronIzquierda } from "@/components/icons";
+import { Toast } from "@/components/toast";
+import { construirEntregas, construirItems } from "./_components/items";
+import { SegmentoCategorias, type VistaCalendario } from "./_components/segmento-categorias";
+import { SemanaGrid } from "./_components/semana-grid";
+import { AgendaSemana } from "./_components/agenda-semana";
+import { consultaCalendario } from "./_components/rutas";
 
-const NOMBRES_DIA = ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"];
-
-const COLOR_BLOQUE: Record<string, string> = {
-  laboral: "var(--color-estado-revision)",
-  familiar: "var(--color-estado-completada)",
-  personal: "var(--color-text-muted)",
+const TEXTOS: Record<VistaCalendario, { vacio: string; diaLibre: string }> = {
+  todo: { vacio: "Sin clases ni bloques esta semana.", diaLibre: "Libre" },
+  clases: { vacio: "Sin clases esta semana.", diaLibre: "Sin clases" },
+  laboral: { vacio: "Sin horario laboral.", diaLibre: "Sin horario laboral" },
+  fam: { vacio: "Sin bloques familiares o personales.", diaLibre: "Sin bloques" },
 };
 
-const ALTURA_GRID_PX = (HORA_FIN_GRID - HORA_INICIO_GRID) * 40;
+function esVista(valor: string | undefined): valor is VistaCalendario {
+  return valor === "todo" || valor === "clases" || valor === "laboral" || valor === "fam";
+}
 
 export default async function CalendarioPage({
   searchParams,
 }: {
-  searchParams: Promise<{ semana?: string }>;
+  searchParams: Promise<{ semana?: string; vista?: string; error?: string; toast?: string }>;
 }) {
   const sesion = await requerirSesion();
-  const { semana } = await searchParams;
+  const { semana, vista: vistaParam, error, toast } = await searchParams;
+  const vista: VistaCalendario = esVista(vistaParam) ? vistaParam : "todo";
 
-  const lunesISO = lunesDeSemanaISO(semana ? new Date(`${semana}T12:00:00-05:00`) : new Date());
+  const ahora = new Date();
+  const hoyISO = fechaEnZonaLimaISO(ahora);
+  const semanaValida = semana && /^\d{4}-\d{2}-\d{2}$/.test(semana) ? semana : null;
+  const lunesISO = lunesDeSemanaISO(semanaValida ? new Date(`${semanaValida}T12:00:00-05:00`) : ahora);
+  const esSemanaActual = lunesISO === lunesDeSemanaISO(ahora);
+
   const { dias, horarios, bloquesOcupados, evaluaciones, tareas } = await obtenerSemanaCalendario(
     sesion.idUsuario,
     lunesISO,
   );
 
-  const semanaAnterior = sumarDiasISO(lunesISO, -7);
-  const semanaSiguiente = sumarDiasISO(lunesISO, 7);
+  const consulta = consultaCalendario(lunesISO, vista);
+  const todosLosItems = construirItems(horarios, bloquesOcupados, consulta);
+  const items = vista === "todo" ? todosLosItems : todosLosItems.filter((item) => item.categoria === vista);
+  const entregas = construirEntregas(evaluaciones, tareas);
 
-  const segmentosPorDia = new Map<
-    number,
-    { topPct: number; heightPct: number; color: string; etiqueta: string }[]
-  >();
+  const minutosPorCategoria: Record<CategoriaCalendario, number> = { clases: 0, laboral: 0, fam: 0 };
+  for (const item of todosLosItems) minutosPorCategoria[item.categoria] += item.finMin - item.inicioMin;
 
-  for (const horario of horarios) {
-    for (const segmento of segmentosDelBloque(horario.diaSemana, horario.horaInicio, horario.horaFin)) {
-      const posicion = posicionEnGrid(segmento.inicioMin, segmento.finMin);
-      if (!posicion) continue;
-      const lista = segmentosPorDia.get(segmento.diaSemana) ?? [];
-      lista.push({ ...posicion, color: "var(--color-primary)", etiqueta: horario.etiqueta });
-      segmentosPorDia.set(segmento.diaSemana, lista);
-    }
-  }
-
-  for (const bloque of bloquesOcupados) {
-    for (const segmento of segmentosDelBloque(bloque.diaSemana, bloque.horaInicio, bloque.horaFin)) {
-      const posicion = posicionEnGrid(segmento.inicioMin, segmento.finMin);
-      if (!posicion) continue;
-      const lista = segmentosPorDia.get(segmento.diaSemana) ?? [];
-      lista.push({ ...posicion, color: COLOR_BLOQUE[bloque.tipo], etiqueta: "Ocupado" });
-      segmentosPorDia.set(segmento.diaSemana, lista);
-    }
-  }
+  const enlaceSemana = (lunes: string) => `/calendario${consultaCalendario(lunes, vista)}`;
+  const textos = TEXTOS[vista];
 
   return (
-    <div className="animate-page-in mx-auto flex max-w-5xl flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-semibold">Calendario</h1>
-        <div className="flex items-center gap-3 text-sm">
-          <Link href={`/calendario?semana=${semanaAnterior}`} className="text-primary hover:underline">
-            Semana anterior
+    <div className="animate-page-in mx-auto flex max-w-6xl flex-col gap-4">
+      <Toast mensaje={toast} />
+
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold">Calendario</h1>
+          <p className="mt-0.5 text-sm text-text-muted">{etiquetaSemana(lunesISO, Number(hoyISO.slice(0, 4)))}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {esSemanaActual ? null : (
+            <Link
+              href={`/calendario${consultaCalendario(undefined, vista)}`}
+              className="rounded-md border border-border-strong bg-surface px-3 py-1.5 text-sm font-medium transition-colors duration-150 hover:bg-bg"
+            >
+              Esta semana
+            </Link>
+          )}
+          <div className="flex overflow-hidden rounded-md border border-border-strong bg-surface">
+            <Link
+              href={enlaceSemana(sumarDiasISO(lunesISO, -7))}
+              aria-label="Semana anterior"
+              title="Semana anterior"
+              className="grid size-8 place-items-center text-text-muted transition-colors duration-150 hover:bg-bg hover:text-text"
+            >
+              <IconChevronIzquierda className="size-4" aria-hidden />
+            </Link>
+            <Link
+              href={enlaceSemana(sumarDiasISO(lunesISO, 7))}
+              aria-label="Semana siguiente"
+              title="Semana siguiente"
+              className="grid size-8 place-items-center border-l border-border-strong text-text-muted transition-colors duration-150 hover:bg-bg hover:text-text"
+            >
+              <IconChevronDerecha className="size-4" aria-hidden />
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {error ? (
+        <p role="alert" className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
+          {error}
+        </p>
+      ) : null}
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <SegmentoCategorias activa={vista} semanaISO={lunesISO} minutosPorCategoria={minutosPorCategoria} />
+        <div className="flex items-center gap-2">
+          <Link
+            href="/cursos?nuevo=1#agregar-curso"
+            className="inline-flex items-center gap-1.5 rounded-md border border-border-strong bg-surface px-3 py-1.5 text-sm font-medium transition-colors duration-150 hover:bg-bg"
+          >
+            <IconAgregar className="size-4" aria-hidden />
+            Agregar curso
           </Link>
-          <span className="text-text-muted">
-            {formatearFechaLima(new Date(`${lunesISO}T12:00:00-05:00`))} -{" "}
-            {formatearFechaLima(new Date(`${sumarDiasISO(lunesISO, 6)}T12:00:00-05:00`))}
-          </span>
-          <Link href={`/calendario?semana=${semanaSiguiente}`} className="text-primary hover:underline">
-            Semana siguiente
+          <Link
+            href={`/calendario/bloques/nuevo${consulta}`}
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white transition-colors duration-150 hover:bg-primary-hover"
+          >
+            <IconAgregar className="size-4" aria-hidden />
+            Agregar bloque
           </Link>
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-7">
-        {dias.map((diaISO, indice) => {
-          const diaSemana = indice + 1;
-          const segmentos = segmentosPorDia.get(diaSemana) ?? [];
-          const eventosDelDia = [
-            ...evaluaciones
-              .filter((e) => fechaEnZonaLimaISO(e.fechaCierre) === diaISO)
-              .map((e) => ({ tipo: "Evaluacion", nombre: `${e.curso.nombre}: ${e.nombre}` })),
-            ...tareas
-              .filter((t) => t.fechaLimite && fechaEnZonaLimaISO(t.fechaLimite) === diaISO)
-              .map((t) => ({ tipo: "Tarea", nombre: `${t.grupo.nombre}: ${t.titulo}` })),
-          ];
-
-          return (
-            <div key={diaISO} className="flex flex-col gap-2 rounded-md border border-border bg-surface p-2">
-              <p className="text-sm font-medium">
-                {NOMBRES_DIA[indice]} <span className="text-text-muted">{diaISO.slice(8, 10)}</span>
-              </p>
-
-              {eventosDelDia.length > 0 ? (
-                <ul className="flex flex-col gap-1">
-                  {eventosDelDia.map((evento, i) => (
-                    <li
-                      key={i}
-                      className={`truncate rounded-sm px-1.5 py-0.5 text-[11px] ${
-                        evento.tipo === "Evaluacion"
-                          ? "bg-danger/10 text-danger"
-                          : "bg-primary-soft text-primary"
-                      }`}
-                      title={evento.nombre}
-                    >
-                      {evento.nombre}
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-
-              <div className="relative overflow-hidden rounded-sm bg-bg" style={{ height: ALTURA_GRID_PX }}>
-                {Array.from({ length: HORA_FIN_GRID - HORA_INICIO_GRID }, (_, h) => (
-                  <div
-                    key={h}
-                    className="absolute inset-x-0 border-t border-border/60 text-[9px] text-text-muted"
-                    style={{ top: `${(h / (HORA_FIN_GRID - HORA_INICIO_GRID)) * 100}%` }}
-                  >
-                    {HORA_INICIO_GRID + h}h
-                  </div>
-                ))}
-                {segmentos.map((segmento, i) => (
-                  <div
-                    key={i}
-                    className="absolute inset-x-0.5 rounded-sm px-1 text-[10px] text-white"
-                    style={{
-                      top: `${segmento.topPct}%`,
-                      height: `${segmento.heightPct}%`,
-                      backgroundColor: segmento.color,
-                    }}
-                    title={segmento.etiqueta}
-                  >
-                    <span className="truncate">{segmento.etiqueta}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="flex flex-wrap items-center gap-4 text-xs text-text-muted">
-        <span className="flex items-center gap-1.5">
-          <span className="size-2.5 rounded-sm" style={{ backgroundColor: "var(--color-primary)" }} />
-          Clases
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="size-2.5 rounded-sm" style={{ backgroundColor: COLOR_BLOQUE.laboral }} />
-          Laboral
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="size-2.5 rounded-sm" style={{ backgroundColor: COLOR_BLOQUE.familiar }} />
-          Familiar
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="size-2.5 rounded-sm" style={{ backgroundColor: COLOR_BLOQUE.personal }} />
-          Personal
-        </span>
-      </div>
+      <SemanaGrid
+        dias={dias}
+        hoyISO={hoyISO}
+        ahoraMin={minutosDelDiaLima(ahora)}
+        items={items}
+        entregas={entregas}
+        mensajeVacio={textos.vacio}
+      />
+      <AgendaSemana dias={dias} hoyISO={hoyISO} items={items} entregas={entregas} textoDiaLibre={textos.diaLibre} />
     </div>
   );
 }

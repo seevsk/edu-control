@@ -1,15 +1,14 @@
 import { prisma } from "@/server/db/client";
-import { horaATime } from "@/lib/dates";
 import { cerrarSesion } from "@/server/auth/session";
 import { requerirUsuarioValido } from "@/server/services/usuario";
-import type { actualizarPerfilSchema, crearBloqueOcupadoSchema } from "@/lib/validation/perfil";
+import type { actualizarPerfilSchema } from "@/lib/validation/perfil";
 import type { z } from "zod";
 
 export async function obtenerPerfilCompleto(idUsuario: number) {
   await requerirUsuarioValido(idUsuario);
   return prisma.usuario.findUniqueOrThrow({
     where: { idUsuario },
-    include: { perfil: true, bloquesOcupados: { orderBy: [{ diaSemana: "asc" }, { horaInicio: "asc" }] } },
+    include: { perfil: true },
   });
 }
 
@@ -32,25 +31,6 @@ export async function actualizarPerfil(idUsuario: number, datos: z.infer<typeof 
       },
     }),
   ]);
-}
-
-export async function crearBloqueOcupado(
-  idUsuario: number,
-  datos: z.infer<typeof crearBloqueOcupadoSchema>,
-) {
-  return prisma.bloqueOcupado.create({
-    data: {
-      idUsuario,
-      tipo: datos.tipo,
-      diaSemana: datos.diaSemana,
-      horaInicio: horaATime(datos.horaInicio),
-      horaFin: horaATime(datos.horaFin),
-    },
-  });
-}
-
-export async function eliminarBloqueOcupado(idUsuario: number, idBloqueOcupado: number) {
-  await prisma.bloqueOcupado.deleteMany({ where: { idBloqueOcupado, idUsuario } });
 }
 
 /**

@@ -11,21 +11,26 @@ export async function obtenerSemanaCalendario(idUsuario: number, lunesISO: strin
       where: { idUsuario, activo: true },
       include: { horarios: true },
     }),
-    prisma.bloqueOcupado.findMany({ where: { idUsuario } }),
+    prisma.bloqueOcupado.findMany({
+      where: { idUsuario },
+      orderBy: [{ diaSemana: "asc" }, { horaInicio: "asc" }],
+    }),
     prisma.evaluacion.findMany({
       where: { curso: { idUsuario }, fechaCierre: { gte: desde, lt: hasta } },
       include: { curso: true },
+      orderBy: { fechaCierre: "asc" },
     }),
     prisma.tarea.findMany({
       where: { idAsignado: idUsuario, fechaLimite: { gte: desde, lt: hasta } },
       include: { grupo: true },
+      orderBy: { fechaLimite: "asc" },
     }),
   ]);
 
   const horarios = cursos.flatMap((curso) =>
     curso.horarios.map((horario) => ({
       ...horario,
-      etiqueta: curso.nombre,
+      curso: { idCurso: curso.idCurso, nombre: curso.nombre, modalidad: curso.modalidad },
     })),
   );
 

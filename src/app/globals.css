@@ -21,6 +21,20 @@
   --color-estado-completada: #2e7d32;
   --color-danger: #c4314b;
 
+  /* Categorias del calendario: punto/acento, fondo tenue, texto y borde del mismo tono. */
+  --color-cat-clases: #0078d4;
+  --color-cat-clases-bg: #e8f2fc;
+  --color-cat-clases-fg: #0b4a80;
+  --color-cat-clases-borde: #b5d4f4;
+  --color-cat-laboral: #b7791f;
+  --color-cat-laboral-bg: #fcf3e3;
+  --color-cat-laboral-fg: #6e4508;
+  --color-cat-laboral-borde: #ecd2a3;
+  --color-cat-fam: #2e7d32;
+  --color-cat-fam-bg: #e9f5ea;
+  --color-cat-fam-fg: #1b5420;
+  --color-cat-fam-borde: #b9dcbb;
+
   /* Superficie de marca: siempre oscura, no sigue el tema claro/oscuro del sistema. */
   --color-brand-ink: #12141a;
   --color-brand-ink-border: rgba(255, 255, 255, 0.14);
@@ -44,6 +58,19 @@
   --color-estado-revision: var(--color-estado-revision);
   --color-estado-completada: var(--color-estado-completada);
   --color-danger: var(--color-danger);
+
+  --color-cat-clases: var(--color-cat-clases);
+  --color-cat-clases-bg: var(--color-cat-clases-bg);
+  --color-cat-clases-fg: var(--color-cat-clases-fg);
+  --color-cat-clases-borde: var(--color-cat-clases-borde);
+  --color-cat-laboral: var(--color-cat-laboral);
+  --color-cat-laboral-bg: var(--color-cat-laboral-bg);
+  --color-cat-laboral-fg: var(--color-cat-laboral-fg);
+  --color-cat-laboral-borde: var(--color-cat-laboral-borde);
+  --color-cat-fam: var(--color-cat-fam);
+  --color-cat-fam-bg: var(--color-cat-fam-bg);
+  --color-cat-fam-fg: var(--color-cat-fam-fg);
+  --color-cat-fam-borde: var(--color-cat-fam-borde);
 
   --color-brand-ink: var(--color-brand-ink);
   --color-brand-ink-border: var(--color-brand-ink-border);
@@ -69,6 +96,19 @@
 
     --color-text: #e6e8eb;
     --color-text-muted: #9aa2ac;
+
+    --color-cat-clases: #3b9cf2;
+    --color-cat-clases-bg: #142a40;
+    --color-cat-clases-fg: #b3d7f8;
+    --color-cat-clases-borde: #24496d;
+    --color-cat-laboral: #d9a03f;
+    --color-cat-laboral-bg: #33280f;
+    --color-cat-laboral-fg: #f2d398;
+    --color-cat-laboral-borde: #5a4518;
+    --color-cat-fam: #5fb564;
+    --color-cat-fam-bg: #16301a;
+    --color-cat-fam-fg: #b2deb4;
+    --color-cat-fam-borde: #2b5530;
   }
 }
 
