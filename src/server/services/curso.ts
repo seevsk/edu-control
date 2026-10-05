@@ -25,9 +25,9 @@ export async function yaImportoCurso(idUsuario: number, idCursoFuente: number) {
   return existente !== null;
 }
 
-export async function listarCursos(idUsuario: number) {
+export async function listarCursos(idUsuario: number, activo: boolean = true) {
   return prisma.curso.findMany({
-    where: { idUsuario },
+    where: { idUsuario, activo },
     include: { horarios: true, evaluaciones: { orderBy: { fechaCierre: "asc" } } },
     orderBy: { fechaCreacion: "desc" },
   });
@@ -79,6 +79,21 @@ export async function actualizarCurso(
   });
 
   return curso;
+}
+
+export async function alternarActivoCurso(idUsuario: number, idCurso: number) {
+  const curso = await obtenerCursoDelUsuario(idUsuario, idCurso);
+  return prisma.curso.update({ where: { idCurso }, data: { activo: !curso.activo } });
+}
+
+/**
+ * Borra el curso y, en cascada, sus horarios y evaluaciones (ver schema.prisma). Si otro
+ * usuario lo habia importado, su copia queda huerfana (importado_de_id_curso -> NULL) pero
+ * conserva sus propios datos: no se le borra nada a nadie mas.
+ */
+export async function eliminarCurso(idUsuario: number, idCurso: number) {
+  await obtenerCursoDelUsuario(idUsuario, idCurso);
+  await prisma.curso.delete({ where: { idCurso } });
 }
 
 /**
