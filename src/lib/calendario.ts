@@ -117,6 +117,22 @@ export function etiquetaFechaLarga(fechaISO: string): string {
   return `${DIAS_LARGOS[diaSemanaISO(fechaISO) - 1]} ${d} de ${MESES_LARGOS[m - 1]}`;
 }
 
+/** Dias de calendario (en Lima) entre hoy y `fecha`: 0 = hoy, 1 = manana, negativo = ya paso. */
+function diasHasta(fecha: Date, ahora: Date): number {
+  const [y1, m1, d1] = fechaLimaISO(ahora).split("-").map(Number);
+  const [y2, m2, d2] = fechaLimaISO(fecha).split("-").map(Number);
+  return Math.round((Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 86_400_000);
+}
+
+/** Fecha relativa para tarjetas: "Hoy", "Mañana", "En 3 días", "Ayer", "Hace 2 días". */
+export function etiquetaRelativa(fecha: Date, ahora = new Date()): string {
+  const dias = diasHasta(fecha, ahora);
+  if (dias === 0) return "Hoy";
+  if (dias === 1) return "Mañana";
+  if (dias === -1) return "Ayer";
+  return dias > 0 ? `En ${dias} días` : `Hace ${-dias} días`;
+}
+
 /** Proxima fecha (hoy incluido) que cae en `diaSemana`, para programar desde un patron semanal. */
 export function proximaFechaDelDia(hoyISO: string, diaSemana: number): string {
   return sumarDiasISO(hoyISO, (diaSemana - diaSemanaISO(hoyISO) + 7) % 7);

@@ -2,8 +2,13 @@ import Link from "next/link";
 import { requerirSesion } from "@/server/auth/session";
 import { listarMisGrupos } from "@/server/services/grupo";
 import { listarEvaluacionesDelUsuario } from "@/server/services/curso";
+import { formatearFechaLima } from "@/lib/dates";
+import { etiquetaRelativa } from "@/lib/calendario";
 import { crearGrupoAction } from "./actions";
 import { SubmitButton } from "@/components/submit-button";
+import { IconoCurso } from "@/components/icono-curso";
+import { AvataresGrupo } from "@/components/avatares-grupo";
+import { DatosTarjeta } from "@/components/datos-tarjeta";
 
 export default async function GruposPage({
   searchParams,
@@ -25,32 +30,56 @@ export default async function GruposPage({
         </p>
       ) : null}
 
-      <ul className="flex flex-col gap-2">
+      <ul className="grid gap-3 sm:grid-cols-2">
         {grupos.map((grupo) => {
           const activos = grupo.integrantes.filter((i) => i.estadoInvitacion === "aceptada");
+          const curso = grupo.evaluacion?.curso ?? null;
+          const finalizado = grupo.estado === "finalizado";
           return (
             <li key={grupo.idGrupo}>
               <Link
                 href={`/grupos/${grupo.idGrupo}`}
-                className="flex items-center justify-between rounded-md border border-border bg-surface p-4 hover:border-border-strong"
+                className="flex h-full flex-col gap-3 rounded-md border border-border bg-surface p-3.5 text-sm transition-colors duration-150 hover:border-border-strong"
               >
-                <div>
-                  <p className="text-sm font-medium">{grupo.nombre}</p>
-                  <p className="text-xs text-text-muted">
-                    {activos.length} integrante{activos.length === 1 ? "" : "s"}
-                  </p>
+                <div className="flex items-start gap-3">
+                  <IconoCurso nombre={curso?.nombre ?? grupo.nombre} codigo={curso?.codigo} />
+                  <p className="min-w-0 pt-0.5 font-medium leading-snug">{grupo.nombre}</p>
                 </div>
-                {grupo.estado === "finalizado" ? (
-                  <span className="rounded-sm bg-bg px-1.5 py-0.5 text-[11px] text-text-muted">
-                    Finalizado
+                <DatosTarjeta
+                  datos={[
+                    { etiqueta: "Curso", valor: curso?.nombre },
+                    {
+                      etiqueta: "Finaliza",
+                      valor: grupo.fechaLimite ? etiquetaRelativa(grupo.fechaLimite) : null,
+                      titulo: grupo.fechaLimite ? formatearFechaLima(grupo.fechaLimite) : undefined,
+                    },
+                    {
+                      etiqueta: "Estado",
+                      valor: (
+                        <span className="inline-flex items-center gap-1.5">
+                          <span
+                            className={`size-2 rounded-full ${finalizado ? "bg-estado-pendiente" : "bg-estado-completada"}`}
+                            aria-hidden
+                          />
+                          {finalizado ? "Finalizado" : "Activo"}
+                        </span>
+                      ),
+                      titulo: finalizado ? "Finalizado" : "Activo",
+                    },
+                  ]}
+                />
+                <div className="mt-auto flex items-center justify-between gap-2 border-t border-border pt-2.5 text-xs text-text-muted">
+                  <span>
+                    {activos.length} integrante{activos.length === 1 ? "" : "s"}
                   </span>
-                ) : null}
+                  <AvataresGrupo personas={activos.map((i) => i.usuario)} />
+                </div>
               </Link>
             </li>
           );
         })}
         {grupos.length === 0 ? (
-          <p className="text-sm text-text-muted">Todavia no perteneces a ningun grupo.</p>
+          <p className="text-sm text-text-muted sm:col-span-2">Todavia no perteneces a ningun grupo.</p>
         ) : null}
       </ul>
 

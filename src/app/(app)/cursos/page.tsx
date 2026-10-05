@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { requerirSesion } from "@/server/auth/session";
 import { listarCursos, listarCursosImportables } from "@/server/services/curso";
-import { colorCurso, inicialesCurso } from "@/lib/color-curso";
 import { formatearFechaLima, timeAHora, DIAS_SEMANA } from "@/lib/dates";
+import { etiquetaRelativa } from "@/lib/calendario";
 import {
   crearCursoAction,
   alternarActivoCursoAction,
@@ -12,8 +12,9 @@ import {
 } from "./actions";
 import { SubmitButton } from "@/components/submit-button";
 import { MenuAcciones } from "@/components/menu-acciones";
-import { IconReloj, IconCalendario } from "@/components/icons";
 import { Toast } from "@/components/toast";
+import { IconoCurso } from "@/components/icono-curso";
+import { DatosTarjeta } from "@/components/datos-tarjeta";
 
 function proximaClase(horarios: { diaSemana: number; horaInicio: Date }[]) {
   if (horarios.length === 0) return null;
@@ -74,12 +75,17 @@ export default async function CursosPage({
                 key={cursoFuente.idCurso}
                 className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-3 py-2 text-sm"
               >
-                <div className="min-w-0">
-                  <p className="truncate font-medium">{cursoFuente.nombre}</p>
-                  <p className="truncate text-xs text-text-muted">
-                    {[cursoFuente.codigo, cursoFuente.docente].filter(Boolean).join(" · ") ||
-                      "Sin detalles"}
-                  </p>
+                <div className="flex min-w-0 items-start gap-3">
+                  <IconoCurso nombre={cursoFuente.nombre} codigo={cursoFuente.codigo} tamano="sm" />
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <p className="truncate font-medium">{cursoFuente.nombre}</p>
+                    <DatosTarjeta
+                      datos={[
+                        { etiqueta: "Código", valor: cursoFuente.codigo },
+                        { etiqueta: "Docente", valor: cursoFuente.docente },
+                      ]}
+                    />
+                  </div>
                 </div>
                 {idCursoLocal && hayActualizaciones ? (
                   <form action={sincronizarCursoAction.bind(null, idCursoLocal)}>
@@ -108,7 +114,6 @@ export default async function CursosPage({
 
       <div className="grid gap-4 sm:grid-cols-2">
         {cursos.map((curso) => {
-          const color = colorCurso(curso.codigo || curso.nombre);
           const clase = proximaClase(curso.horarios);
           const proximaEvaluacion = curso.evaluaciones.find((e) => e.fechaCierre >= new Date());
 
@@ -122,18 +127,8 @@ export default async function CursosPage({
                   href={`/cursos/${curso.idCurso}`}
                   className="flex min-w-0 flex-1 items-start gap-3 hover:opacity-90"
                 >
-                  <span
-                    className="flex size-10 shrink-0 items-center justify-center rounded-md text-sm font-semibold"
-                    style={{ backgroundColor: color.bg, color: color.fg }}
-                  >
-                    {inicialesCurso(curso.nombre)}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{curso.nombre}</p>
-                    <p className="truncate text-xs text-text-muted">
-                      {[curso.codigo, curso.docente].filter(Boolean).join(" · ") || "Sin detalles"}
-                    </p>
-                  </div>
+                  <IconoCurso nombre={curso.nombre} codigo={curso.codigo} />
+                  <p className="min-w-0 pt-0.5 text-sm font-medium leading-snug">{curso.nombre}</p>
                 </Link>
 
                 <div className="flex shrink-0 items-center gap-1">
@@ -160,17 +155,25 @@ export default async function CursosPage({
                 </div>
               </div>
 
-              <div className="flex flex-col gap-1.5 border-t border-border pt-2.5 text-xs text-text-muted">
-                <p className="flex items-center gap-1.5">
-                  <IconReloj className="size-3.5 shrink-0" aria-hidden />
-                  {clase ? `Proxima clase: ${clase}` : "Sin horario registrado"}
-                </p>
-                <p className="flex items-center gap-1.5">
-                  <IconCalendario className="size-3.5 shrink-0" aria-hidden />
-                  {proximaEvaluacion
-                    ? `${proximaEvaluacion.nombre}: cierra ${formatearFechaLima(proximaEvaluacion.fechaCierre)}`
-                    : "Sin evaluaciones proximas"}
-                </p>
+              <DatosTarjeta
+                datos={[
+                  { etiqueta: "Código", valor: curso.codigo },
+                  { etiqueta: "Docente", valor: curso.docente },
+                ]}
+              />
+
+              <div className="border-t border-border pt-2.5">
+                <DatosTarjeta
+                  datos={[
+                    { etiqueta: "Próxima clase", valor: clase ?? "Sin horario" },
+                    { etiqueta: "Evaluación", valor: proximaEvaluacion?.nombre ?? "Sin evaluaciones próximas" },
+                    {
+                      etiqueta: "Finaliza",
+                      valor: proximaEvaluacion ? etiquetaRelativa(proximaEvaluacion.fechaCierre) : null,
+                      titulo: proximaEvaluacion ? formatearFechaLima(proximaEvaluacion.fechaCierre) : undefined,
+                    },
+                  ]}
+                />
               </div>
             </div>
           );

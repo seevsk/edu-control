@@ -63,7 +63,18 @@ export async function listarTareasAsignadasAlUsuario(idUsuario: number, limite =
   return prisma.tarea.findMany({
     where: { idAsignado: idUsuario, estado: { not: "completada" } },
     include: {
-      grupo: { include: { evaluacion: { include: { curso: true } } } },
+      grupo: {
+        include: {
+          evaluacion: { include: { curso: true } },
+          integrantes: {
+            where: { estadoInvitacion: "aceptada" },
+            select: {
+              usuario: { select: { idUsuario: true, nombre: true, apellidos: true, fotoUrl: true } },
+            },
+            orderBy: { fechaInvitacion: "asc" },
+          },
+        },
+      },
     },
     orderBy: [{ fechaLimite: "asc" }, { fechaCreacion: "desc" }],
     take: limite,
