@@ -179,7 +179,7 @@ export function construirReuniones(reuniones: SemanaCalendario["reuniones"]): It
       sigueAlDiaSiguiente: false,
       titulo: reunion.titulo,
       subtitulo: reunion.grupo.nombre,
-      href: `/grupos/${reunion.idGrupo}/reuniones`,
+      href: `/reuniones#reunion-${reunion.idReunion}`,
     };
   });
 }

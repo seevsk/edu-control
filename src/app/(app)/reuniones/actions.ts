@@ -12,50 +12,49 @@ function con(ruta: string, clave: "error" | "toast", valor: string) {
   return `${ruta}${separador}${clave}=${encodeURIComponent(valor)}`;
 }
 
-export async function crearReunionAction(idGrupo: number, formData: FormData) {
+export async function crearReunionAction(formData: FormData) {
   const sesion = await requerirSesion();
-  const formulario = `/grupos/${idGrupo}/reuniones/nueva`;
   const parseo = crearReunionSchema.safeParse(Object.fromEntries(formData.entries()));
+  const idGrupo = Number(formData.get("idGrupo"));
+  const formulario = Number.isInteger(idGrupo) && idGrupo > 0 ? `/reuniones/nueva?grupo=${idGrupo}` : "/reuniones/nueva";
   if (!parseo.success) redirect(con(formulario, "error", parseo.error.issues[0].message));
 
   try {
-    await reunionService.crearReunion(sesion.idUsuario, idGrupo, parseo.data);
+    await reunionService.crearReunion(sesion.idUsuario, parseo.data.idGrupo, parseo.data);
   } catch (error) {
     redirect(con(formulario, "error", mensajeParaUsuario(error)));
   }
 
-  revalidatePath(`/grupos/${idGrupo}/reuniones`);
+  revalidatePath("/reuniones");
   revalidatePath("/calendario");
-  redirect(con(`/grupos/${idGrupo}/reuniones`, "toast", "Reunión programada"));
+  redirect(con("/reuniones", "toast", "Reunión programada"));
 }
 
-export async function responderReunionAction(idGrupo: number, idReunion: number, formData: FormData) {
+export async function responderReunionAction(idReunion: number, formData: FormData) {
   const sesion = await requerirSesion();
-  const lista = `/grupos/${idGrupo}/reuniones`;
   const parseo = responderReunionSchema.safeParse({ respuesta: formData.get("respuesta") });
-  if (!parseo.success) redirect(con(lista, "error", "Respuesta inválida"));
+  if (!parseo.success) redirect(con("/reuniones", "error", "Respuesta inválida"));
 
   try {
     await reunionService.responderReunion(sesion.idUsuario, idReunion, parseo.data.respuesta);
   } catch (error) {
-    redirect(con(lista, "error", mensajeParaUsuario(error)));
+    redirect(con("/reuniones", "error", mensajeParaUsuario(error)));
   }
 
-  revalidatePath(lista);
-  redirect(lista);
+  revalidatePath("/reuniones");
+  redirect(`/reuniones#reunion-${idReunion}`);
 }
 
-export async function cancelarReunionAction(idGrupo: number, idReunion: number) {
+export async function cancelarReunionAction(idReunion: number) {
   const sesion = await requerirSesion();
-  const lista = `/grupos/${idGrupo}/reuniones`;
 
   try {
     await reunionService.cancelarReunion(sesion.idUsuario, idReunion);
   } catch (error) {
-    redirect(con(lista, "error", mensajeParaUsuario(error)));
+    redirect(con("/reuniones", "error", mensajeParaUsuario(error)));
   }
 
-  revalidatePath(lista);
+  revalidatePath("/reuniones");
   revalidatePath("/calendario");
-  redirect(con(lista, "toast", "Reunión cancelada"));
+  redirect(con("/reuniones", "toast", "Reunión cancelada"));
 }

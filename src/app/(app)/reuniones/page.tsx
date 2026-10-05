@@ -1,8 +1,6 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { requerirSesion } from "@/server/auth/session";
-import { obtenerGrupoDelUsuario } from "@/server/services/grupo";
-import { listarReunionesGrupo } from "@/server/services/reunion";
+import { listarMisReuniones } from "@/server/services/reunion";
 import {
   DIAS_CORTOS,
   diaSemanaISO,
@@ -14,50 +12,44 @@ import {
 import { Avatar } from "@/components/avatar";
 import { IconAgregar } from "@/components/icons";
 import { Toast } from "@/components/toast";
-import { TabsGrupo } from "../_components/tabs-grupo";
 import { cancelarReunionAction, responderReunionAction } from "./actions";
 
-type Reuniones = Awaited<ReturnType<typeof listarReunionesGrupo>>;
-type ReunionListada = Reuniones["proximas"][number];
+type Listado = Awaited<ReturnType<typeof listarMisReuniones>>;
+type Reunion = Listado["proximas"][number];
+type Rol = "lider" | "miembro" | "observador";
 
 function horario(reunion: { inicio: Date; fin: Date }) {
   return `${etiquetaMinutos(minutosDelDiaLima(reunion.inicio))} – ${etiquetaMinutos(minutosDelDiaLima(reunion.fin))}`;
 }
 
-export default async function ReunionesGrupoPage({
-  params,
+export default async function ReunionesPage({
   searchParams,
 }: {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; toast?: string }>;
+  searchParams: Promise<{ grupo?: string; error?: string; toast?: string }>;
 }) {
-  const { id } = await params;
-  const idGrupo = Number(id);
-  if (!Number.isInteger(idGrupo)) notFound();
-
   const sesion = await requerirSesion();
-  const { error, toast } = await searchParams;
-  let grupo;
-  try {
-    ({ grupo } = await obtenerGrupoDelUsuario(sesion.idUsuario, idGrupo));
-  } catch {
-    notFound();
-  }
+  const { grupo, error, toast } = await searchParams;
+  const { proximas, pasadas, rolPorGrupo } = await listarMisReuniones(sesion.idUsuario);
 
-  const { proximas, pasadas, rolActual } = await listarReunionesGrupo(sesion.idUsuario, idGrupo);
-  const participa = rolActual !== "observador";
-  const puedeProgramar = participa && grupo.estado === "activo";
+  const grupos = new Map<number, string>();
+  for (const r of [...proximas, ...pasadas]) grupos.set(r.idGrupo, r.grupo.nombre);
+  const filtro = grupo && grupos.has(Number(grupo)) ? Number(grupo) : null;
+  const filtrar = (lista: Reunion[]) => (filtro ? lista.filter((r) => r.idGrupo === filtro) : lista);
 
   return (
-    <div className="animate-page-in mx-auto flex max-w-3xl flex-col gap-6">
+    <div className="animate-page-in mx-auto flex max-w-3xl flex-col gap-5">
       <Toast mensaje={toast} />
-      <div>
-        <Link href="/grupos" className="text-sm text-primary hover:underline">
-          Grupos
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-xl font-semibold">Reuniones</h1>
+        <Link
+          href={filtro ? `/reuniones/nueva?grupo=${filtro}` : "/reuniones/nueva"}
+          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white transition-colors duration-150 hover:bg-primary-hover"
+        >
+          <IconAgregar className="size-4" aria-hidden />
+          Programar reunión
         </Link>
-        <h1 className="mt-1 text-xl font-semibold">{grupo.nombre}</h1>
       </div>
-      <TabsGrupo idGrupo={idGrupo} activa="reuniones" />
 
       {error ? (
         <p role="alert" className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
@@ -65,55 +57,60 @@ export default async function ReunionesGrupoPage({
         </p>
       ) : null}
 
-      <section className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-base font-semibold">Próximas</h2>
-          {puedeProgramar ? (
-            <Link
-              href={`/grupos/${idGrupo}/reuniones/nueva`}
-              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white transition-colors duration-150 hover:bg-primary-hover"
-            >
-              <IconAgregar className="size-4" aria-hidden />
-              Programar reunión
-            </Link>
-          ) : null}
-        </div>
+      {grupos.size > 1 ? (
+        <nav aria-label="Filtrar por grupo" className="max-w-full overflow-x-auto">
+          <div className="flex w-max divide-x divide-border-strong overflow-hidden rounded-md border border-border-strong bg-surface text-sm">
+            {[{ id: null, nombre: "Todos" }, ...[...grupos].map(([id, nombre]) => ({ id, nombre }))].map((opcion) => {
+              const activo = opcion.id === filtro;
+              return (
+                <Link
+                  key={opcion.id ?? "todos"}
+                  href={opcion.id ? `/reuniones?grupo=${opcion.id}` : "/reuniones"}
+                  aria-current={activo ? "page" : undefined}
+                  className={`whitespace-nowrap px-3 py-1.5 transition-colors duration-150 ${
+                    activo ? "bg-primary-soft font-medium text-primary" : "hover:bg-bg"
+                  }`}
+                >
+                  {opcion.nombre}
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
+      ) : null}
 
-        {proximas.length === 0 ? (
-          <p className="rounded-md border border-border bg-surface px-4 py-5 text-sm text-text-muted">
-            Sin reuniones próximas.
-          </p>
+      <section className="flex flex-col gap-3">
+        <h2 className="text-base font-semibold">Próximas</h2>
+        {filtrar(proximas).length === 0 ? (
+          <p className="rounded-md border border-border bg-surface px-4 py-5 text-sm text-text-muted">Sin reuniones próximas.</p>
         ) : (
           <ul className="divide-y divide-border overflow-hidden rounded-md border border-border bg-surface">
-            {proximas.map((reunion) => (
+            {filtrar(proximas).map((reunion) => (
               <FilaReunion
                 key={reunion.idReunion}
                 reunion={reunion}
-                idGrupo={idGrupo}
                 idUsuario={sesion.idUsuario}
-                participa={participa}
-                puedeCancelar={participa && (reunion.creador.idUsuario === sesion.idUsuario || rolActual === "lider")}
+                rol={rolPorGrupo.get(reunion.idGrupo) ?? "observador"}
               />
             ))}
           </ul>
         )}
       </section>
 
-      {pasadas.length > 0 ? (
+      {filtrar(pasadas).length > 0 ? (
         <section className="flex flex-col gap-3">
           <h2 className="text-sm font-semibold text-text-muted">Anteriores</h2>
           <ul className="divide-y divide-border overflow-hidden rounded-md border border-border bg-surface">
-            {pasadas.map((reunion) => {
-              const fechaISO = fechaEnZonaLimaISO(reunion.inicio);
-              return (
-                <li key={reunion.idReunion} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 px-4 py-2.5 text-sm">
-                  <span className="font-medium text-text-muted">{reunion.titulo}</span>
-                  <span className="tabular-nums text-xs text-text-muted">
-                    {etiquetaFechaLarga(fechaISO)} · {horario(reunion)}
-                  </span>
-                </li>
-              );
-            })}
+            {filtrar(pasadas).map((reunion) => (
+              <li key={reunion.idReunion} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 px-4 py-2.5 text-sm">
+                <span className="text-text-muted">
+                  <span className="font-medium">{reunion.titulo}</span> · {reunion.grupo.nombre}
+                </span>
+                <span className="text-xs tabular-nums text-text-muted">
+                  {etiquetaFechaLarga(fechaEnZonaLimaISO(reunion.inicio))} · {horario(reunion)}
+                </span>
+              </li>
+            ))}
           </ul>
         </section>
       ) : null}
@@ -121,28 +118,18 @@ export default async function ReunionesGrupoPage({
   );
 }
 
-function FilaReunion({
-  reunion,
-  idGrupo,
-  idUsuario,
-  participa,
-  puedeCancelar,
-}: {
-  reunion: ReunionListada;
-  idGrupo: number;
-  idUsuario: number;
-  participa: boolean;
-  puedeCancelar: boolean;
-}) {
+function FilaReunion({ reunion, idUsuario, rol }: { reunion: Reunion; idUsuario: number; rol: Rol }) {
   const fechaISO = fechaEnZonaLimaISO(reunion.inicio);
+  const participa = rol !== "observador";
+  const puedeCancelar = participa && (reunion.creador.idUsuario === idUsuario || rol === "lider");
   const mia = reunion.asistentes.find((a) => a.idUsuario === idUsuario)?.respuesta ?? "pendiente";
   const asistiran = reunion.asistentes.filter((a) => a.respuesta === "asistire");
   const noAsistiran = reunion.asistentes.filter((a) => a.respuesta === "no_asistire").length;
   const sinResponder = reunion.asistentes.filter((a) => a.respuesta === "pendiente").length;
-  const responder = responderReunionAction.bind(null, idGrupo, reunion.idReunion);
+  const responder = responderReunionAction.bind(null, reunion.idReunion);
 
   return (
-    <li className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-start">
+    <li id={`reunion-${reunion.idReunion}`} className="flex scroll-mt-4 flex-col gap-3 px-4 py-4 target:bg-primary-soft/40 sm:flex-row sm:items-start">
       <div className="grid w-14 shrink-0 place-items-center rounded-md border border-border py-1.5 text-center">
         <span className="text-[11px] font-medium uppercase tracking-wide text-text-muted">
           {DIAS_CORTOS[diaSemanaISO(fechaISO) - 1]}
@@ -153,16 +140,18 @@ function FilaReunion({
       <div className="min-w-0 flex-1">
         <p className="font-semibold">{reunion.titulo}</p>
         <p className="mt-0.5 text-sm text-text-muted">
-          <span className="tabular-nums">{etiquetaFechaLarga(fechaISO)} · {horario(reunion)}</span>
+          <Link href={`/grupos/${reunion.idGrupo}/horarios`} className="hover:text-primary hover:underline">
+            {reunion.grupo.nombre}
+          </Link>
+        </p>
+        <p className="mt-0.5 text-sm text-text-muted">
+          <span className="tabular-nums">
+            {etiquetaFechaLarga(fechaISO)} · {horario(reunion)}
+          </span>
           {reunion.lugar ? <> · {reunion.lugar}</> : null}
         </p>
         {reunion.enlace ? (
-          <a
-            href={reunion.enlace}
-            target="_blank"
-            rel="noreferrer noopener"
-            className="mt-1 inline-block text-sm text-primary hover:underline"
-          >
+          <a href={reunion.enlace} target="_blank" rel="noreferrer noopener" className="mt-1 inline-block text-sm text-primary hover:underline">
             Abrir enlace
           </a>
         ) : null}
@@ -213,7 +202,7 @@ function FilaReunion({
             ))}
           </div>
           {puedeCancelar ? (
-            <form action={cancelarReunionAction.bind(null, idGrupo, reunion.idReunion)}>
+            <form action={cancelarReunionAction.bind(null, reunion.idReunion)}>
               <button type="submit" className="rounded-sm px-2 py-1 text-xs font-medium text-danger hover:bg-danger/10">
                 Cancelar reunión
               </button>

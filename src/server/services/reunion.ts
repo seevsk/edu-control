@@ -17,15 +17,21 @@ async function requerirParticipante(idUsuario: number, idGrupo: number) {
   return integrante;
 }
 
-/** Reuniones del grupo (proximas primero) con la asistencia. Solo para integrantes aceptados. */
-export async function listarReunionesGrupo(idUsuario: number, idGrupo: number) {
-  const yo = await prisma.grupoIntegrante.findUnique({
-    where: { idGrupo_idUsuario: { idGrupo, idUsuario } },
+/**
+ * Reuniones de todos mis grupos (donde estoy aceptado, observadores incluidos: las ven pero no
+ * responden), proximas primero, con la asistencia y mi rol en cada grupo.
+ */
+export async function listarMisReuniones(idUsuario: number) {
+  const membresias = await prisma.grupoIntegrante.findMany({
+    where: { idUsuario, estadoInvitacion: "aceptada" },
+    select: { idGrupo: true, rol: true },
   });
-  if (!yo || yo.estadoInvitacion !== "aceptada") throw new ErrorDeNegocio("Grupo no encontrado");
+  const rolPorGrupo = new Map(membresias.map((m) => [m.idGrupo, m.rol]));
+  const idsGrupo = [...rolPorGrupo.keys()];
 
   const ahora = new Date();
   const incluir = {
+    grupo: { select: { nombre: true, estado: true } },
     creador: { select: { idUsuario: true, nombre: true } },
     asistentes: {
       select: {
@@ -37,16 +43,32 @@ export async function listarReunionesGrupo(idUsuario: number, idGrupo: number) {
   } as const;
 
   const [proximas, pasadas] = await Promise.all([
-    prisma.reunion.findMany({ where: { idGrupo, fin: { gte: ahora } }, include: incluir, orderBy: { inicio: "asc" } }),
     prisma.reunion.findMany({
-      where: { idGrupo, fin: { lt: ahora } },
+      where: { idGrupo: { in: idsGrupo }, fin: { gte: ahora } },
+      include: incluir,
+      orderBy: { inicio: "asc" },
+    }),
+    prisma.reunion.findMany({
+      where: { idGrupo: { in: idsGrupo }, fin: { lt: ahora } },
       include: incluir,
       orderBy: { inicio: "desc" },
-      take: 5,
+      take: 8,
     }),
   ]);
 
-  return { proximas, pasadas, rolActual: yo.rol };
+  return { proximas, pasadas, rolPorGrupo };
+}
+
+/** Grupos activos donde puedo programar (aceptado, no observador). */
+export async function gruposParaProgramar(idUsuario: number) {
+  return prisma.grupo.findMany({
+    where: {
+      estado: "activo",
+      integrantes: { some: { idUsuario, estadoInvitacion: "aceptada", rol: { not: "observador" } } },
+    },
+    select: { idGrupo: true, nombre: true },
+    orderBy: { fechaCreacion: "desc" },
+  });
 }
 
 export async function crearReunion(idUsuario: number, idGrupo: number, datos: z.infer<typeof crearReunionSchema>) {

@@ -5,13 +5,12 @@ export function TabsGrupo({
   activa,
 }: {
   idGrupo: number;
-  activa: "resumen" | "tareas" | "horarios" | "reuniones" | "actividad";
+  activa: "resumen" | "tareas" | "horarios" | "actividad";
 }) {
   const tabs = [
     { key: "resumen", label: "Resumen", href: `/grupos/${idGrupo}` },
     { key: "tareas", label: "Tareas", href: `/grupos/${idGrupo}/tareas` },
     { key: "horarios", label: "Horarios", href: `/grupos/${idGrupo}/horarios` },
-    { key: "reuniones", label: "Reuniones", href: `/grupos/${idGrupo}/reuniones` },
     { key: "actividad", label: "Actividad", href: `/grupos/${idGrupo}/actividad` },
   ] as const;
 

@@ -12,6 +12,7 @@ import {
 } from "@/lib/calendario";
 import { diasLibresParaTodos, huecos, mapaDeDisponibilidad, type Franja, type Hueco } from "@/lib/disponibilidad";
 import { Avatar } from "@/components/avatar";
+import { IconReuniones } from "@/components/icons";
 import { MapaSemanal } from "@/components/mapa-semanal";
 import { TabsGrupo } from "../_components/tabs-grupo";
 
@@ -97,6 +98,15 @@ export default async function HorariosGrupoPage({ params }: { params: Promise<{ 
               ))}
             </div>
             {total} {total === 1 ? "integrante" : "integrantes"}
+            {programar ? (
+              <Link
+                href={`/reuniones/nueva?grupo=${idGrupo}`}
+                className="ml-2 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white transition-colors duration-150 hover:bg-primary-hover"
+              >
+                <IconReuniones className="size-4" aria-hidden />
+                Programar reunión
+              </Link>
+            ) : null}
           </div>
         </div>
 
@@ -108,7 +118,7 @@ export default async function HorariosGrupoPage({ params }: { params: Promise<{ 
               dia: DIAS_LARGOS[dia - 1],
               horario: "Todo el día",
               faltan: null,
-              href: programar ? `/grupos/${idGrupo}/reuniones/nueva?fecha=${proximaFechaDelDia(programar.hoyISO, dia)}` : null,
+              href: programar ? `/reuniones/nueva?grupo=${idGrupo}&fecha=${proximaFechaDelDia(programar.hoyISO, dia)}` : null,
             }))}
           />
         ) : null}
@@ -164,7 +174,7 @@ function aElemento(hueco: Hueco, nombres: Map<number, string>, programar: { idGr
     horario: `${etiquetaMinutos(hueco.inicioMin)} – ${etiquetaMinutos(hueco.finMin)} · ${formatearDuracion(hueco.finMin - hueco.inicioMin)}`,
     faltan: hueco.faltan.length > 0 ? hueco.faltan.map((id) => nombres.get(id)).join(", ") : null,
     href: programar
-      ? `/grupos/${programar.idGrupo}/reuniones/nueva?fecha=${proximaFechaDelDia(programar.hoyISO, hueco.diaSemana)}&inicio=${hhmm(
+      ? `/reuniones/nueva?grupo=${programar.idGrupo}&fecha=${proximaFechaDelDia(programar.hoyISO, hueco.diaSemana)}&inicio=${hhmm(
           hueco.inicioMin,
         )}&fin=${hhmm(Math.min(hueco.inicioMin + 60, hueco.finMin))}`
       : null,

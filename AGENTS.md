@@ -45,7 +45,7 @@ Nació como proyecto del curso *Proyecto Tecnológico* (NRC 3708, ISIL, metodolo
 | Evaluaciones | HU-009, HU-010 | Modelo `evaluacion` |
 | Perfil y disponibilidad | HU-003, HU-017, HU-018 | Modelo `perfil` y `bloque_ocupado`; se construye después del núcleo |
 | Disponibilidad del grupo | — (aprobado por el usuario, 2026-10-05) | Pestaña "Horarios" del grupo: mapa semanal ocupado/libre y huecos en común. Calculado, sin tabla (ver 8.5) |
-| Reuniones del grupo | — (aprobado por el usuario, 2026-10-05) | Pestaña "Reuniones": programar (también desde un hueco), confirmar asistencia, verlas en el Calendario. Modelos `reunion` y `reunion_asistente` (ver 8.7) |
+| Reuniones | — (aprobado por el usuario, 2026-10-05) | Módulo propio en el sidebar (`/reuniones`): programar con sugerencias de la disponibilidad del grupo, confirmar asistencia, verlas en el Calendario. Modelos `reunion` y `reunion_asistente` (ver 8.7) |
 | Perfil de otros usuarios y buscador de personas | — (aprobado por el usuario, 2026-10-05) | `/usuarios` y `/usuarios/[id]` (ver 8.1) |
 
 **Las tareas existen solo dentro de grupos.** No hay tareas personales en el MVP.
@@ -307,7 +307,9 @@ Reglas de arquitectura:
 
 ### 8.7 Reuniones (confirmado)
 
-- Las programan el líder y los miembros (aceptados, no observadores) de un grupo `activo`, desde la pestaña "Reuniones" o desde un hueco en común de "Horarios" (precarga la próxima fecha de ese día). Son de **una sola vez** (sin repetición) y empiezan y terminan el mismo día. No se programan en el pasado.
+- Módulo propio en el sidebar: `/reuniones` lista las de todos mis grupos (filtro por grupo) y `/reuniones/nueva?grupo=` las programa. También se llega desde la pestaña "Horarios" del grupo (botón o un hueco en común, que precarga la próxima fecha de ese día).
+- Las programan el líder y los miembros (aceptados, no observadores) de un grupo `activo`. Son de **una sola vez** (sin repetición) y empiezan y terminan el mismo día. No se programan en el pasado.
+- **El sistema sugiere, no obliga** (decisión del usuario): el formulario muestra como sugerencias los huecos en común de los próximos 7 días y el mapa del grupo. Se puede elegir cualquier otra hora; si pisa el horario semanal de alguien, se avisa en vivo ("Choca con el horario de …") pero se permite programarla.
 - `enlace` se valida con Zod (`https://` o `http://`), igual que `grupo.enlace_trabajo`.
 - Al crearla se inserta una fila de `reunion_asistente` por integrante aceptado no observador en el mismo `create` anidado: quien la programa queda `asistire`, el resto `pendiente`. Quien se une al grupo después puede responder igual (upsert).
 - Responden (`asistire` | `no_asistire`) los integrantes aceptados no observadores mientras la reunión no haya terminado. Cancelan (borrar la fila; borra en cascada sus asistentes) quien la programó o el líder. Cancelar no notifica en el MVP.
@@ -321,7 +323,7 @@ Usa **Azure DevOps** como referencia visual: se siente profesional, densa en inf
 **Estructura general**
 
 - Barra superior: nombre del producto, búsqueda, campana de notificaciones y avatar.
-- Barra lateral izquierda con íconos: Inicio, Cursos, Calendario, Grupos, Invitaciones (con contador si hay pendientes) y Perfil.
+- Barra lateral izquierda con íconos: Inicio, Cursos, Calendario, Grupos, Reuniones, Invitaciones (con contador si hay pendientes) y Perfil.
 - Migas de pan (*breadcrumbs*) y pestañas dentro de cada página. Ejemplo, página de un grupo: **Resumen · Tareas · Integrantes · Actividad**.
 - Franjas informativas en azul claro para avisos (por ejemplo, "Tienes 2 invitaciones pendientes").
 
