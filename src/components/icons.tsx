@@ -105,6 +105,24 @@ export function IconBuscarPersonas(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function IconPresencial(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="M3.5 16.5h13M5 16.5V8l5-3.5L15 8v8.5" />
+      <path d="M8.5 16.5v-4h3v4" />
+    </svg>
+  );
+}
+
+export function IconRemoto(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <rect x="3" y="4.5" width="14" height="9" rx="1.2" />
+      <path d="M7.5 16.5h5M10 13.5v3" />
+    </svg>
+  );
+}
+
 export function IconReloj(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base(props)}>

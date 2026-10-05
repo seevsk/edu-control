@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { requerirSesion } from "@/server/auth/session";
 import { listarCursos, listarCursosImportables } from "@/server/services/curso";
-import { formatearFechaLima, timeAHora, DIAS_SEMANA } from "@/lib/dates";
-import { etiquetaRelativa } from "@/lib/calendario";
+import { timeAHora } from "@/lib/dates";
+import { DIAS_LARGOS, diaSemanaISO, fechaEnZonaLimaISO, minutosDelDiaLima } from "@/lib/calendario";
 import {
   crearCursoAction,
   alternarActivoCursoAction,
@@ -15,12 +15,27 @@ import { MenuAcciones } from "@/components/menu-acciones";
 import { Toast } from "@/components/toast";
 import { IconoCurso } from "@/components/icono-curso";
 import { DatosTarjeta } from "@/components/datos-tarjeta";
+import { ChipModalidad } from "@/components/chip-modalidad";
+import { EncabezadoTarjeta } from "@/components/encabezado-tarjeta";
 
-function proximaClase(horarios: { diaSemana: number; horaInicio: Date }[]) {
+/** La siguiente sesion desde ahora (en Lima): una clase de hoy que ya empezo pasa a la proxima semana. */
+function proximaClase(horarios: { diaSemana: number; horaInicio: Date }[], ahora: Date) {
   if (horarios.length === 0) return null;
-  const [primero] = [...horarios].sort((a, b) => a.diaSemana - b.diaSemana);
-  const dia = DIAS_SEMANA.find((d) => d.valor === primero.diaSemana)?.nombre;
-  return `${dia} ${timeAHora(primero.horaInicio)}`;
+  const hoy = diaSemanaISO(fechaEnZonaLimaISO(ahora));
+  const ahoraMin = minutosDelDiaLima(ahora);
+
+  const candidatas = horarios.map((horario) => {
+    const inicioMin = horario.horaInicio.getUTCHours() * 60 + horario.horaInicio.getUTCMinutes();
+    let dias = (horario.diaSemana - hoy + 7) % 7;
+    if (dias === 0 && inicioMin <= ahoraMin) dias = 7;
+    return { horario, dias, orden: dias * 1440 + inicioMin };
+  });
+  const { horario, dias } = candidatas.sort((a, b) => a.orden - b.orden)[0];
+
+  return {
+    dia: dias === 0 ? "Hoy" : dias === 1 ? "Mañana" : DIAS_LARGOS[horario.diaSemana - 1],
+    hora: timeAHora(horario.horaInicio),
+  };
 }
 
 export default async function CursosPage({
@@ -33,6 +48,7 @@ export default async function CursosPage({
   const verInactivos = vista === "inactivos";
   const cursos = await listarCursos(sesion.idUsuario, !verInactivos);
   const importables = verInactivos ? [] : await listarCursosImportables(sesion.idUsuario);
+  const ahora = new Date();
 
   return (
     <div className="animate-page-in mx-auto flex max-w-4xl flex-col gap-6">
@@ -114,8 +130,7 @@ export default async function CursosPage({
 
       <div className="grid gap-4 sm:grid-cols-2">
         {cursos.map((curso) => {
-          const clase = proximaClase(curso.horarios);
-          const proximaEvaluacion = curso.evaluaciones.find((e) => e.fechaCierre >= new Date());
+          const clase = proximaClase(curso.horarios, ahora);
 
           return (
             <div
@@ -123,20 +138,15 @@ export default async function CursosPage({
               className="flex flex-col gap-3 rounded-md border border-border bg-surface p-4"
             >
               <div className="flex items-start gap-2">
-                <Link
-                  href={`/cursos/${curso.idCurso}`}
-                  className="flex min-w-0 flex-1 items-start gap-3 hover:opacity-90"
-                >
-                  <IconoCurso nombre={curso.nombre} codigo={curso.codigo} />
-                  <p className="min-w-0 pt-0.5 text-sm font-medium leading-snug">{curso.nombre}</p>
+                <Link href={`/cursos/${curso.idCurso}`} className="min-w-0 flex-1 text-sm hover:opacity-90">
+                  <EncabezadoTarjeta
+                    etiqueta="Curso"
+                    titulo={curso.nombre}
+                    icono={<IconoCurso nombre={curso.nombre} codigo={curso.codigo} />}
+                  />
                 </Link>
 
                 <div className="flex shrink-0 items-center gap-1">
-                  {curso.modalidad ? (
-                    <span className="rounded-sm border border-border px-1.5 py-0.5 text-[11px] text-text-muted">
-                      {curso.modalidad}
-                    </span>
-                  ) : null}
                   <MenuAcciones etiqueta={`Mas opciones de ${curso.nombre}`}>
                     <Link href={`/cursos/${curso.idCurso}`} className="px-3 py-1.5 text-left text-sm hover:bg-bg">
                       Editar
@@ -159,21 +169,22 @@ export default async function CursosPage({
                 datos={[
                   { etiqueta: "Código", valor: curso.codigo },
                   { etiqueta: "Docente", valor: curso.docente },
+                  { etiqueta: "Modalidad", valor: curso.modalidad ? <ChipModalidad modalidad={curso.modalidad} /> : null },
                 ]}
               />
 
-              <div className="border-t border-border pt-2.5">
-                <DatosTarjeta
-                  datos={[
-                    { etiqueta: "Próxima clase", valor: clase ?? "Sin horario" },
-                    { etiqueta: "Evaluación", valor: proximaEvaluacion?.nombre ?? "Sin evaluaciones próximas" },
-                    {
-                      etiqueta: "Finaliza",
-                      valor: proximaEvaluacion ? etiquetaRelativa(proximaEvaluacion.fechaCierre) : null,
-                      titulo: proximaEvaluacion ? formatearFechaLima(proximaEvaluacion.fechaCierre) : undefined,
-                    },
-                  ]}
-                />
+              <div className="flex flex-col gap-1.5 border-t border-border pt-2.5">
+                <p className="text-xs font-medium text-text-muted">Próxima clase</p>
+                {clase ? (
+                  <DatosTarjeta
+                    datos={[
+                      { etiqueta: "Día", valor: clase.dia },
+                      { etiqueta: "Hora", valor: clase.hora },
+                    ]}
+                  />
+                ) : (
+                  <p className="text-xs text-text-muted">Sin horario registrado</p>
+                )}
               </div>
             </div>
           );
