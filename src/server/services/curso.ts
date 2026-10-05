@@ -1,6 +1,7 @@
 import { prisma } from "@/server/db/client";
 import { horaATime, finDeDiaLimaAUtc, inicioDeDiaLimaAUtc } from "@/lib/dates";
 import { ErrorDeNegocio } from "@/lib/errores";
+import type { Curso } from "../../../generated/prisma/client";
 import type {
   crearCursoSchema,
   actualizarCursoSchema,
@@ -14,6 +15,16 @@ export async function listarEvaluacionesDelUsuario(idUsuario: number) {
     where: { curso: { idUsuario } },
     include: { curso: true },
     orderBy: { fechaCierre: "asc" },
+  });
+}
+
+/** Para el "Inicio": evaluaciones propias que todavia no cierran, sin depender de ningun grupo. */
+export async function listarEvaluacionesProximas(idUsuario: number, limite = 8) {
+  return prisma.evaluacion.findMany({
+    where: { curso: { idUsuario, activo: true }, fechaCierre: { gte: new Date() } },
+    include: { curso: true },
+    orderBy: { fechaCierre: "asc" },
+    take: limite,
   });
 }
 
@@ -255,6 +266,41 @@ export async function sincronizarCursoImportado(idUsuario: number, idCursoLocal:
   const local = await obtenerCursoDelUsuario(idUsuario, idCursoLocal);
   if (!local.importadoDeIdCurso) throw new ErrorDeNegocio("Este curso no esta importado de otro");
   await sincronizarListasDeCurso(local.importadoDeIdCurso, idCursoLocal);
+}
+
+/**
+ * Para la seccion de Cursos: cursos de los grupos del usuario (via evaluacion) que todavia no
+ * trajo, o que ya trajo pero el original tiene horario/evaluaciones nuevas. Asi no tiene que
+ * escribir a mano el mismo curso o la misma evaluacion a la que ya lo invitaron.
+ */
+export async function listarCursosImportables(idUsuario: number) {
+  const integraciones = await prisma.grupoIntegrante.findMany({
+    where: { idUsuario, estadoInvitacion: "aceptada" },
+    include: { grupo: { include: { evaluacion: { include: { curso: true } } } } },
+  });
+
+  const candidatos = new Map<number, { cursoFuente: Curso; idGrupo: number }>();
+  for (const integrante of integraciones) {
+    const cursoFuente = integrante.grupo.evaluacion?.curso;
+    if (!cursoFuente || cursoFuente.idUsuario === idUsuario) continue;
+    if (!candidatos.has(cursoFuente.idCurso)) {
+      candidatos.set(cursoFuente.idCurso, { cursoFuente, idGrupo: integrante.idGrupo });
+    }
+  }
+
+  const resultado = [];
+  for (const { cursoFuente, idGrupo } of candidatos.values()) {
+    const local = await prisma.curso.findFirst({
+      where: { idUsuario, importadoDeIdCurso: cursoFuente.idCurso },
+    });
+    const hayActualizaciones = local ? await hayActualizacionesDeCursoImportado(local.idCurso) : false;
+
+    if (!local || hayActualizaciones) {
+      resultado.push({ cursoFuente, idGrupo, idCursoLocal: local?.idCurso ?? null, hayActualizaciones });
+    }
+  }
+
+  return resultado;
 }
 
 export async function agregarHorario(
