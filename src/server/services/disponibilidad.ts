@@ -72,6 +72,52 @@ export async function ocupadosDeUsuarios(idsUsuario: number[]): Promise<Map<numb
 }
 
 /**
+ * Horario semanal de un companero (decision del usuario: con categorias y cursos, como el propio
+ * calendario). Solo si comparten un grupo donde ambos estan aceptados y ninguno es observador.
+ * Los bloques van sin `detalle` (texto libre, puede ser personal). null si no puede verlo.
+ */
+export async function obtenerHorarioCompanero(idVisitante: number, idUsuario: number) {
+  if (idVisitante === idUsuario) return null;
+  const comparten = await prisma.grupo.findFirst({
+    where: {
+      AND: [
+        { integrantes: { some: { idUsuario: idVisitante, estadoInvitacion: "aceptada", rol: { not: "observador" } } } },
+        { integrantes: { some: { idUsuario, estadoInvitacion: "aceptada", rol: { not: "observador" } } } },
+      ],
+    },
+    select: { idGrupo: true },
+  });
+  if (!comparten) return null;
+
+  const usuario = await prisma.usuario.findUnique({
+    where: { idUsuario },
+    select: {
+      nombre: true,
+      apellidos: true,
+      fotoUrl: true,
+      eliminadoEn: true,
+      cursos: {
+        where: { activo: true },
+        select: { nombre: true, horarios: { select: { idHorario: true, diaSemana: true, horaInicio: true, horaFin: true } } },
+      },
+      bloquesOcupados: { select: { idBloqueOcupado: true, tipo: true, diaSemana: true, horaInicio: true, horaFin: true } },
+    },
+  });
+  if (!usuario || usuario.eliminadoEn) return null;
+
+  return {
+    nombre: usuario.nombre,
+    apellidos: usuario.apellidos,
+    fotoUrl: usuario.fotoUrl,
+    horarios: usuario.cursos.flatMap((curso) => curso.horarios.map((h) => ({ ...h, curso: curso.nombre }))),
+    bloques: usuario.bloquesOcupados.map(({ tipo, ...bloque }) => ({
+      ...bloque,
+      categoria: tipo === "laboral" ? ("laboral" as const) : ("fam" as const),
+    })),
+  };
+}
+
+/**
  * Disponibilidad de los integrantes aceptados (sin observadores) de un grupo. Solo la ven
  * integrantes aceptados que no sean observadores (AGENTS.md 8.3: el observador no ve la
  * disponibilidad de nadie).

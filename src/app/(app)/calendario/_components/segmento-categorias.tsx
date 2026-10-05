@@ -8,10 +8,12 @@ export function SegmentoCategorias({
   activa,
   semanaISO,
   minutosPorCategoria,
+  enlace = (vista) => `/calendario?semana=${semanaISO}&vista=${vista}`,
 }: {
   activa: VistaCalendario;
   semanaISO: string;
   minutosPorCategoria: Record<CategoriaCalendario, number>;
+  enlace?: (vista: VistaCalendario) => string;
 }) {
   const opciones: { key: VistaCalendario; label: string }[] = [{ key: "todo", label: "Todo" }, ...CATEGORIAS_CALENDARIO];
 
@@ -24,7 +26,7 @@ export function SegmentoCategorias({
           return (
             <Link
               key={opcion.key}
-              href={`/calendario?semana=${semanaISO}&vista=${opcion.key}`}
+              href={enlace(opcion.key)}
               aria-current={activo ? "page" : undefined}
               className={`flex items-center gap-2 whitespace-nowrap px-3 py-1.5 transition-colors duration-150 ${
                 activo ? "bg-primary-soft font-medium text-primary" : "text-text hover:bg-bg"

@@ -1,7 +1,6 @@
 import { prisma } from "@/server/db/client";
 import { cerrarSesion } from "@/server/auth/session";
 import { requerirUsuarioValido } from "@/server/services/usuario";
-import { ocupadosDeUsuarios } from "@/server/services/disponibilidad";
 import type { actualizarPerfilSchema } from "@/lib/validation/perfil";
 import type { z } from "zod";
 
@@ -17,9 +16,8 @@ export async function obtenerPerfilCompleto(idUsuario: number) {
  * Perfil de otro usuario. Reglas (decididas con el usuario):
  * - Cualquiera lo ve solo si la persona tiene `visible_en_busqueda`; sus companeros de grupo
  *   (ambos con invitacion aceptada) lo ven siempre.
- * - El horario (solo ocupado/libre) se muestra si comparten un grupo donde ambos estan
- *   aceptados y ninguno es observador.
- * - Nunca se expone correo, `trabaja`, el tipo de un bloque ni el curso.
+ * - Datos basicos, incluido si trabaja. Nunca el correo.
+ * - La disponibilidad va en su propia pagina; aqui solo se dice si el visitante puede verla.
  * Devuelve null si no existe, fue eliminado o no es visible para quien lo pide.
  */
 export async function obtenerPerfilPublico(idVisitante: number, idUsuario: number) {
@@ -38,6 +36,7 @@ export async function obtenerPerfilPublico(idVisitante: number, idUsuario: numbe
           carrera: true,
           ciclo: true,
           biografia: true,
+          trabaja: true,
           visibleEnBusqueda: true,
         },
       },
@@ -62,17 +61,15 @@ export async function obtenerPerfilPublico(idVisitante: number, idUsuario: numbe
 
   if (gruposEnComun.length === 0 && !usuario.perfil.visibleEnBusqueda) return null;
 
-  const veHorario = gruposEnComun.some((grupo) => grupo.integrantes.every((i) => i.rol !== "observador"));
-  const ocupados = veHorario ? ((await ocupadosDeUsuarios([idUsuario])).get(idUsuario) ?? []) : null;
-  const { tipoCuenta, institucion, carrera, ciclo, biografia } = usuario.perfil;
+  const { tipoCuenta, institucion, carrera, ciclo, biografia, trabaja } = usuario.perfil;
 
   return {
     nombre: usuario.nombre,
     apellidos: usuario.apellidos,
     fotoUrl: usuario.fotoUrl,
-    perfil: { tipoCuenta, institucion, carrera, ciclo, biografia },
+    perfil: { tipoCuenta, institucion, carrera, ciclo, biografia, trabaja },
     gruposEnComun: gruposEnComun.map(({ idGrupo, nombre }) => ({ idGrupo, nombre })),
-    ocupados,
+    puedeVerDisponibilidad: gruposEnComun.some((grupo) => grupo.integrantes.every((i) => i.rol !== "observador")),
   };
 }
 

@@ -51,8 +51,8 @@ export type ItemCalendario = {
   sigueAlDiaSiguiente: boolean;
   titulo: string;
   subtitulo: string | null;
-  /** Clases: enlace al curso. Bloques: enlace a su pagina de edicion. */
-  href: string;
+  /** Clases: enlace al curso. Bloques: enlace a su pagina de edicion. null = solo lectura (horario de otro). */
+  href: string | null;
 };
 
 export type Entrega = {
@@ -114,6 +114,43 @@ export function construirItems(
   }
 
   return items;
+}
+
+/**
+ * Horario de un companero, de solo lectura: clases con su curso y bloques solo con su
+ * categoria (nunca el detalle, que es texto libre y puede ser personal).
+ */
+export function construirItemsCompanero(horario: {
+  horarios: { idHorario: number; diaSemana: number; horaInicio: Date; horaFin: Date; curso: string }[];
+  bloques: { idBloqueOcupado: number; categoria: CategoriaCalendario; diaSemana: number; horaInicio: Date; horaFin: Date }[];
+}): ItemCalendario[] {
+  const etiquetaCategoria = { clases: "Clases", laboral: "Laboral", fam: "Familiar / Personal" } as const;
+  return [
+    ...horario.horarios.flatMap((h) =>
+      partesPorDia(h.diaSemana, h.horaInicio, h.horaFin).map((parte, i) => ({
+        ...parte,
+        clave: `h-${h.idHorario}-${i}`,
+        categoria: "clases" as const,
+        horaInicio: etiquetaHora(h.horaInicio),
+        horaFin: etiquetaHora(h.horaFin),
+        titulo: h.curso,
+        subtitulo: null,
+        href: null,
+      })),
+    ),
+    ...horario.bloques.flatMap((b) =>
+      partesPorDia(b.diaSemana, b.horaInicio, b.horaFin).map((parte, i) => ({
+        ...parte,
+        clave: `b-${b.idBloqueOcupado}-${i}`,
+        categoria: b.categoria,
+        horaInicio: etiquetaHora(b.horaInicio),
+        horaFin: etiquetaHora(b.horaFin),
+        titulo: etiquetaCategoria[b.categoria],
+        subtitulo: null,
+        href: null,
+      })),
+    ),
+  ];
 }
 
 export function construirEntregas(

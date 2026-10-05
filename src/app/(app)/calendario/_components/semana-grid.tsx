@@ -157,21 +157,26 @@ function BloqueEvento({ item, desdeMin }: { item: ConColumna<ItemCalendario>; de
     );
   }
 
+  const clase = `absolute overflow-hidden border px-1.5 py-1 text-[11px] transition-colors duration-150 focus-visible:z-20 ${estilo.bloque} ${
+    item.href ? estilo.enlace : ""
+  } ${item.sigueAlDiaSiguiente ? "rounded-t-sm border-b-0" : item.sigueDelDiaAnterior ? "rounded-b-sm border-t-0" : "rounded-sm"}`;
+  const posicion = {
+    top: item.sigueDelDiaAnterior ? top : top + 1,
+    height: item.sigueAlDiaSiguiente || item.sigueDelDiaAnterior ? alto - 1 : alto - 2,
+    left: `calc(${(item.columna / item.columnas) * 100}% + 2px)`,
+    width: `calc(${100 / item.columnas}% - 4px)`,
+  };
+
+  if (!item.href) {
+    return (
+      <div className={clase} style={posicion} title={descripcion}>
+        {contenido}
+      </div>
+    );
+  }
+
   return (
-    <Link
-      href={item.href}
-      className={`absolute overflow-hidden border px-1.5 py-1 text-[11px] transition-colors duration-150 focus-visible:z-20 ${estilo.bloque} ${estilo.enlace} ${
-        item.sigueAlDiaSiguiente ? "rounded-t-sm border-b-0" : item.sigueDelDiaAnterior ? "rounded-b-sm border-t-0" : "rounded-sm"
-      }`}
-      style={{
-        top: item.sigueDelDiaAnterior ? top : top + 1,
-        height: item.sigueAlDiaSiguiente || item.sigueDelDiaAnterior ? alto - 1 : alto - 2,
-        left: `calc(${(item.columna / item.columnas) * 100}% + 2px)`,
-        width: `calc(${100 / item.columnas}% - 4px)`,
-      }}
-      title={descripcion}
-      aria-label={descripcion}
-    >
+    <Link href={item.href} className={clase} style={posicion} title={descripcion} aria-label={descripcion}>
       {contenido}
     </Link>
   );

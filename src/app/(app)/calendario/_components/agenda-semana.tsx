@@ -52,23 +52,31 @@ export function AgendaSemana({
             ) : (
               <ul className="divide-y divide-border">
                 {delDia.map((item) => {
-                  const { horaInicio: inicio, horaFin: fin } = item;
+                  const fila = (
+                    <>
+                      <span className="block w-[4.75rem] shrink-0 text-xs leading-5 tabular-nums">
+                        <span className="block font-medium text-text">{item.horaInicio}</span>
+                        <span className="block text-text-muted">{item.horaFin}</span>
+                      </span>
+                      <span
+                        className={`mt-1.5 size-2 shrink-0 rounded-full ${ESTILO_CATEGORIA[item.categoria].punto}`}
+                        aria-hidden
+                      />
+                      <span className="block min-w-0">
+                        <span className="block text-sm font-medium leading-5">{item.titulo}</span>
+                        {item.subtitulo ? <span className="block text-xs text-text-muted">{item.subtitulo}</span> : null}
+                      </span>
+                    </>
+                  );
                   return (
                     <li key={item.clave}>
-                      <Link href={item.href} className="flex gap-3 px-3 py-2.5 transition-colors duration-150 hover:bg-bg">
-                        <span className="block w-[4.75rem] shrink-0 text-xs leading-5 tabular-nums">
-                          <span className="block font-medium text-text">{inicio}</span>
-                          <span className="block text-text-muted">{fin}</span>
-                        </span>
-                        <span
-                          className={`mt-1.5 size-2 shrink-0 rounded-full ${ESTILO_CATEGORIA[item.categoria].punto}`}
-                          aria-hidden
-                        />
-                        <span className="block min-w-0">
-                          <span className="block text-sm font-medium leading-5">{item.titulo}</span>
-                          {item.subtitulo ? <span className="block text-xs text-text-muted">{item.subtitulo}</span> : null}
-                        </span>
-                      </Link>
+                      {item.href ? (
+                        <Link href={item.href} className="flex gap-3 px-3 py-2.5 transition-colors duration-150 hover:bg-bg">
+                          {fila}
+                        </Link>
+                      ) : (
+                        <div className="flex gap-3 px-3 py-2.5">{fila}</div>
+                      )}
                     </li>
                   );
                 })}
