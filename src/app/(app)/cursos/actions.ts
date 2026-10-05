@@ -42,7 +42,8 @@ export async function importarCursoAction(idGrupo: number, volverA: string) {
 
   revalidatePath("/cursos");
   revalidatePath(volverA);
-  redirect(volverA);
+  const separador = volverA.includes("?") ? "&" : "?";
+  redirect(`${volverA}${separador}toast=${encodeURIComponent("Curso importado")}`);
 }
 
 export async function crearCursoAction(formData: FormData) {
