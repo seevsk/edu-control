@@ -3,8 +3,6 @@ import { requerirSesion } from "@/server/auth/session";
 import { obtenerUsuarioActual } from "@/server/services/usuario";
 import { listarTareasAsignadasAlUsuario } from "@/server/services/tarea";
 import { listarEvaluacionesProximas, yaImportoCurso } from "@/server/services/curso";
-import { formatearFechaLima } from "@/lib/dates";
-import { etiquetaRelativa } from "@/lib/calendario";
 import { ETIQUETA_ESTADO_TAREA, COLOR_ESTADO_TAREA } from "@/lib/estado-tarea";
 import { SubmitButton } from "@/components/submit-button";
 import { Toast } from "@/components/toast";
@@ -13,6 +11,7 @@ import { AvataresGrupo } from "@/components/avatares-grupo";
 import { DatosTarjeta } from "@/components/datos-tarjeta";
 import { ChipModalidad } from "@/components/chip-modalidad";
 import { EncabezadoTarjeta } from "@/components/encabezado-tarjeta";
+import { TaloneraFecha } from "@/components/talonera-fecha";
 import { importarCursoAction } from "./cursos/actions";
 
 const TARJETA = "flex flex-col gap-3 rounded-md border border-border bg-surface p-3.5 text-sm transition-colors duration-150";
@@ -61,29 +60,27 @@ export default async function InicioPage({
             <Link
               key={evaluacion.idEvaluacion}
               href={`/cursos/${evaluacion.idCurso}`}
-              className={`${TARJETA} hover:border-border-strong`}
+              className={`${TARJETA} flex-row hover:border-border-strong`}
             >
-              <EncabezadoTarjeta
-                etiqueta="Nombre de la evaluación"
-                titulo={evaluacion.nombre}
-                icono={<IconoCurso nombre={evaluacion.curso.nombre} codigo={evaluacion.curso.codigo} />}
-              />
-              <div className="border-t border-border pt-2.5">
-                <DatosTarjeta
-                  datos={[
-                    { etiqueta: "Nombre del curso", valor: evaluacion.curso.nombre },
-                    {
-                      etiqueta: "Modalidad",
-                      valor: evaluacion.curso.modalidad ? <ChipModalidad modalidad={evaluacion.curso.modalidad} /> : null,
-                    },
-                    {
-                      etiqueta: "Finaliza",
-                      valor: etiquetaRelativa(evaluacion.fechaCierre),
-                      titulo: formatearFechaLima(evaluacion.fechaCierre),
-                    },
-                  ]}
+              <div className="flex min-w-0 flex-1 flex-col gap-3">
+                <EncabezadoTarjeta
+                  etiqueta="Nombre de la evaluación"
+                  titulo={evaluacion.nombre}
+                  icono={<IconoCurso nombre={evaluacion.curso.nombre} codigo={evaluacion.curso.codigo} />}
                 />
+                <div className="border-t border-border pt-2.5">
+                  <DatosTarjeta
+                    datos={[
+                      { etiqueta: "Nombre del curso", valor: evaluacion.curso.nombre },
+                      {
+                        etiqueta: "Modalidad",
+                        valor: evaluacion.curso.modalidad ? <ChipModalidad modalidad={evaluacion.curso.modalidad} /> : null,
+                      },
+                    ]}
+                  />
+                </div>
               </div>
+              <TaloneraFecha fecha={evaluacion.fechaCierre} />
             </Link>
           ))}
           {evaluaciones.length === 0 ? (
@@ -99,7 +96,8 @@ export default async function InicioPage({
         <div className="mt-2 grid gap-3 sm:grid-cols-2">
           {tarjetasTareas.map(({ tarea, curso, puedeImportar }) => (
             <div key={tarea.idTarea} className={TARJETA}>
-              <Link href={`/grupos/${tarea.idGrupo}/tareas`} className="flex flex-1 flex-col gap-3 hover:opacity-90">
+              <Link href={`/grupos/${tarea.idGrupo}/tareas`} className="flex flex-1 gap-3 hover:opacity-90">
+                <div className="flex min-w-0 flex-1 flex-col gap-3">
                 <EncabezadoTarjeta etiqueta="Asignación de tarea" titulo={tarea.titulo} />
                 <div className="border-t border-border pt-2.5">
                 <DatosTarjeta
@@ -121,14 +119,11 @@ export default async function InicioPage({
                     { etiqueta: "Nombre del grupo", valor: tarea.grupo.nombre },
                     { etiqueta: "Nombre del curso", valor: curso?.nombre },
                     { etiqueta: "Modalidad", valor: curso?.modalidad ? <ChipModalidad modalidad={curso.modalidad} /> : null },
-                    {
-                      etiqueta: "Finaliza",
-                      valor: tarea.fechaLimite ? etiquetaRelativa(tarea.fechaLimite) : null,
-                      titulo: tarea.fechaLimite ? formatearFechaLima(tarea.fechaLimite) : undefined,
-                    },
                   ]}
                 />
                 </div>
+                </div>
+                <TaloneraFecha fecha={tarea.fechaLimite} />
               </Link>
 
               <div className="flex items-end justify-between gap-2 border-t border-border pt-2.5">

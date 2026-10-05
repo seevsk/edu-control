@@ -2,8 +2,6 @@ import Link from "next/link";
 import { requerirSesion } from "@/server/auth/session";
 import { listarMisGrupos } from "@/server/services/grupo";
 import { listarEvaluacionesDelUsuario } from "@/server/services/curso";
-import { formatearFechaLima } from "@/lib/dates";
-import { etiquetaRelativa } from "@/lib/calendario";
 import { crearGrupoAction } from "./actions";
 import { SubmitButton } from "@/components/submit-button";
 import { IconoCurso } from "@/components/icono-curso";
@@ -11,6 +9,7 @@ import { AvataresGrupo } from "@/components/avatares-grupo";
 import { DatosTarjeta } from "@/components/datos-tarjeta";
 import { ChipModalidad } from "@/components/chip-modalidad";
 import { EncabezadoTarjeta } from "@/components/encabezado-tarjeta";
+import { TaloneraFecha } from "@/components/talonera-fecha";
 
 export default async function GruposPage({
   searchParams,
@@ -43,6 +42,8 @@ export default async function GruposPage({
                 href={`/grupos/${grupo.idGrupo}`}
                 className="flex h-full flex-col gap-3 rounded-md border border-border bg-surface p-3.5 text-sm transition-colors duration-150 hover:border-border-strong"
               >
+                <div className="flex gap-3">
+                <div className="flex min-w-0 flex-1 flex-col gap-3">
                 <EncabezadoTarjeta
                   etiqueta="Nombre del grupo"
                   titulo={grupo.nombre}
@@ -53,11 +54,6 @@ export default async function GruposPage({
                   datos={[
                     { etiqueta: "Nombre del curso", valor: curso?.nombre },
                     { etiqueta: "Modalidad", valor: curso?.modalidad ? <ChipModalidad modalidad={curso.modalidad} /> : null },
-                    {
-                      etiqueta: "Finaliza",
-                      valor: grupo.fechaLimite ? etiquetaRelativa(grupo.fechaLimite) : null,
-                      titulo: grupo.fechaLimite ? formatearFechaLima(grupo.fechaLimite) : undefined,
-                    },
                     {
                       etiqueta: "Estado",
                       valor: (
@@ -73,6 +69,9 @@ export default async function GruposPage({
                     },
                   ]}
                 />
+                </div>
+                </div>
+                <TaloneraFecha fecha={grupo.fechaLimite} />
                 </div>
                 <div className="mt-auto flex items-center justify-between gap-2 border-t border-border pt-2.5 text-xs">
                   <span>
