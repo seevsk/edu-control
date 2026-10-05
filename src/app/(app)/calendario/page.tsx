@@ -11,7 +11,7 @@ import {
 } from "@/lib/calendario";
 import { IconAgregar, IconChevronDerecha, IconChevronIzquierda } from "@/components/icons";
 import { Toast } from "@/components/toast";
-import { construirEntregas, construirItems } from "./_components/items";
+import { construirEntregas, construirItems, construirReuniones } from "./_components/items";
 import { SegmentoCategorias, type VistaCalendario } from "./_components/segmento-categorias";
 import { SemanaGrid } from "./_components/semana-grid";
 import { AgendaSemana } from "./_components/agenda-semana";
@@ -43,18 +43,23 @@ export default async function CalendarioPage({
   const lunesISO = lunesDeSemanaISO(semanaValida ? new Date(`${semanaValida}T12:00:00-05:00`) : ahora);
   const esSemanaActual = lunesISO === lunesDeSemanaISO(ahora);
 
-  const { dias, horarios, bloquesOcupados, evaluaciones, tareas } = await obtenerSemanaCalendario(
+  const { dias, horarios, bloquesOcupados, evaluaciones, tareas, reuniones } = await obtenerSemanaCalendario(
     sesion.idUsuario,
     lunesISO,
   );
 
   const consulta = consultaCalendario(lunesISO, vista);
   const todosLosItems = construirItems(horarios, bloquesOcupados, consulta);
-  const items = vista === "todo" ? todosLosItems : todosLosItems.filter((item) => item.categoria === vista);
+  const items =
+    vista === "todo"
+      ? [...todosLosItems, ...construirReuniones(reuniones)]
+      : todosLosItems.filter((item) => item.categoria === vista);
   const entregas = construirEntregas(evaluaciones, tareas);
 
   const minutosPorCategoria: Record<CategoriaCalendario, number> = { clases: 0, laboral: 0, fam: 0 };
-  for (const item of todosLosItems) minutosPorCategoria[item.categoria] += item.finMin - item.inicioMin;
+  for (const item of todosLosItems) {
+    if (item.categoria !== "reunion") minutosPorCategoria[item.categoria] += item.finMin - item.inicioMin;
+  }
 
   const enlaceSemana = (lunes: string) => `/calendario${consultaCalendario(lunes, vista)}`;
   const textos = TEXTOS[vista];

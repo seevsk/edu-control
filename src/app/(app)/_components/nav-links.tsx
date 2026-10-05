@@ -48,7 +48,7 @@ export function BottomNav({ invitacionesPendientes = 0 }: { invitacionesPendient
   return (
     <nav
       aria-label="Navegacion principal"
-      className="grid grid-cols-6 border-t border-border bg-surface"
+      className="grid grid-cols-7 border-t border-border bg-surface"
     >
       {navItems.map(({ href, label, Icon }) => {
         const activo = esActivo(pathname, href);

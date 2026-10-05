@@ -45,6 +45,8 @@ Nació como proyecto del curso *Proyecto Tecnológico* (NRC 3708, ISIL, metodolo
 | Evaluaciones | HU-009, HU-010 | Modelo `evaluacion` |
 | Perfil y disponibilidad | HU-003, HU-017, HU-018 | Modelo `perfil` y `bloque_ocupado`; se construye después del núcleo |
 | Disponibilidad del grupo | — (aprobado por el usuario, 2026-10-05) | Pestaña "Horarios" del grupo: mapa semanal ocupado/libre y huecos en común. Calculado, sin tabla (ver 8.5) |
+| Reuniones | — (aprobado por el usuario, 2026-10-05) | Módulo propio en el sidebar (`/reuniones`): programar con sugerencias de la disponibilidad del grupo, confirmar asistencia, verlas en el Calendario. Modelos `reunion` y `reunion_asistente` (ver 8.7) |
+| Perfil de otros usuarios y buscador de personas | — (aprobado por el usuario, 2026-10-05) | `/usuarios` y `/usuarios/[id]` (ver 8.1) |
 
 **Las tareas existen solo dentro de grupos.** No hay tareas personales en el MVP.
 
@@ -156,7 +158,7 @@ Reglas de arquitectura:
 
 ## 7. Modelo de datos
 
-**La especificación exacta está en `docs/educontrol.dbml`** (11 tablas). Si ese archivo no existe, pídelo al usuario; no inventes el esquema. Una vez creado `prisma/schema.prisma`, este pasa a ser la fuente de verdad y el `.dbml` se actualiza en el mismo cambio.
+**La especificación exacta está en `docs/educontrol.dbml`** (13 tablas). Si ese archivo no existe, pídelo al usuario; no inventes el esquema. Una vez creado `prisma/schema.prisma`, este pasa a ser la fuente de verdad y el `.dbml` se actualiza en el mismo cambio.
 
 | Tabla | Propósito |
 |---|---|
@@ -171,6 +173,8 @@ Reglas de arquitectura:
 | `tarea` | Tareas de un grupo, con responsable, estado y peso |
 | `tarea_historial` | Registro inmutable de cambios de cada tarea |
 | `notificacion` | Avisos por destinatario, con estado de envío de correo |
+| `reunion` | Reunión de un grupo, de una sola vez (título, inicio, fin, lugar y enlace opcionales) |
+| `reunion_asistente` | Confirmación de asistencia por integrante (`pendiente` \| `asistire` \| `no_asistire`) |
 
 **Lo que NO tiene tabla** (se calcula con consultas): el calendario, el avance del grupo, la carga y el cumplimiento por integrante, el feed de actividad y el tiempo libre.
 
@@ -291,6 +295,7 @@ Reglas de arquitectura:
 | Devuelven una tarea a `en_progreso` | `tarea_devuelta` | El asignado | Sí |
 | Una tarea queda `completada` | `tarea_completada` | El asignado | No |
 | Cambio a `en_progreso` | — | Nadie (solo queda en el historial) | No |
+| Programan una reunión | `reunion_programada` | Integrantes aceptados no observadores, menos quien la programó | No (confirmado: solo campana) |
 
 - Mantén la **lista de eventos que envían correo en un único lugar** (una constante o archivo de configuración), para poder cambiar la política sin tocar la lógica.
 - `grupo_integrante.correo_actividad = false` silencia los correos de **actividad** de ese grupo (revisión, completada). Los importantes (invitaciones, tareas asignadas o devueltas) siguen llegando.
@@ -300,6 +305,17 @@ Reglas de arquitectura:
   - `ResendEmailSender` (cuando exista dominio verificado): usa el `id_notificacion` como clave de idempotencia para que un reintento no duplique el correo.
 - Límites de Resend en el plan gratuito: tope diario de envíos para toda la app y necesidad de verificar un dominio propio para escribir a terceros. Por eso el correo se reserva para lo que exige acción de alguien.
 
+### 8.7 Reuniones (confirmado)
+
+- Módulo propio en el sidebar: `/reuniones` lista las de todos mis grupos (filtro por grupo) y `/reuniones/nueva?grupo=` las programa. También se llega desde la pestaña "Horarios" del grupo (botón o un hueco en común, que precarga la próxima fecha de ese día).
+- Las programan el líder y los miembros (aceptados, no observadores) de un grupo `activo`. Son de **una sola vez** (sin repetición) y empiezan y terminan el mismo día. No se programan en el pasado.
+- **El sistema sugiere, no obliga** (decisión del usuario): el formulario muestra como sugerencias los huecos en común de los próximos 7 días y el mapa del grupo. Se puede elegir cualquier otra hora; si pisa el horario semanal de alguien, se avisa en vivo ("Choca con el horario de …") pero se permite programarla.
+- `enlace` se valida con Zod (`https://` o `http://`), igual que `grupo.enlace_trabajo`.
+- Al crearla se inserta una fila de `reunion_asistente` por integrante aceptado no observador en el mismo `create` anidado: quien la programa queda `asistire`, el resto `pendiente`. Quien se une al grupo después puede responder igual (upsert).
+- Responden (`asistire` | `no_asistire`) los integrantes aceptados no observadores mientras la reunión no haya terminado. Cancelan (borrar la fila; borra en cascada sus asistentes) quien la programó o el líder. Cancelar no notifica en el MVP.
+- Los observadores ven las reuniones del grupo pero no son asistentes ni reciben avisos.
+- Aparecen en el Calendario de cada integrante participante (solo en la vista "Todo", con su propio color), sin contar en las horas por categoría.
+
 ## 9. Diseño de la interfaz
 
 Usa **Azure DevOps** como referencia visual: se siente profesional, densa en información pero legible, pensada para seguir el estado de un vistazo. Es **inspiración, no copia**: no uses sus logos, íconos ni marca.
@@ -307,7 +323,7 @@ Usa **Azure DevOps** como referencia visual: se siente profesional, densa en inf
 **Estructura general**
 
 - Barra superior: nombre del producto, búsqueda, campana de notificaciones y avatar.
-- Barra lateral izquierda con íconos: Inicio, Cursos, Calendario, Grupos, Invitaciones (con contador si hay pendientes) y Perfil.
+- Barra lateral izquierda con íconos: Inicio, Cursos, Calendario, Grupos, Reuniones, Invitaciones (con contador si hay pendientes) y Perfil.
 - Migas de pan (*breadcrumbs*) y pestañas dentro de cada página. Ejemplo, página de un grupo: **Resumen · Tareas · Integrantes · Actividad**.
 - Franjas informativas en azul claro para avisos (por ejemplo, "Tienes 2 invitaciones pendientes").
 

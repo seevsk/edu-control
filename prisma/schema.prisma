@@ -64,6 +64,13 @@ enum TipoNotificacion {
   tarea_en_revision
   tarea_devuelta
   tarea_completada
+  reunion_programada
+}
+
+enum RespuestaReunion {
+  pendiente
+  asistire
+  no_asistire
 }
 
 enum EstadoCorreo {
@@ -96,6 +103,8 @@ model Usuario {
   tareasAsignadas Tarea[]           @relation("TareaAsignado")
   historial       TareaHistorial[]
   notificaciones  Notificacion[]
+  reunionesCreadas Reunion[]         @relation("ReunionCreador")
+  reuniones        ReunionAsistente[]
 
   @@map("usuario")
 }
@@ -214,6 +223,7 @@ model Grupo {
   evaluacion  Evaluacion?       @relation(fields: [idEvaluacion], references: [idEvaluacion], onDelete: SetNull)
   integrantes GrupoIntegrante[]
   tareas      Tarea[]
+  reuniones   Reunion[]
 
   @@map("grupo")
 }
@@ -273,6 +283,40 @@ model TareaHistorial {
   usuario Usuario @relation(fields: [idUsuario], references: [idUsuario])
 
   @@map("tarea_historial")
+}
+
+/// Reunion de un grupo (de una sola vez). Las fechas se guardan en UTC.
+model Reunion {
+  idReunion     Int      @id @default(autoincrement()) @map("id_reunion")
+  idGrupo       Int      @map("id_grupo")
+  idCreador     Int      @map("id_creador")
+  titulo        String   @db.VarChar(120)
+  inicio        DateTime
+  fin           DateTime
+  lugar         String?  @db.VarChar(160)
+  enlace        String?
+  fechaCreacion DateTime @default(now()) @map("fecha_creacion")
+
+  grupo      Grupo              @relation(fields: [idGrupo], references: [idGrupo], onDelete: Cascade)
+  creador    Usuario            @relation("ReunionCreador", fields: [idCreador], references: [idUsuario])
+  asistentes ReunionAsistente[]
+
+  @@index([idGrupo, inicio])
+  @@map("reunion")
+}
+
+/// Confirmacion de asistencia: una fila por integrante convocado.
+model ReunionAsistente {
+  idReunion      Int              @map("id_reunion")
+  idUsuario      Int              @map("id_usuario")
+  respuesta      RespuestaReunion @default(pendiente)
+  fechaRespuesta DateTime?        @map("fecha_respuesta")
+
+  reunion Reunion @relation(fields: [idReunion], references: [idReunion], onDelete: Cascade)
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario])
+
+  @@id([idReunion, idUsuario])
+  @@map("reunion_asistente")
 }
 
 /// Avisos por destinatario, con estado de envio de correo.

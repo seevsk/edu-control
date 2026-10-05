@@ -15,12 +15,12 @@ export function TabsGrupo({
   ] as const;
 
   return (
-    <div className="flex gap-4 border-b border-border">
+    <div className="flex gap-4 overflow-x-auto border-b border-border">
       {tabs.map((tab) => (
         <Link
           key={tab.key}
           href={tab.href}
-          className={`-mb-px border-b-2 px-1 pb-2 text-sm font-medium ${
+          className={`-mb-px whitespace-nowrap border-b-2 px-1 pb-2 text-sm font-medium ${
             activa === tab.key
               ? "border-primary text-primary"
               : "border-transparent text-text-muted hover:text-text"

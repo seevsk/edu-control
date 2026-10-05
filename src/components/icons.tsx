@@ -49,6 +49,15 @@ export function IconGrupos(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function IconReuniones(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="M3.5 5.5a1.5 1.5 0 0 1 1.5-1.5h7a1.5 1.5 0 0 1 1.5 1.5v4a1.5 1.5 0 0 1-1.5 1.5H8l-2.5 2v-2H5a1.5 1.5 0 0 1-1.5-1.5Z" />
+      <path d="M13.5 7.5H15a1.5 1.5 0 0 1 1.5 1.5v4a1.5 1.5 0 0 1-1.5 1.5h-.5v2L12 14.5H9.5A1.5 1.5 0 0 1 8 13v-.5" />
+    </svg>
+  );
+}
+
 export function IconInvitaciones(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base(props)}>

@@ -34,6 +34,10 @@
   --color-cat-fam-bg: #e9f5ea;
   --color-cat-fam-fg: #1b5420;
   --color-cat-fam-borde: #b9dcbb;
+  --color-cat-reunion: #6b4fbb;
+  --color-cat-reunion-bg: #f1edfb;
+  --color-cat-reunion-fg: #45307f;
+  --color-cat-reunion-borde: #cfc3ef;
 
   /* Superficie de marca: siempre oscura, no sigue el tema claro/oscuro del sistema. */
   --color-brand-ink: #12141a;
@@ -71,6 +75,10 @@
   --color-cat-fam-bg: var(--color-cat-fam-bg);
   --color-cat-fam-fg: var(--color-cat-fam-fg);
   --color-cat-fam-borde: var(--color-cat-fam-borde);
+  --color-cat-reunion: var(--color-cat-reunion);
+  --color-cat-reunion-bg: var(--color-cat-reunion-bg);
+  --color-cat-reunion-fg: var(--color-cat-reunion-fg);
+  --color-cat-reunion-borde: var(--color-cat-reunion-borde);
 
   --color-brand-ink: var(--color-brand-ink);
   --color-brand-ink-border: var(--color-brand-ink-border);
@@ -109,6 +117,10 @@
     --color-cat-fam-bg: #16301a;
     --color-cat-fam-fg: #b2deb4;
     --color-cat-fam-borde: #2b5530;
+    --color-cat-reunion: #a48ae6;
+    --color-cat-reunion-bg: #26203d;
+    --color-cat-reunion-fg: #d6cbf6;
+    --color-cat-reunion-borde: #463a6e;
   }
 }
 
