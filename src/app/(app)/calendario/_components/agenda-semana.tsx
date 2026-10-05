@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { diaMesCorto } from "@/lib/calendario";
-import { DIAS_LARGOS, ESTILO_CATEGORIA, type Entrega, type ItemCalendario } from "./items";
+import { DIAS_LARGOS, diaMesCorto } from "@/lib/calendario";
+import { ESTILO_CATEGORIA, type Entrega, type ItemCalendario } from "./items";
 import { ChipEntrega } from "./chip-entrega";
 
 /** Vista movil: agenda por dia. En una pantalla angosta una grilla de 7 columnas no se lee. */
