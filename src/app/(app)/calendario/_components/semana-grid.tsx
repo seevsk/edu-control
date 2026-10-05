@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { distribuirSolapes, etiquetaHoraEje, horaInicioVisible, type ConColumna } from "@/lib/calendario";
-import { DIAS_CORTOS, ESTILO_CATEGORIA, rangoDe, type Entrega, type ItemCalendario } from "./items";
+import { DIAS_CORTOS, distribuirSolapes, etiquetaHoraEje, horaInicioVisible, type ConColumna } from "@/lib/calendario";
+import { ESTILO_CATEGORIA, rangoDe, type Entrega, type ItemCalendario } from "./items";
 import { ChipEntrega } from "./chip-entrega";
 
 const PX_POR_HORA = 48;

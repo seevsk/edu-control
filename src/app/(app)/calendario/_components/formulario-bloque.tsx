@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { OPCIONES_HORA, etiquetaMinutos } from "@/lib/calendario";
+import { DIAS_CORTOS, DIAS_LARGOS, OPCIONES_HORA, etiquetaMinutos } from "@/lib/calendario";
 import { SubmitButton } from "@/components/submit-button";
-import { DIAS_CORTOS, DIAS_LARGOS } from "./items";
 
 type Tipo = "laboral" | "familiar" | "personal";
 

@@ -16,6 +16,9 @@ export const CATEGORIAS_CALENDARIO: { key: CategoriaCalendario; label: string }[
   { key: "fam", label: "Familiar / Personal" },
 ];
 
+export const DIAS_CORTOS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+export const DIAS_LARGOS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+
 export function categoriaDeTipoBloque(tipo: "laboral" | "familiar" | "personal"): CategoriaCalendario {
   return tipo === "laboral" ? "laboral" : "fam";
 }

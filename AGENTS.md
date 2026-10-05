@@ -44,6 +44,7 @@ Nació como proyecto del curso *Proyecto Tecnológico* (NRC 3708, ISIL, metodolo
 | Calendario | HU-015 | Vista interna sobre evaluaciones y tareas de grupo |
 | Evaluaciones | HU-009, HU-010 | Modelo `evaluacion` |
 | Perfil y disponibilidad | HU-003, HU-017, HU-018 | Modelo `perfil` y `bloque_ocupado`; se construye después del núcleo |
+| Disponibilidad del grupo | — (aprobado por el usuario, 2026-10-05) | Pestaña "Horarios" del grupo: mapa semanal ocupado/libre y huecos en común. Calculado, sin tabla (ver 8.5) |
 
 **Las tareas existen solo dentro de grupos.** No hay tareas personales en el MVP.
 
@@ -55,7 +56,6 @@ Nació como proyecto del curso *Proyecto Tecnológico* (NRC 3708, ISIL, metodolo
 - **Recuperación de acceso** (HU-002): no aplica, porque no hay contraseñas propias; la recuperación la gestiona Google.
 - Subida de archivos o capturas como evidencia de tareas (descartado por complejidad).
 - Ranking o puntaje único de participación (ver sección 8.5).
-- **Candidato a futuro, no implementar sin aprobación:** sugerir horarios comunes del grupo cruzando disponibilidad. El modelo ya lo soporta.
 
 ### Recorrido principal de usuario (guía para la demo)
 
@@ -270,6 +270,7 @@ Reglas de arquitectura:
 - Excluye a los observadores de todas las métricas.
 - **No hay ranking ni puntaje único.** Muestra carga y cumplimiento lado a lado.
 - **Feed de actividad del grupo** = lectura de `tarea_historial`. No lleva tabla propia.
+- **Disponibilidad del grupo** (pestaña "Horarios", `src/lib/disponibilidad.ts`): ocupado de cada integrante aceptado no observador = `horario_curso` de sus cursos activos + sus `bloque_ocupado`, sobre la semana tipo. Se muestra en franjas de 30 min entre 7 AM y 11 PM, con cuántos están libres y **quién falta por nombre**, nunca el motivo (tipo de bloque ni curso). Huecos en común = franjas consecutivas de 1 h o más con todos libres; si no hay, los de "falta una persona". Los observadores no ven esta pestaña.
 
 ### 8.6 Notificaciones
 

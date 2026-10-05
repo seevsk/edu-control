@@ -18,9 +18,6 @@ export const ETIQUETA_TIPO_BLOQUE = {
 
 const ETIQUETA_MODALIDAD = { presencial: "Presencial", remoto: "Remoto" } as const;
 
-export const DIAS_CORTOS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
-export const DIAS_LARGOS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
-
 /** Clases de Tailwind por categoria (cadenas completas para que Tailwind las detecte). */
 export const ESTILO_CATEGORIA: Record<CategoriaCalendario, { punto: string; bloque: string; enlace: string }> = {
   clases: {
