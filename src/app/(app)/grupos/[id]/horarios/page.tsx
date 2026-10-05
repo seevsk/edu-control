@@ -3,19 +3,11 @@ import { notFound } from "next/navigation";
 import { requerirSesion } from "@/server/auth/session";
 import { obtenerGrupoDelUsuario } from "@/server/services/grupo";
 import { obtenerDisponibilidadGrupo } from "@/server/services/disponibilidad";
-import { DIAS_CORTOS, DIAS_LARGOS, etiquetaHoraEje, etiquetaMinutos, formatearDuracion } from "@/lib/calendario";
-import {
-  VENTANA_POR_DEFECTO,
-  diasLibresParaTodos,
-  huecos,
-  mapaDeDisponibilidad,
-  type Franja,
-  type Hueco,
-} from "@/lib/disponibilidad";
+import { DIAS_LARGOS, etiquetaMinutos, formatearDuracion } from "@/lib/calendario";
+import { diasLibresParaTodos, huecos, mapaDeDisponibilidad, type Franja, type Hueco } from "@/lib/disponibilidad";
 import { Avatar } from "@/components/avatar";
+import { MapaSemanal } from "@/components/mapa-semanal";
 import { TabsGrupo } from "../_components/tabs-grupo";
-
-const PX_FRANJA = 14;
 
 function nivelDeFranja(libres: number, total: number) {
   if (libres === total) return "bg-estado-completada";
@@ -67,10 +59,6 @@ export default async function HorariosGrupoPage({ params }: { params: Promise<{ 
   const diasLibres = diasLibresParaTodos(mapa);
   const comunesSinDiasLibres = comunes.filter((hueco) => !diasLibres.includes(hueco.diaSemana));
 
-  const { desdeMin, hastaMin, pasoMin } = VENTANA_POR_DEFECTO;
-  const horas = Array.from({ length: (hastaMin - desdeMin) / 60 }, (_, i) => desdeMin / 60 + i);
-  const altoGrid = ((hastaMin - desdeMin) / pasoMin) * PX_FRANJA;
-
   const describirFranja = (franja: Franja) => {
     const libres = total - franja.ocupados.length;
     const faltan = franja.ocupados.map((idUsuario) => nombres.get(idUsuario)).join(", ");
@@ -91,9 +79,14 @@ export default async function HorariosGrupoPage({ params }: { params: Promise<{ 
           <div className="flex items-center gap-2 text-sm text-text-muted">
             <div className="flex -space-x-1.5">
               {integrantes.map((integrante) => (
-                <span key={integrante.idUsuario} className="rounded-full ring-2 ring-bg" title={integrante.nombre}>
+                <Link
+                  key={integrante.idUsuario}
+                  href={integrante.idUsuario === sesion.idUsuario ? "/perfil" : `/usuarios/${integrante.idUsuario}`}
+                  className="rounded-full ring-2 ring-bg"
+                  title={integrante.nombre}
+                >
                   <Avatar nombre={integrante.nombre} apellidos={integrante.apellidos} fotoUrl={integrante.fotoUrl} tamano="sm" />
-                </span>
+                </Link>
               ))}
             </div>
             {total} {total === 1 ? "integrante" : "integrantes"}
@@ -122,56 +115,18 @@ export default async function HorariosGrupoPage({ params }: { params: Promise<{ 
         ) : null}
       </section>
 
-      <section className="overflow-hidden rounded-md border border-border bg-surface" aria-label="Disponibilidad semanal del grupo">
-        <div className="grid grid-cols-[3.25rem_repeat(7,minmax(0,1fr))] border-b border-border">
-          <div />
-          {DIAS_CORTOS.map((dia) => (
-            <p key={dia} className="border-l border-border py-2 text-center text-[11px] font-medium uppercase tracking-wide text-text-muted">
-              {dia}
-            </p>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-[3.25rem_repeat(7,minmax(0,1fr))]">
-          <div className="relative" style={{ height: altoGrid }} aria-hidden>
-            {horas.map((hora, i) => (
-              <span
-                key={hora}
-                className={`absolute right-2 text-[10px] tabular-nums text-text-muted ${i === 0 ? "top-0.5" : "-translate-y-1/2"}`}
-                style={i === 0 ? undefined : { top: i * (60 / pasoMin) * PX_FRANJA }}
-              >
-                {etiquetaHoraEje(hora)}
-              </span>
-            ))}
-          </div>
-
-          {mapa.map((franjas, i) => (
-            <div key={DIAS_CORTOS[i]} className="flex flex-col gap-px border-l border-border p-px" style={{ height: altoGrid }}>
-              {franjas.map((franja) => (
-                <div
-                  key={franja.inicioMin}
-                  className={`flex-1 rounded-[2px] ${nivelDeFranja(total - franja.ocupados.length, total)}`}
-                  title={describirFranja(franja)}
-                />
-              ))}
-            </div>
-          ))}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-border px-3 py-2.5 text-xs text-text-muted">
-          {[
-            { clase: "bg-estado-completada", texto: "Todos libres" },
-            { clase: "bg-estado-completada/45", texto: "La mayoría" },
-            { clase: "bg-estado-completada/15", texto: "Algunos" },
-            { clase: "bg-border", texto: "Nadie" },
-          ].map((nivel) => (
-            <span key={nivel.texto} className="flex items-center gap-1.5">
-              <span className={`size-3 rounded-[2px] ${nivel.clase}`} aria-hidden />
-              {nivel.texto}
-            </span>
-          ))}
-        </div>
-      </section>
+      <MapaSemanal
+        etiqueta="Disponibilidad semanal del grupo"
+        mapa={mapa}
+        claseDeFranja={(franja) => nivelDeFranja(total - franja.ocupados.length, total)}
+        describirFranja={describirFranja}
+        leyenda={[
+          { clase: "bg-estado-completada", texto: "Todos libres" },
+          { clase: "bg-estado-completada/45", texto: "La mayoría" },
+          { clase: "bg-estado-completada/15", texto: "Algunos" },
+          { clase: "bg-border", texto: "Nadie" },
+        ]}
+      />
     </div>
   );
 }

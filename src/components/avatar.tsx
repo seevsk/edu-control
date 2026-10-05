@@ -8,6 +8,7 @@ function iniciales(nombre: string, apellidos?: string | null) {
 const TAMANOS = {
   sm: { clase: "size-6 text-[10px]", px: 24 },
   md: { clase: "size-7 text-xs", px: 28 },
+  lg: { clase: "size-16 text-xl", px: 64 },
 } as const;
 
 export function Avatar({

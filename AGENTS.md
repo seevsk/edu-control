@@ -211,6 +211,7 @@ Reglas de arquitectura:
 - Sugerir compañeros por dominio de correo solo tiene sentido si el dominio **no es genérico** (gmail.com, hotmail.com, outlook.com, live.com, yahoo.com, icloud.com, etc.). Guarda esa lista en un archivo de constantes.
 - `perfil.tipo_cuenta` (`estudiante` | `profesor`) es **solo una etiqueta autodeclarada, sin ningún permiso**. Los permisos salen únicamente de `grupo_integrante.rol`. No la muestres como insignia de "verificado".
 - **Búsqueda de compañeros:** solo usuarios registrados, no eliminados y con `visible_en_busqueda = true`. Exige correo exacto o un mínimo de caracteres, limita la cantidad de resultados y limita las invitaciones por hora. Nunca muestres datos de disponibilidad en los resultados.
+- **Perfil de otros usuarios (`/usuarios/[id]`, confirmado):** muestra foto, nombre, apellidos, `tipo_cuenta` (como texto, no como insignia), carrera, ciclo, institución, biografía y grupos en común. Lo ve cualquier usuario solo si la persona tiene `visible_en_busqueda = true`; sus compañeros de grupo (ambos `aceptada`) lo ven siempre. **El horario** (solo ocupado/libre) aparece únicamente si comparten un grupo donde ambos están aceptados y ninguno es observador. Nunca se muestran el correo, `trabaja`, el tipo de un bloque ni el curso.
 - **Eliminar cuenta = anonimizar:** poner `eliminado_en`, vaciar nombre, apellidos, correo y foto, borrar `perfil` y `bloque_ocupado`, y conservar `tarea` y `tarea_historial` (para no romper los grupos).
 
 ### 8.2 Cursos, horarios, evaluaciones y calendario
