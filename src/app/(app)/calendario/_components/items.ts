@@ -1,6 +1,7 @@
 import type { obtenerSemanaCalendario } from "@/server/services/calendario";
 import {
   categoriaDeTipoBloque,
+  diaSemanaISO,
   etiquetaMinutos,
   fechaEnZonaLimaISO,
   minutosDelDiaLima,
@@ -18,8 +19,16 @@ export const ETIQUETA_TIPO_BLOQUE = {
 
 const ETIQUETA_MODALIDAD = { presencial: "Presencial", remoto: "Remoto" } as const;
 
+/** Las reuniones no son una categoria del filtro: solo aparecen en "Todo". */
+export type TipoItem = CategoriaCalendario | "reunion";
+
 /** Clases de Tailwind por categoria (cadenas completas para que Tailwind las detecte). */
-export const ESTILO_CATEGORIA: Record<CategoriaCalendario, { punto: string; bloque: string; enlace: string }> = {
+export const ESTILO_CATEGORIA: Record<TipoItem, { punto: string; bloque: string; enlace: string }> = {
+  reunion: {
+    punto: "bg-cat-reunion",
+    bloque: "border-cat-reunion-borde bg-cat-reunion-bg text-cat-reunion-fg",
+    enlace: "hover:border-cat-reunion",
+  },
   clases: {
     punto: "bg-cat-clases",
     bloque: "border-cat-clases-borde bg-cat-clases-bg text-cat-clases-fg",
@@ -39,7 +48,7 @@ export const ESTILO_CATEGORIA: Record<CategoriaCalendario, { punto: string; bloq
 
 export type ItemCalendario = {
   clave: string;
-  categoria: CategoriaCalendario;
+  categoria: TipoItem;
   diaSemana: number;
   /** Posicion de esta parte dentro del dia (0-1440). */
   inicioMin: number;
@@ -151,6 +160,28 @@ export function construirItemsCompanero(horario: {
       })),
     ),
   ];
+}
+
+/** Reuniones de la semana: son eventos con fecha (no patrones), siempre dentro de un mismo dia. */
+export function construirReuniones(reuniones: SemanaCalendario["reuniones"]): ItemCalendario[] {
+  return reuniones.map((reunion) => {
+    const inicioMin = minutosDelDiaLima(reunion.inicio);
+    const finMin = minutosDelDiaLima(reunion.fin) || 24 * 60;
+    return {
+      clave: `r-${reunion.idReunion}`,
+      categoria: "reunion",
+      diaSemana: diaSemanaISO(fechaEnZonaLimaISO(reunion.inicio)),
+      inicioMin,
+      finMin,
+      horaInicio: etiquetaMinutos(inicioMin),
+      horaFin: etiquetaMinutos(finMin),
+      sigueDelDiaAnterior: false,
+      sigueAlDiaSiguiente: false,
+      titulo: reunion.titulo,
+      subtitulo: reunion.grupo.nombre,
+      href: `/grupos/${reunion.idGrupo}/reuniones`,
+    };
+  });
 }
 
 export function construirEntregas(

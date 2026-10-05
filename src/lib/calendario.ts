@@ -104,6 +104,24 @@ export function etiquetaSemana(lunesISO: string, anioActual: number): string {
   return `Desde el ${inicio} hasta el ${fin}`;
 }
 
+/** "2026-10-05" -> 1 (lunes) ... 7 (domingo). */
+export function diaSemanaISO(fechaISO: string): number {
+  const [y, m, d] = fechaISO.split("-").map(Number);
+  const dia = new Date(Date.UTC(y, m - 1, d, 12)).getUTCDay();
+  return dia === 0 ? 7 : dia;
+}
+
+/** "2026-10-07" -> "Miércoles 7 de octubre". */
+export function etiquetaFechaLarga(fechaISO: string): string {
+  const [, m, d] = fechaISO.split("-").map(Number);
+  return `${DIAS_LARGOS[diaSemanaISO(fechaISO) - 1]} ${d} de ${MESES_LARGOS[m - 1]}`;
+}
+
+/** Proxima fecha (hoy incluido) que cae en `diaSemana`, para programar desde un patron semanal. */
+export function proximaFechaDelDia(hoyISO: string, diaSemana: number): string {
+  return sumarDiasISO(hoyISO, (diaSemana - diaSemanaISO(hoyISO) + 7) % 7);
+}
+
 function minutosDesdeMedianoche(fecha: Date): number {
   return fecha.getUTCHours() * 60 + fecha.getUTCMinutes();
 }

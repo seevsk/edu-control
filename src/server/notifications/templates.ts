@@ -45,4 +45,11 @@ export const plantillasNotificacion = {
       asunto: `Tarea completada: ${titulo}`,
     };
   },
+  reunionProgramada(titulo: string, nombreGrupo: string, idGrupo: number, cuando: string) {
+    return {
+      mensaje: `Nueva reunión en "${nombreGrupo}": "${titulo}", ${cuando}.`,
+      enlace: `/grupos/${idGrupo}/reuniones`,
+      asunto: `Reunión programada: ${titulo}`,
+    };
+  },
 };

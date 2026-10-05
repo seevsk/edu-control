@@ -3,7 +3,13 @@ import { notFound } from "next/navigation";
 import { requerirSesion } from "@/server/auth/session";
 import { obtenerGrupoDelUsuario } from "@/server/services/grupo";
 import { obtenerDisponibilidadGrupo } from "@/server/services/disponibilidad";
-import { DIAS_LARGOS, etiquetaMinutos, formatearDuracion } from "@/lib/calendario";
+import {
+  DIAS_LARGOS,
+  etiquetaMinutos,
+  fechaEnZonaLimaISO,
+  formatearDuracion,
+  proximaFechaDelDia,
+} from "@/lib/calendario";
 import { diasLibresParaTodos, huecos, mapaDeDisponibilidad, type Franja, type Hueco } from "@/lib/disponibilidad";
 import { Avatar } from "@/components/avatar";
 import { MapaSemanal } from "@/components/mapa-semanal";
@@ -58,6 +64,7 @@ export default async function HorariosGrupoPage({ params }: { params: Promise<{ 
   const casiTodos = total > 2 && comunes.length === 0 ? huecos(mapa, { toleranciaFaltantes: 1 }) : [];
   const diasLibres = diasLibresParaTodos(mapa);
   const comunesSinDiasLibres = comunes.filter((hueco) => !diasLibres.includes(hueco.diaSemana));
+  const programar = grupo.estado === "activo" ? { idGrupo, hoyISO: fechaEnZonaLimaISO(new Date()) } : null;
 
   const describirFranja = (franja: Franja) => {
     const libres = total - franja.ocupados.length;
@@ -96,16 +103,22 @@ export default async function HorariosGrupoPage({ params }: { params: Promise<{ 
         {diasLibres.length > 0 ? (
           <ListaHuecos
             titulo="Todo el día"
-            elementos={diasLibres.map((dia) => ({ clave: `d-${dia}`, dia: DIAS_LARGOS[dia - 1], horario: null, faltan: null }))}
+            elementos={diasLibres.map((dia) => ({
+              clave: `d-${dia}`,
+              dia: DIAS_LARGOS[dia - 1],
+              horario: "Todo el día",
+              faltan: null,
+              href: programar ? `/grupos/${idGrupo}/reuniones/nueva?fecha=${proximaFechaDelDia(programar.hoyISO, dia)}` : null,
+            }))}
           />
         ) : null}
 
         {comunesSinDiasLibres.length > 0 ? (
-          <ListaHuecos titulo="Todos libres" elementos={comunesSinDiasLibres.map((h) => aElemento(h, nombres))} />
+          <ListaHuecos titulo="Todos libres" elementos={comunesSinDiasLibres.map((h) => aElemento(h, nombres, programar))} />
         ) : null}
 
         {casiTodos.length > 0 ? (
-          <ListaHuecos titulo="Falta una persona" elementos={casiTodos.map((h) => aElemento(h, nombres))} />
+          <ListaHuecos titulo="Falta una persona" elementos={casiTodos.map((h) => aElemento(h, nombres, programar))} />
         ) : null}
 
         {diasLibres.length === 0 && comunes.length === 0 && casiTodos.length === 0 ? (
@@ -131,14 +144,30 @@ export default async function HorariosGrupoPage({ params }: { params: Promise<{ 
   );
 }
 
-type ElementoHueco = { clave: string; dia: string; horario: string | null; faltan: string | null };
+type ElementoHueco = {
+  clave: string;
+  dia: string;
+  horario: string | null;
+  faltan: string | null;
+  /** Programar una reunion en este hueco (la proxima fecha de ese dia), si el grupo lo permite. */
+  href: string | null;
+};
 
-function aElemento(hueco: Hueco, nombres: Map<number, string>): ElementoHueco {
+function hhmm(minutos: number) {
+  return `${String(Math.floor(minutos / 60)).padStart(2, "0")}:${String(minutos % 60).padStart(2, "0")}`;
+}
+
+function aElemento(hueco: Hueco, nombres: Map<number, string>, programar: { idGrupo: number; hoyISO: string } | null): ElementoHueco {
   return {
     clave: `${hueco.diaSemana}-${hueco.inicioMin}`,
     dia: DIAS_LARGOS[hueco.diaSemana - 1],
     horario: `${etiquetaMinutos(hueco.inicioMin)} – ${etiquetaMinutos(hueco.finMin)} · ${formatearDuracion(hueco.finMin - hueco.inicioMin)}`,
     faltan: hueco.faltan.length > 0 ? hueco.faltan.map((id) => nombres.get(id)).join(", ") : null,
+    href: programar
+      ? `/grupos/${programar.idGrupo}/reuniones/nueva?fecha=${proximaFechaDelDia(programar.hoyISO, hueco.diaSemana)}&inicio=${hhmm(
+          hueco.inicioMin,
+        )}&fin=${hhmm(Math.min(hueco.inicioMin + 60, hueco.finMin))}`
+      : null,
   };
 }
 
@@ -155,17 +184,29 @@ function ListaHuecos({ titulo, elementos }: { titulo: string; elementos: Element
           <li key={dia} className="flex flex-col gap-1.5 px-4 py-2.5 text-sm sm:flex-row sm:items-center sm:gap-4">
             <span className="w-24 shrink-0 font-medium">{dia}</span>
             <span className="flex flex-wrap gap-1.5">
-              {delDia.map((elemento) =>
-                elemento.horario ? (
-                  <span
-                    key={elemento.clave}
-                    className="rounded-sm bg-estado-completada/12 px-2 py-0.5 tabular-nums text-text"
-                  >
+              {delDia.map((elemento) => {
+                if (!elemento.horario) return null;
+                const contenido = (
+                  <>
                     {elemento.horario}
                     {elemento.faltan ? <span className="text-text-muted"> · falta {elemento.faltan}</span> : null}
+                  </>
+                );
+                return elemento.href ? (
+                  <Link
+                    key={elemento.clave}
+                    href={elemento.href}
+                    title="Programar reunión"
+                    className="rounded-sm border border-transparent bg-estado-completada/12 px-2 py-0.5 tabular-nums text-text transition-colors duration-150 hover:border-estado-completada/50"
+                  >
+                    {contenido}
+                  </Link>
+                ) : (
+                  <span key={elemento.clave} className="rounded-sm bg-estado-completada/12 px-2 py-0.5 tabular-nums text-text">
+                    {contenido}
                   </span>
-                ) : null,
-              )}
+                );
+              })}
             </span>
           </li>
         ))}

@@ -1,12 +1,13 @@
 import { prisma } from "@/server/db/client";
 import { diasDeLaSemana, sumarDiasISO } from "@/lib/calendario";
+import { reunionesDelUsuarioEntre } from "@/server/services/reunion";
 
 export async function obtenerSemanaCalendario(idUsuario: number, lunesISO: string) {
   const dias = diasDeLaSemana(lunesISO);
   const desde = new Date(`${lunesISO}T00:00:00-05:00`);
   const hasta = new Date(`${sumarDiasISO(lunesISO, 7)}T00:00:00-05:00`);
 
-  const [cursos, bloquesOcupados, evaluaciones, tareas] = await Promise.all([
+  const [cursos, bloquesOcupados, evaluaciones, tareas, reuniones] = await Promise.all([
     prisma.curso.findMany({
       where: { idUsuario, activo: true },
       include: { horarios: true },
@@ -25,6 +26,7 @@ export async function obtenerSemanaCalendario(idUsuario: number, lunesISO: strin
       include: { grupo: true },
       orderBy: { fechaLimite: "asc" },
     }),
+    reunionesDelUsuarioEntre(idUsuario, desde, hasta),
   ]);
 
   const horarios = cursos.flatMap((curso) =>
@@ -34,5 +36,5 @@ export async function obtenerSemanaCalendario(idUsuario: number, lunesISO: strin
     })),
   );
 
-  return { dias, horarios, bloquesOcupados, evaluaciones, tareas };
+  return { dias, horarios, bloquesOcupados, evaluaciones, tareas, reuniones };
 }
