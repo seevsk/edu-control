@@ -13,3 +13,31 @@ export const COLOR_ESTADO_TAREA: Record<string, string> = {
   en_revision: "var(--color-estado-revision)",
   completada: "var(--color-estado-completada)",
 };
+
+export function accionesDisponiblesTarea({
+  estado,
+  idAsignado,
+  idUsuario,
+  rol,
+}: {
+  estado: (typeof ESTADOS_TAREA_ORDEN)[number];
+  idAsignado: number | null;
+  idUsuario: number;
+  rol: "lider" | "miembro" | "observador";
+}): { estado: (typeof ESTADOS_TAREA_ORDEN)[number]; etiqueta: string }[] {
+  if (rol === "observador") return [];
+  const esAsignado = idAsignado === idUsuario;
+  if (estado === "pendiente" && (esAsignado || rol === "lider")) {
+    return [{ estado: "en_progreso", etiqueta: "Empezar" }];
+  }
+  if (estado === "en_progreso" && esAsignado) {
+    return [{ estado: "en_revision", etiqueta: "Enviar a revisión" }];
+  }
+  if (estado === "en_revision" && !esAsignado) {
+    return [
+      { estado: "completada", etiqueta: "Confirmar" },
+      { estado: "en_progreso", etiqueta: "Devolver" },
+    ];
+  }
+  return [];
+}

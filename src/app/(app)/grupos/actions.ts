@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requerirSesion } from "@/server/auth/session";
 import { crearGrupoSchema, actualizarGrupoSchema } from "@/lib/validation/grupo";
+import { idRegistroSchema } from "@/lib/validation/tarea";
 import * as grupoService from "@/server/services/grupo";
 import { mensajeParaUsuario } from "@/lib/errores";
 
@@ -67,14 +68,24 @@ export async function responderInvitacionAction(idGrupo: number, respuesta: "ace
 
 export async function retirarIntegranteAction(idGrupo: number, idUsuarioObjetivo: number) {
   const sesion = await requerirSesion();
+  const grupoId = idRegistroSchema.safeParse(idGrupo);
+  const usuarioId = idRegistroSchema.safeParse(idUsuarioObjetivo);
+  if (!grupoId.success || !usuarioId.success) {
+    redirect("/grupos");
+  }
 
   try {
-    await grupoService.retirarIntegrante(sesion.idUsuario, idGrupo, idUsuarioObjetivo);
+    await grupoService.retirarIntegrante(sesion.idUsuario, grupoId.data, usuarioId.data);
   } catch (error) {
     const mensaje = mensajeParaUsuario(error, "No se pudo retirar");
     redirect(`/grupos/${idGrupo}?error=${encodeURIComponent(mensaje)}`);
   }
 
   revalidatePath(`/grupos/${idGrupo}`);
+  revalidatePath(`/grupos/${idGrupo}/tareas`);
+  revalidatePath(`/grupos/${idGrupo}/tareas/[idTarea]`, "page");
+  revalidatePath(`/grupos/${idGrupo}/actividad`);
+  revalidatePath("/calendario");
+  revalidatePath("/");
   redirect(`/grupos/${idGrupo}`);
 }

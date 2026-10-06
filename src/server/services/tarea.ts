@@ -3,7 +3,7 @@ import { crearNotificacion } from "@/server/notifications/crear-notificacion";
 import { plantillasNotificacion } from "@/server/notifications/templates";
 import { finDeDiaLimaAUtc } from "@/lib/dates";
 import { ErrorDeNegocio } from "@/lib/errores";
-import type { crearTareaSchema } from "@/lib/validation/tarea";
+import { filtrosTareaSchema, type crearTareaSchema } from "@/lib/validation/tarea";
 import type { z } from "zod";
 
 type EstadoDb = "pendiente" | "en_progreso" | "en_revision" | "completada";
@@ -12,10 +12,18 @@ type RolDb = "lider" | "miembro" | "observador";
 async function requerirIntegranteActivo(idUsuario: number, idGrupo: number) {
   const integrante = await prisma.grupoIntegrante.findUnique({
     where: { idGrupo_idUsuario: { idGrupo, idUsuario } },
+    include: { grupo: { select: { estado: true } } },
   });
   if (!integrante || integrante.estadoInvitacion !== "aceptada") {
     throw new ErrorDeNegocio("No eres integrante de este grupo");
   }
+  return integrante;
+}
+
+async function requerirIntegranteQuePuedeModificar(idUsuario: number, idGrupo: number) {
+  const integrante = await requerirIntegranteActivo(idUsuario, idGrupo);
+  if (integrante.grupo.estado !== "activo") throw new ErrorDeNegocio("El grupo esta finalizado");
+  if (integrante.rol === "observador") throw new ErrorDeNegocio("Los observadores no pueden modificar tareas");
   return integrante;
 }
 
@@ -84,18 +92,39 @@ export async function listarTareasAsignadasAlUsuario(idUsuario: number, limite =
 export async function listarTareasDelGrupo(
   idUsuario: number,
   idGrupo: number,
-  filtros: { estado?: EstadoDb; idAsignado?: number } = {},
+  filtros: { estado?: EstadoDb; idAsignado?: number; q?: string } = {},
 ) {
   await requerirIntegranteActivo(idUsuario, idGrupo);
+  const parseo = filtrosTareaSchema.safeParse({ ...filtros, asignado: filtros.idAsignado });
+  if (!parseo.success) throw new ErrorDeNegocio("Los filtros de tareas no son validos");
+  const { estado, asignado, q } = parseo.data;
   return prisma.tarea.findMany({
     where: {
       idGrupo,
-      ...(filtros.estado ? { estado: filtros.estado } : {}),
-      ...(filtros.idAsignado ? { idAsignado: filtros.idAsignado } : {}),
+      ...(estado ? { estado } : {}),
+      ...(asignado ? { idAsignado: asignado } : {}),
+      ...(q ? { titulo: { contains: q, mode: "insensitive" } } : {}),
     },
     include: { asignado: true, creador: true },
     orderBy: [{ fechaCreacion: "desc" }],
   });
+}
+
+export async function obtenerTareaDelGrupo(idUsuario: number, idGrupo: number, idTarea: number) {
+  await requerirIntegranteActivo(idUsuario, idGrupo);
+  const tarea = await prisma.tarea.findFirst({
+    where: { idTarea, idGrupo },
+    include: {
+      asignado: { select: { nombre: true, apellidos: true, fotoUrl: true } },
+      creador: { select: { nombre: true, apellidos: true } },
+      historial: {
+        include: { usuario: { select: { nombre: true, apellidos: true } } },
+        orderBy: [{ fecha: "desc" }, { idHistorial: "desc" }],
+      },
+    },
+  });
+  if (!tarea) throw new ErrorDeNegocio("Tarea no encontrada");
+  return tarea;
 }
 
 export async function crearTarea(
@@ -103,8 +132,7 @@ export async function crearTarea(
   idGrupo: number,
   datos: z.infer<typeof crearTareaSchema>,
 ) {
-  const integrante = await requerirIntegranteActivo(idActor, idGrupo);
-  if (integrante.rol === "observador") throw new ErrorDeNegocio("Los observadores no pueden crear tareas");
+  await requerirIntegranteQuePuedeModificar(idActor, idGrupo);
 
   const idAsignado = datos.idAsignado ? Number(datos.idAsignado) : null;
   if (idAsignado) await validarAsignable(idGrupo, idAsignado);
@@ -140,8 +168,7 @@ export async function reasignarTarea(
   idTarea: number,
   nuevoIdAsignadoRaw: string,
 ) {
-  const integrante = await requerirIntegranteActivo(idActor, idGrupo);
-  if (integrante.rol === "observador") throw new ErrorDeNegocio("Los observadores no pueden reasignar tareas");
+  await requerirIntegranteQuePuedeModificar(idActor, idGrupo);
 
   const tarea = await prisma.tarea.findFirst({ where: { idTarea, idGrupo } });
   if (!tarea) throw new ErrorDeNegocio("Tarea no encontrada");
@@ -181,7 +208,7 @@ export async function cambiarEstadoTarea(
   idTarea: number,
   nuevoEstado: EstadoDb,
 ) {
-  const integrante = await requerirIntegranteActivo(idActor, idGrupo);
+  const integrante = await requerirIntegranteQuePuedeModificar(idActor, idGrupo);
   const tarea = await prisma.tarea.findFirst({ where: { idTarea, idGrupo } });
   if (!tarea) throw new ErrorDeNegocio("Tarea no encontrada");
 

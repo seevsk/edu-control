@@ -36,6 +36,18 @@ export function formatearFechaLima(fecha: Date): string {
   }).format(fecha);
 }
 
+export function formatearFechaHoraLima(fecha: Date): string {
+  return new Intl.DateTimeFormat("es-PE", {
+    timeZone: ZONA_LIMA,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(fecha);
+}
+
 export const DIAS_SEMANA = [
   { valor: 1, nombre: "Lunes" },
   { valor: 2, nombre: "Martes" },

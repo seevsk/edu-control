@@ -2,6 +2,7 @@ import { prisma } from "@/server/db/client";
 import { crearNotificacion } from "@/server/notifications/crear-notificacion";
 import { plantillasNotificacion } from "@/server/notifications/templates";
 import { ErrorDeNegocio } from "@/lib/errores";
+import { Prisma } from "../../../generated/prisma/client";
 import type { crearGrupoSchema, actualizarGrupoSchema } from "@/lib/validation/grupo";
 import type { z } from "zod";
 
@@ -212,24 +213,56 @@ export async function responderInvitacion(
 }
 
 export async function retirarIntegrante(idActor: number, idGrupo: number, idUsuarioObjetivo: number) {
-  await requerirLiderDelGrupo(idActor, idGrupo);
+  try {
+    await prisma.$transaction(async (tx) => {
+      const actor = await tx.grupoIntegrante.findUnique({
+        where: { idGrupo_idUsuario: { idGrupo, idUsuario: idActor } },
+        include: { grupo: { select: { estado: true } } },
+      });
+      if (!actor || actor.estadoInvitacion !== "aceptada" || actor.rol !== "lider") {
+        throw new ErrorDeNegocio("Solo el lider del grupo puede hacer esto");
+      }
+      if (actor.grupo.estado !== "activo") throw new ErrorDeNegocio("El grupo esta finalizado");
 
-  const objetivo = await prisma.grupoIntegrante.findUnique({
-    where: { idGrupo_idUsuario: { idGrupo, idUsuario: idUsuarioObjetivo } },
-  });
-  if (!objetivo || objetivo.estadoInvitacion === "retirado") {
-    throw new ErrorDeNegocio("Esa persona no es integrante del grupo");
+      const objetivo = await tx.grupoIntegrante.findUnique({
+        where: { idGrupo_idUsuario: { idGrupo, idUsuario: idUsuarioObjetivo } },
+      });
+      if (!objetivo || objetivo.estadoInvitacion === "retirado") {
+        throw new ErrorDeNegocio("Esa persona no es integrante del grupo");
+      }
+      if (objetivo.rol === "lider") throw new ErrorDeNegocio("El lider no se puede retirar a si mismo");
+
+      const tareasAbiertas = await tx.tarea.findMany({
+        where: { idGrupo, idAsignado: idUsuarioObjetivo, estado: { not: "completada" } },
+        select: { idTarea: true, idAsignado: true },
+      });
+
+      await tx.grupoIntegrante.update({
+        where: { idGrupo_idUsuario: { idGrupo, idUsuario: idUsuarioObjetivo } },
+        data: { estadoInvitacion: "retirado" },
+      });
+
+      if (tareasAbiertas.length > 0) {
+        await tx.tarea.updateMany({
+          where: { idTarea: { in: tareasAbiertas.map((tarea) => tarea.idTarea) } },
+          data: { idAsignado: null },
+        });
+        await tx.tareaHistorial.createMany({
+          data: tareasAbiertas.map((tarea) => ({
+            idTarea: tarea.idTarea,
+            idUsuario: idActor,
+            accion: "reasignada",
+            valorAnterior: String(tarea.idAsignado),
+            valorNuevo: null,
+          })),
+        });
+      }
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  } catch (error) {
+    // Un cambio simultaneo debe revertirse entero, sin dejar un historial desfasado.
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") {
+      throw new ErrorDeNegocio("El grupo cambio mientras retirabas al integrante. Intenta de nuevo");
+    }
+    throw error;
   }
-  if (objetivo.rol === "lider") throw new ErrorDeNegocio("El lider no se puede retirar a si mismo");
-
-  await prisma.$transaction([
-    prisma.grupoIntegrante.update({
-      where: { idGrupo_idUsuario: { idGrupo, idUsuario: idUsuarioObjetivo } },
-      data: { estadoInvitacion: "retirado" },
-    }),
-    prisma.tarea.updateMany({
-      where: { idGrupo, idAsignado: idUsuarioObjetivo, estado: { not: "completada" } },
-      data: { idAsignado: null },
-    }),
-  ]);
 }
