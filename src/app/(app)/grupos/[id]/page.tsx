@@ -44,7 +44,8 @@ export default async function GrupoDetallePage({
   }
 
   const esLider = rolActual === "lider";
-  const resultadosBusqueda = q ? await buscarUsuarios(sesion.idUsuario, q) : [];
+  const puedeAdministrar = esLider && grupo.estado === "activo";
+  const resultadosBusqueda = puedeAdministrar && q ? await buscarUsuarios(sesion.idUsuario, q) : [];
   const idsYaEnGrupo = new Set(grupo.integrantes.map((i) => i.idUsuario));
   const { avance, porIntegrante } = await obtenerMetricasGrupo(sesion.idUsuario, idGrupo);
 
@@ -70,6 +71,12 @@ export default async function GrupoDetallePage({
       </div>
 
       <TabsGrupo idGrupo={idGrupo} activa="resumen" />
+
+      {grupo.estado === "finalizado" ? (
+        <p role="status" className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-sm">
+          Este grupo está finalizado y es de solo lectura. Puedes consultar sus tareas, integrantes e historial.
+        </p>
+      ) : null}
 
       {error ? (
         <p className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
@@ -202,7 +209,7 @@ export default async function GrupoDetallePage({
                   </p>
                 </div>
               </div>
-              {esLider &&
+              {puedeAdministrar &&
               integrante.rol !== "lider" &&
               integrante.estadoInvitacion !== "retirado" ? (
                 <form action={retirarIntegranteAction.bind(null, idGrupo, integrante.idUsuario)}>
@@ -216,7 +223,7 @@ export default async function GrupoDetallePage({
         </ul>
       </section>
 
-      {esLider ? (
+      {puedeAdministrar ? (
         <section className="rounded-md border border-border bg-surface p-4">
           <h2 className="text-sm font-medium">Invitar a alguien</h2>
           <form action={`/grupos/${idGrupo}`} className="mt-3 flex gap-2">
@@ -274,7 +281,7 @@ export default async function GrupoDetallePage({
         </section>
       ) : null}
 
-      {esLider ? (
+      {puedeAdministrar ? (
         <section className="rounded-md border border-border bg-surface p-4">
           <h2 className="text-sm font-medium">Editar grupo</h2>
           <form action={actualizarConId} className="mt-3 grid gap-3">
@@ -317,6 +324,9 @@ export default async function GrupoDetallePage({
                 <option value="finalizado">Finalizado</option>
               </select>
             </label>
+            <p className="text-xs text-text-muted">
+              Al finalizar el grupo, sus datos, integrantes y tareas quedarán en modo de solo lectura.
+            </p>
             <SubmitButton className="mt-1 w-fit rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover">
               Guardar cambios
             </SubmitButton>
