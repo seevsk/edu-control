@@ -2,6 +2,8 @@ import { prisma } from "@/server/db/client";
 import { crearNotificacion } from "@/server/notifications/crear-notificacion";
 import { plantillasNotificacion } from "@/server/notifications/templates";
 import { ErrorDeNegocio } from "@/lib/errores";
+import type { Prisma } from "../../../generated/prisma/client";
+import { ejecutarCambioDeGrupo } from "./cambio-grupo";
 import type { crearGrupoSchema, actualizarGrupoSchema } from "@/lib/validation/grupo";
 import type { z } from "zod";
 
@@ -46,13 +48,16 @@ export async function obtenerGrupoDelUsuario(idUsuario: number, idGrupo: number)
   return { grupo, rolActual: integrante.rol };
 }
 
-async function requerirLiderDelGrupo(idUsuario: number, idGrupo: number) {
-  const integrante = await prisma.grupoIntegrante.findUnique({
+async function requerirLiderDelGrupo(idUsuario: number, idGrupo: number, tx: Prisma.TransactionClient) {
+  const integrante = await tx.grupoIntegrante.findUnique({
     where: { idGrupo_idUsuario: { idGrupo, idUsuario } },
     include: { grupo: true },
   });
   if (!integrante || integrante.estadoInvitacion !== "aceptada" || integrante.rol !== "lider") {
     throw new ErrorDeNegocio("Solo el lider del grupo puede hacer esto");
+  }
+  if (integrante.grupo.estado !== "activo") {
+    throw new ErrorDeNegocio("El grupo está finalizado y es de solo lectura");
   }
   return integrante.grupo;
 }
@@ -91,15 +96,17 @@ export async function actualizarGrupo(
   idGrupo: number,
   datos: z.infer<typeof actualizarGrupoSchema>,
 ) {
-  await requerirLiderDelGrupo(idUsuario, idGrupo);
-  return prisma.grupo.update({
-    where: { idGrupo },
-    data: {
-      nombre: datos.nombre,
-      descripcion: datos.descripcion || null,
-      enlaceTrabajo: datos.enlaceTrabajo || null,
-      estado: datos.estado,
-    },
+  return ejecutarCambioDeGrupo(async (tx) => {
+    await requerirLiderDelGrupo(idUsuario, idGrupo, tx);
+    return tx.grupo.update({
+      where: { idGrupo },
+      data: {
+        nombre: datos.nombre,
+        descripcion: datos.descripcion || null,
+        enlaceTrabajo: datos.enlaceTrabajo || null,
+        estado: datos.estado,
+      },
+    });
   });
 }
 
@@ -152,29 +159,31 @@ export async function buscarPersonas(idUsuarioActual: number, consulta: string) 
 }
 
 export async function invitarIntegrante(idActor: number, idGrupo: number, idUsuarioInvitado: number) {
-  const grupo = await requerirLiderDelGrupo(idActor, idGrupo);
-  if (grupo.estado !== "activo") throw new ErrorDeNegocio("El grupo esta finalizado");
+  const { grupo, integrante } = await ejecutarCambioDeGrupo(async (tx) => {
+    const grupo = await requerirLiderDelGrupo(idActor, idGrupo, tx);
 
-  const invitacionesUltimaHora = await prisma.grupoIntegrante.count({
-    where: {
-      grupo: { idCreador: idActor },
-      fechaInvitacion: { gte: new Date(Date.now() - 60 * 60 * 1000) },
-    },
-  });
-  if (invitacionesUltimaHora >= LIMITE_INVITACIONES_POR_HORA) {
-    throw new ErrorDeNegocio("Llegaste al limite de invitaciones por hora, intenta mas tarde");
-  }
+    const invitacionesUltimaHora = await tx.grupoIntegrante.count({
+      where: {
+        grupo: { idCreador: idActor },
+        fechaInvitacion: { gte: new Date(Date.now() - 60 * 60 * 1000) },
+      },
+    });
+    if (invitacionesUltimaHora >= LIMITE_INVITACIONES_POR_HORA) {
+      throw new ErrorDeNegocio("Llegaste al limite de invitaciones por hora, intenta mas tarde");
+    }
 
-  const invitado = await prisma.usuario.findUnique({ where: { idUsuario: idUsuarioInvitado } });
-  if (!invitado || invitado.eliminadoEn) throw new ErrorDeNegocio("Usuario no encontrado");
+    const invitado = await tx.usuario.findUnique({ where: { idUsuario: idUsuarioInvitado } });
+    if (!invitado || invitado.eliminadoEn) throw new ErrorDeNegocio("Usuario no encontrado");
 
-  const yaEsIntegrante = await prisma.grupoIntegrante.findUnique({
-    where: { idGrupo_idUsuario: { idGrupo, idUsuario: idUsuarioInvitado } },
-  });
-  if (yaEsIntegrante) throw new ErrorDeNegocio("Esa persona ya fue invitada a este grupo antes");
+    const yaEsIntegrante = await tx.grupoIntegrante.findUnique({
+      where: { idGrupo_idUsuario: { idGrupo, idUsuario: idUsuarioInvitado } },
+    });
+    if (yaEsIntegrante) throw new ErrorDeNegocio("Esa persona ya fue invitada a este grupo antes");
 
-  const integrante = await prisma.grupoIntegrante.create({
-    data: { idGrupo, idUsuario: idUsuarioInvitado, rol: "miembro", estadoInvitacion: "pendiente" },
+    const integrante = await tx.grupoIntegrante.create({
+      data: { idGrupo, idUsuario: idUsuarioInvitado, rol: "miembro", estadoInvitacion: "pendiente" },
+    });
+    return { grupo, integrante };
   });
 
   await crearNotificacion({
@@ -191,17 +200,23 @@ export async function responderInvitacion(
   idGrupo: number,
   respuesta: "aceptada" | "rechazada",
 ) {
-  const integrante = await prisma.grupoIntegrante.findUnique({
-    where: { idGrupo_idUsuario: { idGrupo, idUsuario } },
-    include: { grupo: true },
-  });
-  if (!integrante || integrante.estadoInvitacion !== "pendiente") {
-    throw new ErrorDeNegocio("No tienes una invitacion pendiente a ese grupo");
-  }
+  const integrante = await ejecutarCambioDeGrupo(async (tx) => {
+    const integrante = await tx.grupoIntegrante.findUnique({
+      where: { idGrupo_idUsuario: { idGrupo, idUsuario } },
+      include: { grupo: true },
+    });
+    if (!integrante || integrante.estadoInvitacion !== "pendiente") {
+      throw new ErrorDeNegocio("No tienes una invitacion pendiente a ese grupo");
+    }
+    if (integrante.grupo.estado !== "activo") {
+      throw new ErrorDeNegocio("El grupo está finalizado y es de solo lectura");
+    }
 
-  await prisma.grupoIntegrante.update({
-    where: { idGrupo_idUsuario: { idGrupo, idUsuario } },
-    data: { estadoInvitacion: respuesta, fechaRespuesta: new Date() },
+    await tx.grupoIntegrante.update({
+      where: { idGrupo_idUsuario: { idGrupo, idUsuario } },
+      data: { estadoInvitacion: respuesta, fechaRespuesta: new Date() },
+    });
+    return integrante;
   });
 
   await crearNotificacion({
@@ -212,24 +227,41 @@ export async function responderInvitacion(
 }
 
 export async function retirarIntegrante(idActor: number, idGrupo: number, idUsuarioObjetivo: number) {
-  await requerirLiderDelGrupo(idActor, idGrupo);
+  await ejecutarCambioDeGrupo(async (tx) => {
+    await requerirLiderDelGrupo(idActor, idGrupo, tx);
 
-  const objetivo = await prisma.grupoIntegrante.findUnique({
-    where: { idGrupo_idUsuario: { idGrupo, idUsuario: idUsuarioObjetivo } },
-  });
-  if (!objetivo || objetivo.estadoInvitacion === "retirado") {
-    throw new ErrorDeNegocio("Esa persona no es integrante del grupo");
-  }
-  if (objetivo.rol === "lider") throw new ErrorDeNegocio("El lider no se puede retirar a si mismo");
+    const objetivo = await tx.grupoIntegrante.findUnique({
+      where: { idGrupo_idUsuario: { idGrupo, idUsuario: idUsuarioObjetivo } },
+    });
+    if (!objetivo || objetivo.estadoInvitacion === "retirado") {
+      throw new ErrorDeNegocio("Esa persona no es integrante del grupo");
+    }
+    if (objetivo.rol === "lider") throw new ErrorDeNegocio("El lider no se puede retirar a si mismo");
 
-  await prisma.$transaction([
-    prisma.grupoIntegrante.update({
+    const tareasAbiertas = await tx.tarea.findMany({
+      where: { idGrupo, idAsignado: idUsuarioObjetivo, estado: { not: "completada" } },
+      select: { idTarea: true, idAsignado: true },
+    });
+
+    await tx.grupoIntegrante.update({
       where: { idGrupo_idUsuario: { idGrupo, idUsuario: idUsuarioObjetivo } },
       data: { estadoInvitacion: "retirado" },
-    }),
-    prisma.tarea.updateMany({
-      where: { idGrupo, idAsignado: idUsuarioObjetivo, estado: { not: "completada" } },
-      data: { idAsignado: null },
-    }),
-  ]);
+    });
+
+    if (tareasAbiertas.length > 0) {
+      await tx.tarea.updateMany({
+        where: { idTarea: { in: tareasAbiertas.map((tarea) => tarea.idTarea) } },
+        data: { idAsignado: null },
+      });
+      await tx.tareaHistorial.createMany({
+        data: tareasAbiertas.map((tarea) => ({
+          idTarea: tarea.idTarea,
+          idUsuario: idActor,
+          accion: "reasignada",
+          valorAnterior: String(tarea.idAsignado),
+          valorNuevo: null,
+        })),
+      });
+    }
+  });
 }
