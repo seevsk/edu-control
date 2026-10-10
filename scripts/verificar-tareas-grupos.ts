@@ -43,12 +43,42 @@ async function verificar() {
     const tareaService = await import("../src/server/services/tarea");
     const { ErrorDeNegocio } = await import("../src/lib/errores");
     const { invitacionGrupoSchema, responderInvitacionSchema } = await import("../src/lib/validation/grupo");
+    const { accionesDisponiblesTarea, ESTADOS_TAREA_ORDEN } = await import("../src/lib/estado-tarea");
+    const { contextoTareaSchema } = await import("../src/lib/validation/tarea");
     let casos = 0;
     async function caso(nombreCaso: string, prueba: () => Promise<void>) {
       await prueba();
       casos++;
       console.log(`OK ${nombreCaso}`);
     }
+    await caso("las acciones visibles coinciden con los permisos del servidor en 144 combinaciones", async () => {
+      for (const rol of ["lider", "miembro", "observador"] as const) {
+        for (const idAsignado of [null, 1, 2]) {
+          for (const estado of ESTADOS_TAREA_ORDEN) {
+            const acciones = accionesDisponiblesTarea({ estado, idAsignado, idUsuario: 1, rol });
+            for (const nuevoEstado of ESTADOS_TAREA_ORDEN) {
+              let permitido = true;
+              try {
+                tareaService.verificarTransicion({ estadoActual: estado, nuevoEstado, actorEsAsignado: idAsignado === 1, actorRol: rol });
+              } catch (error) {
+                assert.ok(error instanceof ErrorDeNegocio);
+                permitido = false;
+              }
+              assert.equal(acciones.some((accion) => accion.estado === nuevoEstado), permitido,
+                `${rol}, asignado ${idAsignado}, ${estado} → ${nuevoEstado}`);
+            }
+          }
+        }
+      }
+    });
+    await caso("el retorno acepta solo tablero, tabla o detalle propios de una tarea", async () => {
+      for (const destino of ["lista", "tabla", "detalle"]) {
+        assert.equal(contextoTareaSchema.safeParse({ idGrupo: 1, idTarea: 1, destino }).success, true);
+      }
+      for (const destino of ["https://example.invalid", "/otro-grupo", "", "javascript:alert(1)"]) {
+        assert.equal(contextoTareaSchema.safeParse({ idGrupo: 1, idTarea: 1, destino }).success, false);
+      }
+    });
     const usuarios = await Promise.all(["Lider", "Ana", "Luis", "Observador", "Invitado", "Externo"].map((nombreUsuario) =>
       db!.usuario.create({ data: {
         googleId: `prueba-${nombreUsuario}`, correo: `${nombreUsuario.toLowerCase()}@example.invalid`,
@@ -171,6 +201,28 @@ async function verificar() {
       const revisor = actual.idAsignado === lider ? ana : lider;
       await tareaService.cambiarEstadoTarea(revisor, idGrupo, tarea.idTarea, "completada");
       assert.deepEqual((await db!.tarea.findUniqueOrThrow({ where: { idTarea: tarea.idTarea } })).fechaTerminada, revision.fechaTerminada);
+    });
+    await caso("un miembro puede devolver y completar, con historial y aviso al responsable", async () => {
+      const revision = await tareaService.crearTarea(ana, idGrupo, { titulo: "Revisión del equipo", peso: 3, idAsignado: String(ana) });
+      await tareaService.cambiarEstadoTarea(ana, idGrupo, revision.idTarea, "en_progreso");
+      await tareaService.cambiarEstadoTarea(ana, idGrupo, revision.idTarea, "en_revision");
+      await tareaService.cambiarEstadoTarea(luis, idGrupo, revision.idTarea, "en_progreso");
+      assert.equal((await db!.tarea.findUniqueOrThrow({ where: { idTarea: revision.idTarea } })).fechaTerminada, null);
+      await tareaService.cambiarEstadoTarea(ana, idGrupo, revision.idTarea, "en_revision");
+      const avisosAntes = await db!.notificacion.count({ where: { tipo: "tarea_completada", idUsuario: ana } });
+      await tareaService.cambiarEstadoTarea(luis, idGrupo, revision.idTarea, "completada");
+      assert.equal(await db!.notificacion.count({ where: { tipo: "tarea_completada", idUsuario: ana } }), avisosAntes + 1);
+      const historial = await db!.tareaHistorial.findMany({ where: { idTarea: revision.idTarea, accion: "estado" }, orderBy: { idHistorial: "asc" } });
+      assert.deepEqual(historial.map((cambio) => [cambio.valorAnterior, cambio.valorNuevo]), [
+        ["pendiente", "en_progreso"], ["en_progreso", "en_revision"], ["en_revision", "en_progreso"],
+        ["en_progreso", "en_revision"], ["en_revision", "completada"],
+      ]);
+      assert.equal(historial.at(-1)?.idUsuario, luis);
+      const { obtenerMetricasGrupo } = await import("../src/server/services/metricas");
+      assert.equal((await obtenerMetricasGrupo(luis, idGrupo)).avance, 1);
+      const historialAntes = await db!.tareaHistorial.count();
+      await assert.rejects(tareaService.cambiarEstadoTarea(luis, idGrupo, revision.idTarea, "completada"), ErrorDeNegocio);
+      assert.equal(await db!.tareaHistorial.count(), historialAntes);
     });
     await caso("retirar mientras se asignan tareas nunca deja tareas abiertas del retirado", async () => {
       const grupo = await crearGrupo();

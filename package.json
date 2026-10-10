@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "verificar:tareas-grupos": "tsx scripts/verificar-tareas-grupos.ts"
+    "verificar:tareas-grupos": "tsx scripts/verificar-tareas-grupos.ts",
+    "verificar:acciones-tarea-http": "node scripts/verificar-acciones-tarea-http.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.0",

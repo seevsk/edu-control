@@ -3,7 +3,7 @@ export const ESTADOS_TAREA_ORDEN = ["pendiente", "en_progreso", "en_revision", "
 export const ETIQUETA_ESTADO_TAREA: Record<string, string> = {
   pendiente: "Pendiente",
   en_progreso: "En progreso",
-  en_revision: "En revision",
+  en_revision: "En revisión",
   completada: "Completada",
 };
 
@@ -28,15 +28,15 @@ export function accionesDisponiblesTarea({
   if (rol === "observador") return [];
   const esAsignado = idAsignado === idUsuario;
   if (estado === "pendiente" && (esAsignado || rol === "lider")) {
-    return [{ estado: "en_progreso", etiqueta: "Empezar" }];
+    return [{ estado: "en_progreso", etiqueta: "Empezar tarea" }];
   }
   if (estado === "en_progreso" && esAsignado) {
     return [{ estado: "en_revision", etiqueta: "Enviar a revisión" }];
   }
   if (estado === "en_revision" && !esAsignado) {
     return [
-      { estado: "completada", etiqueta: "Confirmar" },
-      { estado: "en_progreso", etiqueta: "Devolver" },
+      { estado: "completada", etiqueta: "Aprobar y completar" },
+      { estado: "en_progreso", etiqueta: "Devolver a progreso" },
     ];
   }
   return [];

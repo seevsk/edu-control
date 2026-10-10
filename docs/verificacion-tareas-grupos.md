@@ -7,6 +7,7 @@ npm run verificar:tareas-grupos
 npx tsc --noEmit
 npm run lint
 npm run build
+npm run verificar:acciones-tarea-http
 ```
 
 La verificación usa las dependencias existentes y las aserciones de Node, sin agregar un framework.
@@ -24,3 +25,25 @@ Para revisar la interfaz, finalizar un grupo como líder y comprobar el aviso de
 resumen, tablero y detalle de tarea. No deben aparecer controles para editar, invitar, retirar o modificar
 tareas. Una invitación a ese grupo debe indicar que está finalizado. Si otra pestaña conserva un
 formulario anterior, enviarlo debe mostrar un error sin guardar cambios.
+
+## Aprobación y finalización de tareas
+
+El responsable envía la tarea a revisión y ve «Pendiente de aprobación por otro integrante».
+Otro integrante aceptado, que no sea observador, ve «Aprobar y completar» y «Devolver a progreso»
+en el tablero, la lista y el detalle. Las acciones de la lista conservan esa vista, también ante errores.
+Los grupos finalizados mantienen las tareas en modo de solo lectura.
+
+La prueba HTTP necesita el build generado y las variables locales de `.env`, incluido `SESSION_SECRET`.
+Levanta un servidor en un puerto libre y una base temporal con usuarios ficticios. Comprueba los
+formularios reales de Server Actions, los permisos, las redirecciones, el historial, las notificaciones
+y el avance calculado. Detiene el servidor y elimina la base al terminar.
+
+Para una revisión manual con esos datos, ejecuta desde una terminal interactiva:
+
+```powershell
+npm run verificar:acciones-tarea-http -- --visual
+```
+
+Abre la URL impresa. El sufijo `/__qa/2` muestra al responsable y `/__qa/3` al revisor;
+agrega `?vista=tablero` o `?vista=detalle` para cambiar la vista. Presiona Enter en la terminal
+al terminar. El acceso de prueba solo existe en el proxy local de este script, sobre la base temporal.
