@@ -9,6 +9,7 @@ import {
   contextoTareaSchema,
   cambiarEstadoTareaSchema,
   idRegistroSchema,
+  type DestinoTarea,
 } from "@/lib/validation/tarea";
 import * as tareaService from "@/server/services/tarea";
 import { mensajeParaUsuario } from "@/lib/errores";
@@ -21,8 +22,13 @@ function redirigirConError(idGrupo: number, mensaje: string): never {
   redirect(`/grupos/${idGrupo}/tareas?error=${encodeURIComponent(mensaje)}`);
 }
 
-function rutaTarea(idGrupo: number, idTarea: number, destino: "lista" | "detalle") {
-  return destino === "detalle" ? `/grupos/${idGrupo}/tareas/${idTarea}` : `/grupos/${idGrupo}/tareas`;
+function rutaTarea(idGrupo: number, idTarea: number, destino: DestinoTarea) {
+  if (destino === "detalle") return `/grupos/${idGrupo}/tareas/${idTarea}`;
+  return `/grupos/${idGrupo}/tareas${destino === "tabla" ? "?vista=lista" : ""}`;
+}
+
+function redirigirErrorTarea(ruta: string, mensaje: string): never {
+  redirect(`${ruta}${ruta.includes("?") ? "&" : "?"}error=${encodeURIComponent(mensaje)}`);
 }
 
 function revalidarTarea(idGrupo: number, idTarea: number) {
@@ -55,7 +61,7 @@ export async function crearTareaAction(idGrupo: number, formData: FormData) {
 export async function reasignarTareaAction(
   idGrupo: number,
   idTarea: number,
-  destino: "lista" | "detalle",
+  destino: DestinoTarea,
   formData: FormData,
 ) {
   const sesion = await requerirSesion();
@@ -63,12 +69,12 @@ export async function reasignarTareaAction(
   if (!contexto.success) redirect("/grupos");
   const ruta = rutaTarea(contexto.data.idGrupo, contexto.data.idTarea, contexto.data.destino);
   const parseo = reasignarTareaSchema.safeParse(leerFormData(formData));
-  if (!parseo.success) redirect(`${ruta}?error=${encodeURIComponent(parseo.error.issues[0].message)}`);
+  if (!parseo.success) redirigirErrorTarea(ruta, parseo.error.issues[0].message);
 
   try {
     await tareaService.reasignarTarea(sesion.idUsuario, contexto.data.idGrupo, contexto.data.idTarea, parseo.data.idAsignado ?? "");
   } catch (error) {
-    redirect(`${ruta}?error=${encodeURIComponent(mensajeParaUsuario(error, "No se pudo reasignar"))}`);
+    redirigirErrorTarea(ruta, mensajeParaUsuario(error, "No se pudo reasignar"));
   }
 
   revalidarTarea(idGrupo, idTarea);
@@ -79,7 +85,7 @@ export async function cambiarEstadoTareaAction(
   idGrupo: number,
   idTarea: number,
   nuevoEstado: "pendiente" | "en_progreso" | "en_revision" | "completada",
-  destino: "lista" | "detalle",
+  destino: DestinoTarea,
 ) {
   const sesion = await requerirSesion();
   const contexto = cambiarEstadoTareaSchema.safeParse({ idGrupo, idTarea, nuevoEstado, destino });
@@ -89,7 +95,7 @@ export async function cambiarEstadoTareaAction(
   try {
     await tareaService.cambiarEstadoTarea(sesion.idUsuario, contexto.data.idGrupo, contexto.data.idTarea, contexto.data.nuevoEstado);
   } catch (error) {
-    redirect(`${ruta}?error=${encodeURIComponent(mensajeParaUsuario(error, "No se pudo cambiar el estado"))}`);
+    redirigirErrorTarea(ruta, mensajeParaUsuario(error, "No se pudo cambiar el estado"));
   }
 
   revalidarTarea(idGrupo, idTarea);

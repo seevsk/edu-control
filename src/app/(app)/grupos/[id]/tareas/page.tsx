@@ -193,6 +193,7 @@ export default async function TareasGrupoPage({
                 <th className="px-3 py-2 font-medium">Estado</th>
                 <th className="px-3 py-2 font-medium">Peso</th>
                 <th className="px-3 py-2 font-medium">Fecha limite</th>
+                {puedeGestionar ? <th className="px-3 py-2 font-medium">Acciones</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -232,11 +233,16 @@ export default async function TareasGrupoPage({
                   <td className="px-3 py-2">
                     {tarea.fechaLimite ? formatearFechaLima(tarea.fechaLimite) : "-"}
                   </td>
+                  {puedeGestionar ? (
+                    <td className="min-w-64 px-3 py-2">
+                      <AccionesTarea idGrupo={idGrupo} tarea={tarea} idUsuario={sesion.idUsuario} rol={rolActual} asignables={asignables} destino="tabla" />
+                    </td>
+                  ) : null}
                 </tr>
               ))}
               {tareas.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-3 py-4 text-center text-text-muted">
+                  <td colSpan={puedeGestionar ? 6 : 5} className="px-3 py-4 text-center text-text-muted">
                     {mensajeVacio}
                   </td>
                 </tr>

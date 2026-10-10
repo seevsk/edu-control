@@ -1,6 +1,7 @@
 import { accionesDisponiblesTarea, type ESTADOS_TAREA_ORDEN } from "@/lib/estado-tarea";
 import { SubmitButton } from "@/components/submit-button";
 import { cambiarEstadoTareaAction, reasignarTareaAction } from "../actions";
+import type { DestinoTarea } from "@/lib/validation/tarea";
 
 export function AccionesTarea({
   idGrupo,
@@ -15,17 +16,30 @@ export function AccionesTarea({
   idUsuario: number;
   rol: "lider" | "miembro" | "observador";
   asignables: { idUsuario: number; usuario: { nombre: string; apellidos: string | null } }[];
-  destino?: "lista" | "detalle";
+  destino?: DestinoTarea;
 }) {
   if (rol === "observador") return null;
   const acciones = accionesDisponiblesTarea({ ...tarea, idUsuario, rol });
+  const esperaRevision = tarea.estado === "en_revision" && tarea.idAsignado === idUsuario;
   return (
     <div className="flex flex-wrap items-center gap-3 pt-1">
       {acciones.map((accion) => (
         <form key={accion.estado} action={cambiarEstadoTareaAction.bind(null, idGrupo, tarea.idTarea, accion.estado, destino)}>
-          <SubmitButton className="text-sm text-primary hover:underline">{accion.etiqueta}</SubmitButton>
+          <SubmitButton
+            pendingText={accion.estado === "completada" ? "Completando..." : "Actualizando..."}
+            className={`rounded-md px-3 py-1.5 text-xs font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
+              accion.estado === "completada"
+                ? "bg-primary text-white hover:bg-primary-hover"
+                : "border border-border-strong text-primary hover:bg-primary-soft"
+            }`}
+          >
+            {accion.etiqueta}
+          </SubmitButton>
         </form>
       ))}
+      {esperaRevision ? (
+        <p className="w-full text-xs text-text-muted">Pendiente de aprobación por otro integrante.</p>
+      ) : null}
       <details className="ml-auto">
         <summary className="cursor-pointer text-sm text-text-muted hover:text-text">Reasignar</summary>
         <form

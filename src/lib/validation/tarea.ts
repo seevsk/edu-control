@@ -21,8 +21,10 @@ export const idRegistroSchema = z.coerce.number().int().positive().max(214748364
 export const contextoTareaSchema = z.object({
   idGrupo: idRegistroSchema,
   idTarea: idRegistroSchema,
-  destino: z.enum(["lista", "detalle"]),
+  destino: z.enum(["lista", "tabla", "detalle"]),
 });
+
+export type DestinoTarea = z.infer<typeof contextoTareaSchema>["destino"];
 
 export const cambiarEstadoTareaSchema = contextoTareaSchema.extend({
   nuevoEstado: z.enum(ESTADOS_TAREA),
