@@ -10,7 +10,8 @@ const schema = z.object({
 
 export const env = schema.parse({
   DATABASE_URL: process.env.DATABASE_URL,
-  APP_URL: process.env.APP_URL,
+  // En Render, si no se define APP_URL se usa la URL publica que Render inyecta en cada servicio.
+  APP_URL: process.env.APP_URL || process.env.RENDER_EXTERNAL_URL,
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
   SESSION_SECRET: process.env.SESSION_SECRET,

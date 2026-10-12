@@ -1,0 +1,38 @@
+# Blueprint de Render para el entorno de demo (staging). Toda la configuracion vive aqui;
+# si se borra el servicio o la base, se recrean igual desde este archivo.
+# Para pagar mas adelante basta cambiar `plan` por uno pago (ver render.com/pricing).
+# La base free expira a los 30 dias (+14 de gracia): se borra en el dashboard y se resincroniza
+# el Blueprint para recrearla vacia; las migraciones se aplican solas en el siguiente deploy.
+services:
+  - type: web
+    name: educontrol-demo
+    runtime: node
+    plan: free
+    region: virginia
+    branch: develop
+    autoDeployTrigger: commit
+    # El seed NO va aqui: borra todas las tablas y se ejecutaria en cada deploy.
+    buildCommand: npm ci && npx prisma generate && npx prisma migrate deploy && npm run build
+    startCommand: npm run start
+    healthCheckPath: /login
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: educontrol-demo-db
+          property: connectionString
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+
+databases:
+  - name: educontrol-demo-db
+    plan: free
+    region: virginia
+    postgresMajorVersion: "17"
+    databaseName: educontrol
+    user: educontrol

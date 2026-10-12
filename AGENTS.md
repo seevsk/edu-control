@@ -93,7 +93,7 @@ Notas:
 
 ## 5. Entornos y despliegue
 
-**Por ahora todo se ejecuta en local.** No agregues configuración de despliegue (ni `render.yaml`, ni Dockerfile de la app, ni CI de despliegue) hasta que se pida.
+**Desarrollo en local + una demo en Render** (pedido por el usuario, 2026-10-12): `render.yaml` define el servicio `educontrol-demo` (rama `develop`) y su base `educontrol-demo-db`, ambos en plan **free**. Los datos de la demo son descartables (la base free expira a los 30 días); lo que se conserva es la configuración, versionada en `render.yaml`. Pasar a pago = cambiar `plan` en ese archivo. No agregues Dockerfile de la app ni CI de despliegue sin que se pida.
 
 ### Local (actual)
 
