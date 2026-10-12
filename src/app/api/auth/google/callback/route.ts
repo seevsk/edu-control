@@ -13,7 +13,10 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const claims = await validarCallbackGoogle(new URL(request.url), codeVerifier);
+    // Detras de un proxy (Render) request.url puede traer el host interno; openid-client deriva
+    // el redirect_uri de esta URL y debe coincidir exacto con el registrado en Google.
+    const callbackUrl = new URL(`/api/auth/google/callback${request.nextUrl.search}`, env.APP_URL);
+    const claims = await validarCallbackGoogle(callbackUrl, codeVerifier);
     const usuario = await iniciarSesionConGoogle(claims);
     await crearSesion(usuario.idUsuario);
   } catch (error) {
