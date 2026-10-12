@@ -1,16 +1,76 @@
 import { prisma } from "@/server/db/client";
-import { horaATime } from "@/lib/dates";
 import { cerrarSesion } from "@/server/auth/session";
 import { requerirUsuarioValido } from "@/server/services/usuario";
-import type { actualizarPerfilSchema, crearBloqueOcupadoSchema } from "@/lib/validation/perfil";
+import type { actualizarPerfilSchema } from "@/lib/validation/perfil";
 import type { z } from "zod";
 
 export async function obtenerPerfilCompleto(idUsuario: number) {
   await requerirUsuarioValido(idUsuario);
   return prisma.usuario.findUniqueOrThrow({
     where: { idUsuario },
-    include: { perfil: true, bloquesOcupados: { orderBy: [{ diaSemana: "asc" }, { horaInicio: "asc" }] } },
+    include: { perfil: true },
   });
+}
+
+/**
+ * Perfil de otro usuario. Reglas (decididas con el usuario):
+ * - Cualquiera lo ve solo si la persona tiene `visible_en_busqueda`; sus companeros de grupo
+ *   (ambos con invitacion aceptada) lo ven siempre.
+ * - Datos basicos, incluido si trabaja. Nunca el correo.
+ * - La disponibilidad va en su propia pagina; aqui solo se dice si el visitante puede verla.
+ * Devuelve null si no existe, fue eliminado o no es visible para quien lo pide.
+ */
+export async function obtenerPerfilPublico(idVisitante: number, idUsuario: number) {
+  const usuario = await prisma.usuario.findUnique({
+    where: { idUsuario },
+    select: {
+      idUsuario: true,
+      nombre: true,
+      apellidos: true,
+      fotoUrl: true,
+      eliminadoEn: true,
+      perfil: {
+        select: {
+          tipoCuenta: true,
+          institucion: true,
+          carrera: true,
+          ciclo: true,
+          biografia: true,
+          trabaja: true,
+          visibleEnBusqueda: true,
+        },
+      },
+    },
+  });
+  if (!usuario || usuario.eliminadoEn || !usuario.perfil) return null;
+
+  const gruposEnComun = await prisma.grupo.findMany({
+    where: {
+      AND: [
+        { integrantes: { some: { idUsuario: idVisitante, estadoInvitacion: "aceptada" } } },
+        { integrantes: { some: { idUsuario, estadoInvitacion: "aceptada" } } },
+      ],
+    },
+    select: {
+      idGrupo: true,
+      nombre: true,
+      integrantes: { where: { idUsuario: { in: [idVisitante, idUsuario] } }, select: { rol: true } },
+    },
+    orderBy: { fechaCreacion: "desc" },
+  });
+
+  if (gruposEnComun.length === 0 && !usuario.perfil.visibleEnBusqueda) return null;
+
+  const { tipoCuenta, institucion, carrera, ciclo, biografia, trabaja } = usuario.perfil;
+
+  return {
+    nombre: usuario.nombre,
+    apellidos: usuario.apellidos,
+    fotoUrl: usuario.fotoUrl,
+    perfil: { tipoCuenta, institucion, carrera, ciclo, biografia, trabaja },
+    gruposEnComun: gruposEnComun.map(({ idGrupo, nombre }) => ({ idGrupo, nombre })),
+    puedeVerDisponibilidad: gruposEnComun.some((grupo) => grupo.integrantes.every((i) => i.rol !== "observador")),
+  };
 }
 
 export async function actualizarPerfil(idUsuario: number, datos: z.infer<typeof actualizarPerfilSchema>) {
@@ -32,25 +92,6 @@ export async function actualizarPerfil(idUsuario: number, datos: z.infer<typeof 
       },
     }),
   ]);
-}
-
-export async function crearBloqueOcupado(
-  idUsuario: number,
-  datos: z.infer<typeof crearBloqueOcupadoSchema>,
-) {
-  return prisma.bloqueOcupado.create({
-    data: {
-      idUsuario,
-      tipo: datos.tipo,
-      diaSemana: datos.diaSemana,
-      horaInicio: horaATime(datos.horaInicio),
-      horaFin: horaATime(datos.horaFin),
-    },
-  });
-}
-
-export async function eliminarBloqueOcupado(idUsuario: number, idBloqueOcupado: number) {
-  await prisma.bloqueOcupado.deleteMany({ where: { idBloqueOcupado, idUsuario } });
 }
 
 /**

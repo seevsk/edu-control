@@ -54,7 +54,7 @@ export async function obtenerFeedActividad(idUsuario: number, idGrupo: number, l
   return prisma.tareaHistorial.findMany({
     where: { tarea: { idGrupo } },
     include: { usuario: true, tarea: true },
-    orderBy: { fecha: "desc" },
+    orderBy: [{ fecha: "desc" }, { idHistorial: "desc" }],
     take: limite,
   });
 }

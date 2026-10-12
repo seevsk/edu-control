@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { IconBuscar, IconCampana } from "@/components/icons";
+import { IconBuscarPersonas, IconCampana } from "@/components/icons";
 import { Avatar } from "@/components/avatar";
 
 export function Header({
@@ -13,19 +13,23 @@ export function Header({
     <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface px-4">
       <span className="text-[15px] font-semibold tracking-tight">EduControl</span>
 
-      <div className="hidden flex-1 items-center justify-end pr-2 sm:flex">
-        <div className="flex w-full max-w-64 items-center gap-2 rounded-md border border-border bg-bg px-2.5 py-1 text-sm text-text-muted">
-          <IconBuscar className="size-4 shrink-0" aria-hidden />
+      <form action="/usuarios" role="search" className="hidden flex-1 items-center justify-end pr-2 sm:flex">
+        <label className="flex w-full max-w-64 items-center gap-2 rounded-md border border-border bg-bg px-2.5 py-1 text-sm text-text-muted focus-within:border-primary">
+          <IconBuscarPersonas className="size-4 shrink-0" aria-hidden />
+          <span className="sr-only">Buscar personas</span>
           <input
             type="search"
-            placeholder="Buscar"
-            disabled
-            className="w-full bg-transparent text-sm placeholder:text-text-muted focus:outline-none disabled:cursor-not-allowed"
+            name="q"
+            placeholder="Buscar personas"
+            className="w-full bg-transparent text-sm text-text placeholder:text-text-muted focus:outline-none"
           />
-        </div>
-      </div>
+        </label>
+      </form>
 
       <div className="ml-auto flex items-center gap-3 sm:ml-0">
+        <Link href="/usuarios" className="sm:hidden" aria-label="Buscar personas">
+          <IconBuscarPersonas className="size-5 text-text-muted" aria-hidden />
+        </Link>
         <Link href="/notificaciones" className="relative" aria-label="Notificaciones">
           <IconCampana className="size-5 text-text-muted" aria-hidden />
           {notificacionesNoLeidas > 0 ? (

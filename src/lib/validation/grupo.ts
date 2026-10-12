@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { idRegistroSchema } from "./tarea";
 
 const enlaceHttp = z
   .string()
@@ -23,4 +24,14 @@ export const actualizarGrupoSchema = z.object({
 
 export const buscarUsuariosSchema = z.object({
   consulta: z.string().trim().min(1).max(120),
+});
+
+export const invitacionGrupoSchema = z.object({
+  idGrupo: idRegistroSchema,
+  idUsuario: idRegistroSchema,
+});
+
+export const responderInvitacionSchema = z.object({
+  idGrupo: idRegistroSchema,
+  respuesta: z.enum(["aceptada", "rechazada"]),
 });

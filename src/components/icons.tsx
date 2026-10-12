@@ -49,6 +49,15 @@ export function IconGrupos(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function IconReuniones(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="M3.5 5.5a1.5 1.5 0 0 1 1.5-1.5h7a1.5 1.5 0 0 1 1.5 1.5v4a1.5 1.5 0 0 1-1.5 1.5H8l-2.5 2v-2H5a1.5 1.5 0 0 1-1.5-1.5Z" />
+      <path d="M13.5 7.5H15a1.5 1.5 0 0 1 1.5 1.5v4a1.5 1.5 0 0 1-1.5 1.5h-.5v2L12 14.5H9.5A1.5 1.5 0 0 1 8 13v-.5" />
+    </svg>
+  );
+}
+
 export function IconInvitaciones(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base(props)}>
@@ -81,6 +90,78 @@ export function IconBuscar(props: SVGProps<SVGSVGElement>) {
     <svg {...base(props)}>
       <circle cx="8.7" cy="8.7" r="5" />
       <path d="M16.3 16.3 12.6 12.6" />
+    </svg>
+  );
+}
+
+export function IconBuscarPersonas(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="7.5" cy="6.5" r="2.7" />
+      <path d="M2.5 16c.5-3 2.4-4.6 5-4.6 1 0 1.9.2 2.6.6" />
+      <circle cx="14" cy="13" r="2.6" />
+      <path d="m16 15 1.8 1.8" />
+    </svg>
+  );
+}
+
+export function IconPresencial(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="M3.5 16.5h13M5 16.5V8l5-3.5L15 8v8.5" />
+      <path d="M8.5 16.5v-4h3v4" />
+    </svg>
+  );
+}
+
+export function IconRemoto(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <rect x="3" y="4.5" width="14" height="9" rx="1.2" />
+      <path d="M7.5 16.5h5M10 13.5v3" />
+    </svg>
+  );
+}
+
+export function IconReloj(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="10" cy="10" r="6.75" />
+      <path d="M10 6.5V10l2.6 1.6" />
+    </svg>
+  );
+}
+
+export function IconChevronIzquierda(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 4.5 6.5 10l5.5 5.5" />
+    </svg>
+  );
+}
+
+export function IconChevronDerecha(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="M8 4.5 13.5 10 8 15.5" />
+    </svg>
+  );
+}
+
+export function IconAgregar(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="M10 4.5v11M4.5 10h11" />
+    </svg>
+  );
+}
+
+export function IconMas(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)} fill="currentColor" stroke="none">
+      <circle cx="10" cy="4.5" r="1.4" />
+      <circle cx="10" cy="10" r="1.4" />
+      <circle cx="10" cy="15.5" r="1.4" />
     </svg>
   );
 }

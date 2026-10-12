@@ -44,6 +44,9 @@ Nació como proyecto del curso *Proyecto Tecnológico* (NRC 3708, ISIL, metodolo
 | Calendario | HU-015 | Vista interna sobre evaluaciones y tareas de grupo |
 | Evaluaciones | HU-009, HU-010 | Modelo `evaluacion` |
 | Perfil y disponibilidad | HU-003, HU-017, HU-018 | Modelo `perfil` y `bloque_ocupado`; se construye después del núcleo |
+| Disponibilidad del grupo | — (aprobado por el usuario, 2026-10-05) | Pestaña "Horarios" del grupo: mapa semanal ocupado/libre y huecos en común. Calculado, sin tabla (ver 8.5) |
+| Reuniones | — (aprobado por el usuario, 2026-10-05) | Módulo propio en el sidebar (`/reuniones`): programar con sugerencias de la disponibilidad del grupo, confirmar asistencia, verlas en el Calendario. Modelos `reunion` y `reunion_asistente` (ver 8.7) |
+| Perfil de otros usuarios y buscador de personas | — (aprobado por el usuario, 2026-10-05) | `/usuarios` y `/usuarios/[id]` (ver 8.1) |
 
 **Las tareas existen solo dentro de grupos.** No hay tareas personales en el MVP.
 
@@ -55,7 +58,6 @@ Nació como proyecto del curso *Proyecto Tecnológico* (NRC 3708, ISIL, metodolo
 - **Recuperación de acceso** (HU-002): no aplica, porque no hay contraseñas propias; la recuperación la gestiona Google.
 - Subida de archivos o capturas como evidencia de tareas (descartado por complejidad).
 - Ranking o puntaje único de participación (ver sección 8.5).
-- **Candidato a futuro, no implementar sin aprobación:** sugerir horarios comunes del grupo cruzando disponibilidad. El modelo ya lo soporta.
 
 ### Recorrido principal de usuario (guía para la demo)
 
@@ -156,7 +158,7 @@ Reglas de arquitectura:
 
 ## 7. Modelo de datos
 
-**La especificación exacta está en `docs/educontrol.dbml`** (11 tablas). Si ese archivo no existe, pídelo al usuario; no inventes el esquema. Una vez creado `prisma/schema.prisma`, este pasa a ser la fuente de verdad y el `.dbml` se actualiza en el mismo cambio.
+**La especificación exacta está en `docs/educontrol.dbml`** (13 tablas). Si ese archivo no existe, pídelo al usuario; no inventes el esquema. Una vez creado `prisma/schema.prisma`, este pasa a ser la fuente de verdad y el `.dbml` se actualiza en el mismo cambio.
 
 | Tabla | Propósito |
 |---|---|
@@ -171,6 +173,8 @@ Reglas de arquitectura:
 | `tarea` | Tareas de un grupo, con responsable, estado y peso |
 | `tarea_historial` | Registro inmutable de cambios de cada tarea |
 | `notificacion` | Avisos por destinatario, con estado de envío de correo |
+| `reunion` | Reunión de un grupo, de una sola vez (título, inicio, fin, lugar y enlace opcionales) |
+| `reunion_asistente` | Confirmación de asistencia por integrante (`pendiente` \| `asistire` \| `no_asistire`) |
 
 **Lo que NO tiene tabla** (se calcula con consultas): el calendario, el avance del grupo, la carga y el cumplimiento por integrante, el feed de actividad y el tiempo libre.
 
@@ -211,6 +215,7 @@ Reglas de arquitectura:
 - Sugerir compañeros por dominio de correo solo tiene sentido si el dominio **no es genérico** (gmail.com, hotmail.com, outlook.com, live.com, yahoo.com, icloud.com, etc.). Guarda esa lista en un archivo de constantes.
 - `perfil.tipo_cuenta` (`estudiante` | `profesor`) es **solo una etiqueta autodeclarada, sin ningún permiso**. Los permisos salen únicamente de `grupo_integrante.rol`. No la muestres como insignia de "verificado".
 - **Búsqueda de compañeros:** solo usuarios registrados, no eliminados y con `visible_en_busqueda = true`. Exige correo exacto o un mínimo de caracteres, limita la cantidad de resultados y limita las invitaciones por hora. Nunca muestres datos de disponibilidad en los resultados.
+- **Perfil de otros usuarios (`/usuarios/[id]`, confirmado):** muestra primero los datos básicos: `tipo_cuenta` (como texto, no como insignia), nombres, apellidos, institución, carrera, ciclo, `trabaja` (Sí/No) y biografía, más los grupos en común. Nunca el correo. Lo ve cualquier usuario solo si la persona tiene `visible_en_busqueda = true`; sus compañeros de grupo (ambos `aceptada`) lo ven siempre. Arriba, el botón **"Ver disponibilidad"** lleva a `/usuarios/[id]/disponibilidad` solo si son compañeros (ver 8.2); si no, aparece deshabilitado. El buscador de la barra superior (`/usuarios?q=`) sigue las mismas reglas que la búsqueda para invitar y tampoco muestra el correo.
 - **Eliminar cuenta = anonimizar:** poner `eliminado_en`, vaciar nombre, apellidos, correo y foto, borrar `perfil` y `bloque_ocupado`, y conservar `tarea` y `tarea_historial` (para no romper los grupos).
 
 ### 8.2 Cursos, horarios, evaluaciones y calendario
@@ -224,7 +229,7 @@ Reglas de arquitectura:
 - `evaluacion`: pertenece a un curso. `fecha_cierre` es obligatoria. `fecha_apertura` es opcional (una evaluación presencial no tiene ventana). Si el usuario solo indica el día, usa **23:59 (America/Lima)** como hora de cierre. `requiere_entrega` indica si se sube algo; `fecha_entrega` la marca el propio usuario (`NULL` = aún no entrega) y es autodeclarada, no verificada.
 - **El calendario es una vista, no una tabla.** Eventos con fecha: cierres de evaluaciones y fechas límite de tareas de grupo. Patrones semanales (`horario_curso` y `bloque_ocupado`): franjas de fondo proyectadas sobre los días de la semana mostrada. Un bloque que cruza la medianoche se dibuja hasta las 24:00 de un día y desde las 00:00 del siguiente.
 - **Fechas:** se guardan en UTC y se muestran en `America/Lima` (UTC-5, sin horario de verano). Centraliza la conversión en `src/lib/dates`.
-- La disponibilidad es información sensible: a otros integrantes del grupo solo se les puede mostrar **ocupado/libre**, nunca el tipo de bloque ni el curso.
+- La disponibilidad es información sensible (decisión del usuario, 2026-10-05): un **compañero** (comparten un grupo donde ambos están `aceptada` y ninguno es observador) puede ver el horario semanal del otro en `/usuarios/[id]/disponibilidad`, con la misma segmentación y colores del Calendario: clases con el nombre del curso y bloques con su categoría (Laboral / Familiar-Personal). **Nunca el `detalle` de un bloque** ni las entregas. En la pestaña "Horarios" del grupo se sigue mostrando solo ocupado/libre por persona. Nadie fuera de esa condición ve la disponibilidad.
 
 ### 8.3 Grupos e invitaciones
 
@@ -270,6 +275,7 @@ Reglas de arquitectura:
 - Excluye a los observadores de todas las métricas.
 - **No hay ranking ni puntaje único.** Muestra carga y cumplimiento lado a lado.
 - **Feed de actividad del grupo** = lectura de `tarea_historial`. No lleva tabla propia.
+- **Disponibilidad del grupo** (pestaña "Horarios", `src/lib/disponibilidad.ts`): ocupado de cada integrante aceptado no observador = `horario_curso` de sus cursos activos + sus `bloque_ocupado`, sobre la semana tipo. Se muestra en franjas de 30 min entre 7 AM y 11 PM, con cuántos están libres y **quién falta por nombre**, nunca el motivo (tipo de bloque ni curso). Huecos en común = franjas consecutivas de 1 h o más con todos libres; si no hay, los de "falta una persona". Los observadores no ven esta pestaña.
 
 ### 8.6 Notificaciones
 
@@ -289,6 +295,7 @@ Reglas de arquitectura:
 | Devuelven una tarea a `en_progreso` | `tarea_devuelta` | El asignado | Sí |
 | Una tarea queda `completada` | `tarea_completada` | El asignado | No |
 | Cambio a `en_progreso` | — | Nadie (solo queda en el historial) | No |
+| Programan una reunión | `reunion_programada` | Integrantes aceptados no observadores, menos quien la programó | No (confirmado: solo campana) |
 
 - Mantén la **lista de eventos que envían correo en un único lugar** (una constante o archivo de configuración), para poder cambiar la política sin tocar la lógica.
 - `grupo_integrante.correo_actividad = false` silencia los correos de **actividad** de ese grupo (revisión, completada). Los importantes (invitaciones, tareas asignadas o devueltas) siguen llegando.
@@ -298,6 +305,17 @@ Reglas de arquitectura:
   - `ResendEmailSender` (cuando exista dominio verificado): usa el `id_notificacion` como clave de idempotencia para que un reintento no duplique el correo.
 - Límites de Resend en el plan gratuito: tope diario de envíos para toda la app y necesidad de verificar un dominio propio para escribir a terceros. Por eso el correo se reserva para lo que exige acción de alguien.
 
+### 8.7 Reuniones (confirmado)
+
+- Módulo propio en el sidebar: `/reuniones` lista las de todos mis grupos (filtro por grupo) y `/reuniones/nueva?grupo=` las programa. También se llega desde la pestaña "Horarios" del grupo (botón o un hueco en común, que precarga la próxima fecha de ese día).
+- Las programan el líder y los miembros (aceptados, no observadores) de un grupo `activo`. Son de **una sola vez** (sin repetición) y empiezan y terminan el mismo día. No se programan en el pasado.
+- **El sistema sugiere, no obliga** (decisión del usuario): el formulario muestra como sugerencias los huecos en común de los próximos 7 días y el mapa del grupo. Se puede elegir cualquier otra hora; si pisa el horario semanal de alguien, se avisa en vivo ("Choca con el horario de …") pero se permite programarla.
+- `enlace` se valida con Zod (`https://` o `http://`), igual que `grupo.enlace_trabajo`.
+- Al crearla se inserta una fila de `reunion_asistente` por integrante aceptado no observador en el mismo `create` anidado: quien la programa queda `asistire`, el resto `pendiente`. Quien se une al grupo después puede responder igual (upsert).
+- Responden (`asistire` | `no_asistire`) los integrantes aceptados no observadores mientras la reunión no haya terminado. Cancelan (borrar la fila; borra en cascada sus asistentes) quien la programó o el líder. Cancelar no notifica en el MVP.
+- Los observadores ven las reuniones del grupo pero no son asistentes ni reciben avisos.
+- Aparecen en el Calendario de cada integrante participante (solo en la vista "Todo", con su propio color), sin contar en las horas por categoría.
+
 ## 9. Diseño de la interfaz
 
 Usa **Azure DevOps** como referencia visual: se siente profesional, densa en información pero legible, pensada para seguir el estado de un vistazo. Es **inspiración, no copia**: no uses sus logos, íconos ni marca.
@@ -305,7 +323,7 @@ Usa **Azure DevOps** como referencia visual: se siente profesional, densa en inf
 **Estructura general**
 
 - Barra superior: nombre del producto, búsqueda, campana de notificaciones y avatar.
-- Barra lateral izquierda con íconos: Inicio, Cursos, Calendario, Grupos, Invitaciones (con contador si hay pendientes) y Perfil.
+- Barra lateral izquierda con íconos: Inicio, Cursos, Calendario, Grupos, Reuniones, Invitaciones (con contador si hay pendientes) y Perfil.
 - Migas de pan (*breadcrumbs*) y pestañas dentro de cada página. Ejemplo, página de un grupo: **Resumen · Tareas · Integrantes · Actividad**.
 - Franjas informativas en azul claro para avisos (por ejemplo, "Tienes 2 invitaciones pendientes").
 
@@ -323,13 +341,13 @@ Usa **Azure DevOps** como referencia visual: se siente profesional, densa en inf
 
 - Tema claro primero; deja preparados los tokens para un tema oscuro futuro.
 - Color primario azul cercano a `#0078D4`; superficies blancas; neutros muy claros para el fondo; bordes finos y sombras sutiles.
-- Radios pequeños (2–4 px), texto base de 14 px, tipografía `"Segoe UI", system-ui, sans-serif`.
+- Radios pequeños (2–4 px), texto base de 14 px, tipografía **Poppins** (via `next/font/google`, self-hosted) con fallback a `"Segoe UI", system-ui, sans-serif`.
 - Componentes densos y compactos, con estados de carga (*skeletons*), estados vacíos y mensajes de error claros.
 
 **Reglas transversales**
 
 - **Responsivo y móvil primero:** los estudiantes consultarán desde el celular.
-- Textos de la interfaz **en español (Perú)**. Fechas `dd/mm/aaaa`, horas en formato de 24 h (evita ambigüedades con turnos nocturnos).
+- Textos de la interfaz **en español (Perú)**. Fechas `dd/mm/aaaa`, horas en formato de 12 h con AM/PM (`src/lib/dates.ts#timeAHora`); los turnos que cruzan la medianoche se distinguen por contexto (bloque dibujado hasta las 12:00 AM y desde las 12:00 AM del día siguiente), no por el formato de hora.
 - Accesibilidad básica: contraste suficiente, navegación por teclado y foco visible.
 - No agregues una librería de componentes ni de íconos sin consultarlo.
 
@@ -421,7 +439,7 @@ Datos de ejemplo (`prisma/seed.ts`, **solo desarrollo**): varios usuarios de pru
 - No crees tareas personales ni subida de archivos.
 - No borres filas de `usuario`, `grupo_integrante` ni `tarea_historial`.
 - No confíes en un id de usuario que venga del cliente; no dejes rutas de grupo sin verificar membresía.
-- No expongas a otros usuarios el tipo de un bloque ocupado ni el detalle de la disponibilidad.
+- No expongas el `detalle` de un bloque ocupado a nadie más que su dueño, ni la disponibilidad a quien no sea compañero (ver 8.2).
 - No guardes cifras derivadas (avance, carga, cumplimiento, tiempo libre) en la base de datos.
 - No hardcodees URLs, dominios ni secretos; no subas `.env` a Git.
 - No agregues dependencias, columnas o tablas fuera de lo definido sin preguntar.

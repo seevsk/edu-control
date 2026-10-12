@@ -42,7 +42,8 @@ export async function importarCursoAction(idGrupo: number, volverA: string) {
 
   revalidatePath("/cursos");
   revalidatePath(volverA);
-  redirect(volverA);
+  const separador = volverA.includes("?") ? "&" : "?";
+  redirect(`${volverA}${separador}toast=${encodeURIComponent("Curso importado")}`);
 }
 
 export async function crearCursoAction(formData: FormData) {
@@ -56,7 +57,7 @@ export async function crearCursoAction(formData: FormData) {
 
   await cursoService.crearCurso(sesion.idUsuario, parseo.data);
   revalidatePath("/cursos");
-  redirect("/cursos");
+  redirect(`/cursos?toast=${encodeURIComponent("Curso creado")}`);
 }
 
 export async function actualizarCursoAction(idCurso: number, formData: FormData) {
@@ -74,7 +75,33 @@ export async function actualizarCursoAction(idCurso: number, formData: FormData)
   await cursoService.actualizarCurso(sesion.idUsuario, idCurso, parseo.data);
   revalidatePath(`/cursos/${idCurso}`);
   revalidatePath("/cursos");
-  redirect("/cursos");
+  redirect(`/cursos?toast=${encodeURIComponent("Cambios guardados")}`);
+}
+
+export async function alternarActivoCursoAction(idCurso: number) {
+  const sesion = await requerirSesion();
+
+  try {
+    await cursoService.alternarActivoCurso(sesion.idUsuario, idCurso);
+  } catch (error) {
+    redirect(`/cursos?error=${encodeURIComponent(mensajeParaUsuario(error))}`);
+  }
+
+  revalidatePath("/cursos");
+  redirect(`/cursos?toast=${encodeURIComponent("Curso actualizado")}`);
+}
+
+export async function eliminarCursoAction(idCurso: number) {
+  const sesion = await requerirSesion();
+
+  try {
+    await cursoService.eliminarCurso(sesion.idUsuario, idCurso);
+  } catch (error) {
+    redirect(`/cursos?error=${encodeURIComponent(mensajeParaUsuario(error))}`);
+  }
+
+  revalidatePath("/cursos");
+  redirect(`/cursos?toast=${encodeURIComponent("Curso eliminado")}`);
 }
 
 export async function agregarHorarioAction(idCurso: number, formData: FormData) {

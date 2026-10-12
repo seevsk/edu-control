@@ -12,20 +12,6 @@ export const actualizarPerfilSchema = z.object({
   visibleEnBusqueda: z.boolean(),
 });
 
-const horaHHMM = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Hora invalida (HH:mm)");
-
-export const crearBloqueOcupadoSchema = z
-  .object({
-    tipo: z.enum(["laboral", "familiar", "personal"]),
-    diaSemana: z.coerce.number().int().min(1, "Dia invalido").max(7, "Dia invalido"),
-    horaInicio: horaHHMM,
-    horaFin: horaHHMM,
-  })
-  .refine((datos) => datos.horaInicio !== datos.horaFin, {
-    message: "La hora de inicio y fin no pueden ser iguales",
-    path: ["horaFin"],
-  });
-
 export const eliminarCuentaSchema = z.object({
   confirmacion: z.string().refine((v) => v.trim().toLowerCase() === "eliminar", {
     message: "Escribe ELIMINAR para confirmar",

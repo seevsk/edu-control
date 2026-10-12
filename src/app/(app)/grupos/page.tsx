@@ -4,6 +4,13 @@ import { listarMisGrupos } from "@/server/services/grupo";
 import { listarEvaluacionesDelUsuario } from "@/server/services/curso";
 import { crearGrupoAction } from "./actions";
 import { SubmitButton } from "@/components/submit-button";
+import { IconoCurso } from "@/components/icono-curso";
+import { AvataresGrupo } from "@/components/avatares-grupo";
+import { DatosTarjeta } from "@/components/datos-tarjeta";
+import { ChipModalidad } from "@/components/chip-modalidad";
+import { EncabezadoTarjeta } from "@/components/encabezado-tarjeta";
+import { formatearFechaLima } from "@/lib/dates";
+import { etiquetaRelativa } from "@/lib/calendario";
 
 export default async function GruposPage({
   searchParams,
@@ -25,32 +32,61 @@ export default async function GruposPage({
         </p>
       ) : null}
 
-      <ul className="flex flex-col gap-2">
+      <ul className="grid gap-3 sm:grid-cols-2">
         {grupos.map((grupo) => {
           const activos = grupo.integrantes.filter((i) => i.estadoInvitacion === "aceptada");
+          const curso = grupo.evaluacion?.curso ?? null;
+          const finalizado = grupo.estado === "finalizado";
           return (
             <li key={grupo.idGrupo}>
               <Link
                 href={`/grupos/${grupo.idGrupo}`}
-                className="flex items-center justify-between rounded-md border border-border bg-surface p-4 hover:border-border-strong"
+                className="flex h-full flex-col gap-3 rounded-md border border-border bg-surface p-3.5 text-sm transition-colors duration-150 hover:border-border-strong"
               >
-                <div>
-                  <p className="text-sm font-medium">{grupo.nombre}</p>
-                  <p className="text-xs text-text-muted">
-                    {activos.length} integrante{activos.length === 1 ? "" : "s"}
-                  </p>
+                <EncabezadoTarjeta
+                  etiqueta="Grupo"
+                  titulo={grupo.nombre}
+                  icono={<IconoCurso nombre={curso?.nombre ?? grupo.nombre} codigo={curso?.codigo} />}
+                />
+                <div className="border-t border-border pt-2.5">
+                <DatosTarjeta
+                  datos={[
+                    { etiqueta: "Curso", valor: curso?.nombre },
+                    { etiqueta: "Modalidad", valor: curso?.modalidad ? <ChipModalidad modalidad={curso.modalidad} /> : null },
+                    {
+                      etiqueta: "Finaliza",
+                      valor: grupo.fechaLimite ? etiquetaRelativa(grupo.fechaLimite) : null,
+                      titulo: grupo.fechaLimite ? formatearFechaLima(grupo.fechaLimite) : undefined,
+                    },
+                    {
+                      etiqueta: "Estado",
+                      valor: (
+                        <span className="inline-flex items-center gap-1.5">
+                          <span
+                            className={`size-2 rounded-full ${finalizado ? "bg-estado-pendiente" : "bg-estado-completada"}`}
+                            aria-hidden
+                          />
+                          {finalizado ? "Finalizado" : "Activo"}
+                        </span>
+                      ),
+                      titulo: finalizado ? "Finalizado" : "Activo",
+                    },
+                  ]}
+                />
                 </div>
-                {grupo.estado === "finalizado" ? (
-                  <span className="rounded-sm bg-bg px-1.5 py-0.5 text-[11px] text-text-muted">
-                    Finalizado
+                <div className="mt-auto flex items-center justify-between gap-2 border-t border-border pt-2.5 text-xs">
+                  <span>
+                    <span className="text-text-muted">Número de integrantes:</span>{" "}
+                    <span className="font-medium tabular-nums">{activos.length}</span>
                   </span>
-                ) : null}
+                  <AvataresGrupo personas={activos.map((i) => i.usuario)} />
+                </div>
               </Link>
             </li>
           );
         })}
         {grupos.length === 0 ? (
-          <p className="text-sm text-text-muted">Todavia no perteneces a ningun grupo.</p>
+          <p className="text-sm text-text-muted sm:col-span-2">Todavia no perteneces a ningun grupo.</p>
         ) : null}
       </ul>
 
