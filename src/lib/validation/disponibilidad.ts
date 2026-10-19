@@ -10,17 +10,17 @@ const camposComunes = {
   detalle: z.string().trim().max(120, "El detalle admite hasta 120 caracteres").optional().or(z.literal("")),
 };
 
-const horasDistintas = {
-  check: (datos: { horaInicio: string; horaFin: string }) => datos.horaInicio !== datos.horaFin,
-  params: { message: "La hora de inicio y de fin no pueden ser iguales", path: ["horaFin"] },
+const rangoHorarioValido = {
+  check: (datos: { horaInicio: string; horaFin: string }) => datos.horaFin > datos.horaInicio,
+  params: { message: "La hora de fin debe ser posterior a la hora de inicio", path: ["horaFin"] },
 };
 
 /** Al crear se pueden marcar varios dias: se guarda un bloque por dia. */
 export const crearBloqueOcupadoSchema = z
   .object({ ...camposComunes, dias: z.array(dia).min(1, "Elige al menos un día") })
-  .refine(horasDistintas.check, horasDistintas.params);
+  .refine(rangoHorarioValido.check, rangoHorarioValido.params);
 
 /** Al editar, el bloque es una sola fila: un solo dia. */
 export const actualizarBloqueOcupadoSchema = z
   .object({ ...camposComunes, diaSemana: dia })
-  .refine(horasDistintas.check, horasDistintas.params);
+  .refine(rangoHorarioValido.check, rangoHorarioValido.params);

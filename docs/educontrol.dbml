@@ -173,7 +173,7 @@ COMMENT ON COLUMN "bloque_ocupado"."tipo" IS 'laboral | familiar | personal';
 
 COMMENT ON COLUMN "bloque_ocupado"."dia_semana" IS '1 = lunes ... 7 = domingo. Es el día en que EMPIEZA el bloque';
 
-COMMENT ON COLUMN "bloque_ocupado"."hora_fin" IS 'Si hora_fin < hora_inicio, el bloque cruza la medianoche';
+COMMENT ON COLUMN "bloque_ocupado"."hora_fin" IS 'Debe ser estrictamente posterior a hora_inicio; no se permiten bloques que crucen la medianoche';
 
 COMMENT ON COLUMN "bloque_ocupado"."detalle" IS 'Descripcion opcional y libre del bloque (ej. "Turno en la tienda"). Nunca se muestra a otros integrantes de un grupo';
 

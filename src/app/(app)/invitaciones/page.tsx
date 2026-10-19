@@ -1,6 +1,7 @@
 import { requerirSesion } from "@/server/auth/session";
 import { listarInvitacionesPendientes } from "@/server/services/grupo";
 import { responderInvitacionAction } from "../grupos/actions";
+import { ConfirmarAceptacion } from "./confirmar-aceptacion";
 
 export default async function InvitacionesPage({ searchParams }: {
   searchParams: Promise<{ error?: string }>;
@@ -35,14 +36,10 @@ export default async function InvitacionesPage({ searchParams }: {
               <p className="text-xs text-text-muted">Grupo finalizado · Solo lectura</p>
             ) : (
               <div className="flex gap-2">
-                <form action={responderInvitacionAction.bind(null, invitacion.idGrupo, "aceptada")}>
-                  <button
-                    type="submit"
-                    className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-hover"
-                  >
-                    Aceptar
-                  </button>
-                </form>
+                <ConfirmarAceptacion
+                  nombreGrupo={invitacion.grupo.nombre}
+                  action={responderInvitacionAction.bind(null, invitacion.idGrupo, "aceptada")}
+                />
                 <form action={responderInvitacionAction.bind(null, invitacion.idGrupo, "rechazada")}>
                   <button
                     type="submit"

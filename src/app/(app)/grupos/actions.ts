@@ -71,10 +71,20 @@ export async function invitarIntegranteAction(idGrupo: number, formData: FormDat
   redirect(`/grupos/${idGrupo}`);
 }
 
-export async function responderInvitacionAction(idGrupo: number, respuesta: "aceptada" | "rechazada") {
+export async function responderInvitacionAction(
+  idGrupo: number,
+  respuesta: "aceptada" | "rechazada",
+  formData: FormData,
+) {
   const sesion = await requerirSesion();
-  const parseo = responderInvitacionSchema.safeParse({ idGrupo, respuesta });
-  if (!parseo.success) redirect(`/invitaciones?error=${encodeURIComponent("La respuesta a la invitación no es válida")}`);
+  const parseo = responderInvitacionSchema.safeParse({
+    idGrupo,
+    respuesta,
+    consentimientoPrivacidad: formData.get("consentimientoPrivacidad"),
+  });
+  if (!parseo.success) {
+    redirect(`/invitaciones?error=${encodeURIComponent(parseo.error.issues[0].message)}`);
+  }
   try {
     await grupoService.responderInvitacion(sesion.idUsuario, parseo.data.idGrupo, parseo.data.respuesta);
   } catch (error) {
