@@ -31,7 +31,16 @@ export const invitacionGrupoSchema = z.object({
   idUsuario: idRegistroSchema,
 });
 
-export const responderInvitacionSchema = z.object({
-  idGrupo: idRegistroSchema,
-  respuesta: z.enum(["aceptada", "rechazada"]),
-});
+export const responderInvitacionSchema = z.discriminatedUnion("respuesta", [
+  z.object({
+    idGrupo: idRegistroSchema,
+    respuesta: z.literal("aceptada"),
+    consentimientoPrivacidad: z.literal("acepto", {
+      error: "Confirma que leíste cómo se compartirán tus datos personales",
+    }),
+  }),
+  z.object({
+    idGrupo: idRegistroSchema,
+    respuesta: z.literal("rechazada"),
+  }),
+]);

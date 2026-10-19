@@ -275,9 +275,26 @@ async function verificar() {
     await caso("la validación rechaza identificadores y respuestas inválidas", async () => {
       for (const id of [null, "", 0, -1, 1.5, "abc", 2147483648]) {
         assert.equal(invitacionGrupoSchema.safeParse({ idGrupo: id, idUsuario: ana }).success, false);
-        assert.equal(responderInvitacionSchema.safeParse({ idGrupo: id, respuesta: "aceptada" }).success, false);
+        assert.equal(
+          responderInvitacionSchema.safeParse({
+            idGrupo: id,
+            respuesta: "aceptada",
+            consentimientoPrivacidad: "acepto",
+          }).success,
+          false,
+        );
       }
       assert.equal(responderInvitacionSchema.safeParse({ idGrupo, respuesta: "retirado" }).success, false);
+      assert.equal(responderInvitacionSchema.safeParse({ idGrupo, respuesta: "aceptada" }).success, false);
+      assert.equal(
+        responderInvitacionSchema.safeParse({
+          idGrupo,
+          respuesta: "aceptada",
+          consentimientoPrivacidad: "acepto",
+        }).success,
+        true,
+      );
+      assert.equal(responderInvitacionSchema.safeParse({ idGrupo, respuesta: "rechazada" }).success, true);
     });
     console.log(`${casos} casos de integración correctos`);
   } finally {
