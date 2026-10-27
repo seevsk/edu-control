@@ -6,7 +6,9 @@ import { obtenerMetricasGrupo } from "@/server/services/metricas";
 import { yaImportoCurso } from "@/server/services/curso";
 import { formatearFechaLima } from "@/lib/dates";
 import { importarCursoAction } from "../../cursos/actions";
+import { actualizarPreferenciaCorreoActividadAction } from "../actions";
 import { SubmitButton } from "@/components/submit-button";
+import { Toast } from "@/components/toast";
 import { IconAgregar, IconReuniones } from "@/components/icons";
 import { TabsGrupo } from "./_components/tabs-grupo";
 
@@ -15,18 +17,19 @@ export default async function GrupoDetallePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; nuevo?: string }>;
+  searchParams: Promise<{ error?: string; nuevo?: string; toast?: string }>;
 }) {
   const { id } = await params;
   const idGrupo = Number(id);
   if (!Number.isInteger(idGrupo)) notFound();
 
   const sesion = await requerirSesion();
-  const { error, nuevo } = await searchParams;
+  const { error, nuevo, toast } = await searchParams;
   const resultado = await obtenerGrupoDelUsuario(sesion.idUsuario, idGrupo).catch(() => null);
   if (!resultado) notFound();
 
   const { grupo, rolActual } = resultado;
+  const integranteActual = grupo.integrantes.find((integrante) => integrante.idUsuario === sesion.idUsuario)!;
   const esLider = rolActual === "lider";
   const puedeParticipar = rolActual !== "observador" && grupo.estado === "activo";
   const { avance, porIntegrante } = await obtenerMetricasGrupo(sesion.idUsuario, idGrupo);
@@ -39,6 +42,7 @@ export default async function GrupoDetallePage({
 
   return (
     <div className="animate-page-in mx-auto flex max-w-5xl flex-col gap-6">
+      <Toast mensaje={toast} />
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <Link href="/grupos" className="text-sm text-primary hover:underline">
@@ -144,6 +148,44 @@ export default async function GrupoDetallePage({
           )}
         </div>
       </section>
+
+      {rolActual !== "observador" ? (
+        <section id="notificaciones" aria-labelledby="titulo-notificaciones" className="scroll-mt-4 rounded-md border border-border bg-surface p-4">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="max-w-2xl">
+              <h2 id="titulo-notificaciones" className="text-sm font-medium">Tus notificaciones de este grupo</h2>
+              <p className="mt-1 text-xs leading-relaxed text-text-muted">
+                La campana dentro de EduControl siempre permanece activa. Esta preferencia solo controla los correos de actividad,
+                como cuando una tarea pasa a revisión. Las invitaciones, asignaciones y devoluciones importantes siguen llegando.
+              </p>
+            </div>
+
+            {grupo.estado === "activo" ? (
+              <form action={actualizarPreferenciaCorreoActividadAction.bind(null, idGrupo)} className="flex flex-col items-start gap-2">
+                <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
+                  <input
+                    type="checkbox"
+                    name="correoActividad"
+                    defaultChecked={integranteActual.correoActividad}
+                    className="size-4 accent-primary"
+                  />
+                  Recibir correos de actividad
+                </label>
+                <SubmitButton
+                  pendingText="Guardando..."
+                  className="rounded-md border border-border-strong bg-surface px-3 py-1.5 text-sm font-medium hover:bg-bg"
+                >
+                  Guardar preferencia
+                </SubmitButton>
+              </form>
+            ) : (
+              <p className="text-xs text-text-muted">
+                Preferencia {integranteActual.correoActividad ? "activada" : "desactivada"}. El grupo finalizado es de solo lectura.
+              </p>
+            )}
+          </div>
+        </section>
+      ) : null}
 
       <section className="rounded-md border border-border bg-surface p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">

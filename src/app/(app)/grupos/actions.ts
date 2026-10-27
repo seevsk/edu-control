@@ -3,7 +3,13 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requerirSesion } from "@/server/auth/session";
-import { crearGrupoSchema, actualizarGrupoSchema, invitacionGrupoSchema, responderInvitacionSchema } from "@/lib/validation/grupo";
+import {
+  crearGrupoSchema,
+  actualizarGrupoSchema,
+  actualizarPreferenciaCorreoActividadSchema,
+  invitacionGrupoSchema,
+  responderInvitacionSchema,
+} from "@/lib/validation/grupo";
 import { idRegistroSchema } from "@/lib/validation/tarea";
 import * as grupoService from "@/server/services/grupo";
 import { mensajeParaUsuario } from "@/lib/errores";
@@ -95,6 +101,33 @@ export async function responderInvitacionAction(
   revalidatePath("/invitaciones");
   revalidatePath("/grupos");
   redirect("/invitaciones");
+}
+
+export async function actualizarPreferenciaCorreoActividadAction(idGrupo: number, formData: FormData) {
+  const sesion = await requerirSesion();
+  const grupoId = idRegistroSchema.safeParse(idGrupo);
+  if (!grupoId.success) redirect("/grupos");
+
+  const parseo = actualizarPreferenciaCorreoActividadSchema.safeParse({
+    correoActividad: formData.get("correoActividad") === "on",
+  });
+  if (!parseo.success) {
+    redirect(`/grupos/${idGrupo}?error=${encodeURIComponent("La preferencia no es válida")}#notificaciones`);
+  }
+
+  try {
+    await grupoService.actualizarPreferenciaCorreoActividad(
+      sesion.idUsuario,
+      grupoId.data,
+      parseo.data.correoActividad,
+    );
+  } catch (error) {
+    const mensaje = mensajeParaUsuario(error, "No se pudo guardar la preferencia");
+    redirect(`/grupos/${idGrupo}?error=${encodeURIComponent(mensaje)}#notificaciones`);
+  }
+
+  revalidatePath(`/grupos/${idGrupo}`);
+  redirect(`/grupos/${idGrupo}?toast=${encodeURIComponent("Preferencia de correo guardada")}#notificaciones`);
 }
 
 export async function retirarIntegranteAction(idGrupo: number, idUsuarioObjetivo: number) {

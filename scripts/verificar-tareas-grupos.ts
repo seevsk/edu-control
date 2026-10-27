@@ -41,6 +41,7 @@ async function verificar() {
     db = (await import("../src/server/db/client")).prisma;
     const grupoService = await import("../src/server/services/grupo");
     const tareaService = await import("../src/server/services/tarea");
+    const { crearNotificacion } = await import("../src/server/notifications/crear-notificacion");
     const { ErrorDeNegocio } = await import("../src/lib/errores");
     const { invitacionGrupoSchema, responderInvitacionSchema } = await import("../src/lib/validation/grupo");
     const { accionesDisponiblesTarea, ESTADOS_TAREA_ORDEN } = await import("../src/lib/estado-tarea");
@@ -97,6 +98,54 @@ async function verificar() {
       return grupo.idGrupo;
     }
     const idGrupo = await crearGrupo();
+    await caso("cada miembro gestiona solo su preferencia de correo de actividad", async () => {
+      await grupoService.actualizarPreferenciaCorreoActividad(ana, idGrupo, false);
+      assert.equal(
+        (await db!.grupoIntegrante.findUniqueOrThrow({
+          where: { idGrupo_idUsuario: { idGrupo, idUsuario: ana } },
+        })).correoActividad,
+        false,
+      );
+
+      const silenciada = await crearNotificacion({
+        idUsuario: ana,
+        tipo: "tarea_en_revision",
+        mensaje: "Una tarea está lista para revisión",
+        enlace: `/grupos/${idGrupo}/tareas`,
+        asunto: "Tarea en revisión",
+        idGrupo,
+      });
+      assert.equal(silenciada.estadoCorreo, "no_aplica");
+
+      await grupoService.actualizarPreferenciaCorreoActividad(ana, idGrupo, true);
+      const habilitada = await crearNotificacion({
+        idUsuario: ana,
+        tipo: "tarea_en_revision",
+        mensaje: "Otra tarea está lista para revisión",
+        enlace: `/grupos/${idGrupo}/tareas`,
+        asunto: "Tarea en revisión",
+        idGrupo,
+      });
+      assert.equal(
+        (await db!.notificacion.findUniqueOrThrow({
+          where: { idNotificacion: habilitada.idNotificacion },
+        })).estadoCorreo,
+        "enviado",
+      );
+
+      await assert.rejects(
+        grupoService.actualizarPreferenciaCorreoActividad(invitado, idGrupo, false),
+        ErrorDeNegocio,
+      );
+      await assert.rejects(
+        grupoService.actualizarPreferenciaCorreoActividad(observador, idGrupo, false),
+        ErrorDeNegocio,
+      );
+      await assert.rejects(
+        grupoService.actualizarPreferenciaCorreoActividad(externo, idGrupo, false),
+        ErrorDeNegocio,
+      );
+    });
     await caso("los grupos activos permiten invitar y responder con los permisos correctos", async () => {
       const grupo = await crearGrupo();
       await assert.rejects(grupoService.invitarIntegrante(ana, grupo, externo), ErrorDeNegocio);
@@ -261,6 +310,10 @@ async function verificar() {
       await assert.rejects(tareaService.crearTarea(lider, idGrupo, { titulo: "No permitida", peso: 1 }), ErrorDeNegocio);
       await assert.rejects(tareaService.reasignarTarea(lider, idGrupo, abierta.idTarea, String(luis)), ErrorDeNegocio);
       await assert.rejects(tareaService.cambiarEstadoTarea(ana, idGrupo, abierta.idTarea, "en_progreso"), ErrorDeNegocio);
+      await assert.rejects(
+        grupoService.actualizarPreferenciaCorreoActividad(ana, idGrupo, false),
+        ErrorDeNegocio,
+      );
       assert.deepEqual(await db!.grupo.findUniqueOrThrow({ where: { idGrupo } }), antes);
       assert.equal(await db!.tareaHistorial.count(), historial);
       assert.equal(await db!.notificacion.count(), notificaciones);
@@ -305,7 +358,15 @@ async function verificar() {
   }
 }
 
-verificar().catch(() => {
+verificar().catch((error: unknown) => {
+  if (error && typeof error === "object") {
+    const detalle = error as { name?: unknown; code?: unknown; message?: unknown };
+    console.error(
+      `Detalle: ${String(detalle.name ?? "Error")} ${String(detalle.code ?? "sin-código")} ${String(detalle.message ?? "sin mensaje")}`,
+    );
+  } else {
+    console.error(`Detalle: ${String(error)}`);
+  }
   console.error("Falló la verificación de tareas y grupos. Revisa el último caso mostrado y PostgreSQL local.");
   process.exitCode = 1;
 });
