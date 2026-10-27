@@ -169,7 +169,7 @@ export async function invitarIntegrante(idActor: number, idGrupo: number, idUsua
       },
     });
     if (invitacionesUltimaHora >= LIMITE_INVITACIONES_POR_HORA) {
-      throw new ErrorDeNegocio("Llegaste al limite de invitaciones por hora, intenta mas tarde");
+      throw new ErrorDeNegocio("Llegaste al límite de invitaciones por hora, intenta más tarde");
     }
 
     const invitado = await tx.usuario.findUnique({ where: { idUsuario: idUsuarioInvitado } });
@@ -206,7 +206,7 @@ export async function responderInvitacion(
       include: { grupo: true },
     });
     if (!integrante || integrante.estadoInvitacion !== "pendiente") {
-      throw new ErrorDeNegocio("No tienes una invitacion pendiente a ese grupo");
+      throw new ErrorDeNegocio("No tienes una invitación pendiente a ese grupo");
     }
     if (integrante.grupo.estado !== "activo") {
       throw new ErrorDeNegocio("El grupo está finalizado y es de solo lectura");

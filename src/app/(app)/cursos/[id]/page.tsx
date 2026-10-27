@@ -13,20 +13,21 @@ import {
   sincronizarCursoAction,
 } from "../actions";
 import { SubmitButton } from "@/components/submit-button";
+import { BotonConfirmacion } from "@/components/boton-confirmacion";
 
 export default async function CursoDetallePage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; nuevo?: string }>;
 }) {
   const { id } = await params;
   const idCurso = Number(id);
   if (!Number.isInteger(idCurso)) notFound();
 
   const sesion = await requerirSesion();
-  const { error } = await searchParams;
+  const { error, nuevo } = await searchParams;
 
   let curso;
   try {
@@ -57,12 +58,21 @@ export default async function CursoDetallePage({
         </p>
       ) : null}
 
+      {nuevo === "1" ? (
+        <section className="rounded-md border border-primary/30 bg-primary-soft px-4 py-3 text-sm">
+          <p className="font-medium">Curso creado correctamente.</p>
+          <p className="mt-1 text-text-muted">
+            Ahora agrega su horario semanal y, si corresponde, la primera evaluación. Así aparecerán en tu calendario.
+          </p>
+        </section>
+      ) : null}
+
       {curso.importadoDeIdCurso && hayActualizaciones ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/30 bg-primary-soft px-3 py-2 text-sm">
           <span>Hay actualizaciones en el horario o las evaluaciones del curso original.</span>
           <form action={sincronizarCursoAction.bind(null, idCurso)}>
             <SubmitButton className="text-xs font-medium text-primary hover:underline" pendingText="Actualizando...">
-              Traer actualizaciones
+              Actualizar desde el original
             </SubmitButton>
           </form>
         </div>
@@ -82,7 +92,7 @@ export default async function CursoDetallePage({
             />
           </label>
           <label className="flex flex-col gap-1 text-sm">
-            Codigo
+            Código
             <input
               name="codigo"
               maxLength={30}
@@ -134,9 +144,12 @@ export default async function CursoDetallePage({
                 {timeAHora(horario.horaInicio)} - {timeAHora(horario.horaFin)}
               </span>
               <form action={eliminarHorarioAction.bind(null, idCurso, horario.idHorario)}>
-                <button type="submit" className="text-xs text-danger hover:underline">
+                <BotonConfirmacion
+                  mensaje="¿Quitar esta sesión del horario semanal?"
+                  className="text-xs text-danger hover:underline"
+                >
                   Quitar
-                </button>
+                </BotonConfirmacion>
               </form>
             </li>
           ))}
@@ -147,7 +160,7 @@ export default async function CursoDetallePage({
 
         <form action={agregarHorarioConId} className="mt-4 flex flex-wrap items-end gap-3">
           <label className="flex flex-col gap-1 text-sm">
-            Dia
+            Día
             <select
               name="diaSemana"
               required
@@ -182,7 +195,7 @@ export default async function CursoDetallePage({
             type="submit"
             className="rounded-md border border-border-strong px-3 py-1.5 text-sm font-medium hover:bg-bg"
           >
-            Agregar sesion
+            Agregar sesión
           </button>
         </form>
       </section>
@@ -219,9 +232,12 @@ export default async function CursoDetallePage({
                 <form
                   action={eliminarEvaluacionAction.bind(null, idCurso, evaluacion.idEvaluacion)}
                 >
-                  <button type="submit" className="text-xs text-danger hover:underline">
+                  <BotonConfirmacion
+                    mensaje={`¿Quitar la evaluación “${evaluacion.nombre}”?`}
+                    className="text-xs text-danger hover:underline"
+                  >
                     Quitar
-                  </button>
+                  </BotonConfirmacion>
                 </form>
               </div>
             </li>

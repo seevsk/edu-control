@@ -19,7 +19,10 @@ export default async function NuevoBloquePage({
         <Link href={`/calendario${consulta}`} className="text-sm text-primary hover:underline">
           Calendario
         </Link>
-        <h1 className="mt-1 text-xl font-semibold">Agregar bloque</h1>
+        <h1 className="mt-1 text-xl font-semibold">Agregar tiempo ocupado</h1>
+        <p className="mt-1 text-sm text-text-muted">
+          Registra trabajo, compromisos familiares o actividades personales para calcular tu disponibilidad.
+        </p>
       </div>
 
       {error ? (
