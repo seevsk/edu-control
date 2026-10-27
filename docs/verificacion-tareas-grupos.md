@@ -1,4 +1,4 @@
-# Verificación de tareas y grupos (HU-008, HU-011 y HU-013)
+# Verificación de preferencias, tareas y grupos (HU-004, HU-008, HU-011 y HU-013)
 
 Con las dependencias instaladas, el cliente de Prisma generado y PostgreSQL local disponible:
 
@@ -20,6 +20,10 @@ los cambios simultáneos, la reversión ante un fallo del historial y el retiro 
 También verifica que finalizar preserve la consulta y bloquee edición, reapertura, invitaciones,
 respuestas pendientes, retiros y cambios de tareas. El inicio muestra solo tareas de grupos activos
 en los que el usuario sigue siendo un integrante aceptado que no sea observador.
+
+La HU-004 comprueba que cada integrante aceptado pueda activar o silenciar sus correos de actividad
+sin desactivar la campana ni los avisos importantes. Un invitado pendiente, observador o usuario externo
+no puede modificar esa preferencia, y un grupo finalizado mantiene el modo de solo lectura.
 
 Para revisar la interfaz, finalizar un grupo como líder y comprobar el aviso de solo lectura en el
 resumen, tablero y detalle de tarea. No deben aparecer controles para editar, invitar, retirar o modificar

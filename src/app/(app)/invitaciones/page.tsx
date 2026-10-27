@@ -29,7 +29,7 @@ export default async function InvitacionesPage({ searchParams }: {
             <div>
               <p className="text-sm font-medium">{invitacion.grupo.nombre}</p>
               <p className="text-xs text-text-muted">
-                Invito {invitacion.grupo.creador.nombre} {invitacion.grupo.creador.apellidos ?? ""}
+                Te invitó {invitacion.grupo.creador.nombre} {invitacion.grupo.creador.apellidos ?? ""}
               </p>
             </div>
             {invitacion.grupo.estado === "finalizado" ? (

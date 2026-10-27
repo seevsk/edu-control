@@ -22,6 +22,10 @@ export const actualizarGrupoSchema = z.object({
   estado: z.enum(["activo", "finalizado"]),
 });
 
+export const actualizarPreferenciaCorreoActividadSchema = z.object({
+  correoActividad: z.boolean(),
+});
+
 export const buscarUsuariosSchema = z.object({
   consulta: z.string().trim().min(1).max(120),
 });

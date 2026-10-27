@@ -124,10 +124,15 @@ export default async function CalendarioPage({
             className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white transition-colors duration-150 hover:bg-primary-hover"
           >
             <IconAgregar className="size-4" aria-hidden />
-            Agregar bloque
+            Agregar tiempo ocupado
           </Link>
         </div>
       </div>
+
+      <p className="text-xs text-text-muted">
+        Las evaluaciones se registran dentro de cada curso y aparecen aquí automáticamente.{" "}
+        <Link href="/cursos" className="font-medium text-primary hover:underline">Ir a Cursos</Link>
+      </p>
 
       <SemanaGrid
         dias={dias}

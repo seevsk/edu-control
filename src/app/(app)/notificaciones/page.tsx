@@ -15,7 +15,7 @@ export default async function NotificacionesPage() {
         {hayNoLeidas ? (
           <form action={marcarTodasLeidasAction}>
             <button type="submit" className="text-sm text-primary hover:underline">
-              Marcar todas como leidas
+              Marcar todas como leídas
             </button>
           </form>
         ) : null}
@@ -44,14 +44,14 @@ export default async function NotificacionesPage() {
             {!notificacion.leida ? (
               <form action={marcarNotificacionLeidaAction.bind(null, notificacion.idNotificacion)}>
                 <button type="submit" className="shrink-0 text-xs text-primary hover:underline">
-                  Marcar leida
+                  Marcar leída
                 </button>
               </form>
             ) : null}
           </li>
         ))}
         {notificaciones.length === 0 ? (
-          <p className="text-sm text-text-muted">No tienes notificaciones todavia.</p>
+          <p className="text-sm text-text-muted">No tienes notificaciones todavía.</p>
         ) : null}
       </ul>
     </div>

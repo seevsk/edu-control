@@ -5,6 +5,7 @@ import { obtenerBloqueOcupado } from "@/server/services/disponibilidad";
 import { actualizarBloqueOcupadoAction, eliminarBloqueOcupadoAction } from "../../actions";
 import { FormularioBloque } from "../../_components/formulario-bloque";
 import { consultaCalendario } from "../../_components/rutas";
+import { BotonConfirmacion } from "@/components/boton-confirmacion";
 
 function aHHMM(fecha: Date) {
   return `${String(fecha.getUTCHours()).padStart(2, "0")}:${String(fecha.getUTCMinutes()).padStart(2, "0")}`;
@@ -35,7 +36,7 @@ export default async function EditarBloquePage({
         <Link href={volverA} className="text-sm text-primary hover:underline">
           Calendario
         </Link>
-        <h1 className="mt-1 text-xl font-semibold">Editar bloque</h1>
+        <h1 className="mt-1 text-xl font-semibold">Editar tiempo ocupado</h1>
       </div>
 
       {error ? (
@@ -62,12 +63,12 @@ export default async function EditarBloquePage({
 
       <form action={eliminarBloqueOcupadoAction.bind(null, idBloqueOcupado)} className="flex justify-end">
         <input type="hidden" name="volverA" value={volverA} />
-        <button
-          type="submit"
+        <BotonConfirmacion
+          mensaje="¿Quitar este tiempo ocupado de tu calendario?"
           className="rounded-md border border-danger/40 bg-surface px-4 py-2 text-sm font-medium text-danger transition-colors duration-150 hover:bg-danger/10"
         >
-          Quitar bloque
-        </button>
+          Quitar tiempo ocupado
+        </BotonConfirmacion>
       </form>
     </div>
   );

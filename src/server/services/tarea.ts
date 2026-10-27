@@ -105,7 +105,7 @@ export async function listarTareasDelGrupo(
 ) {
   await requerirIntegranteActivo(idUsuario, idGrupo);
   const parseo = filtrosTareaSchema.safeParse({ ...filtros, asignado: filtros.idAsignado });
-  if (!parseo.success) throw new ErrorDeNegocio("Los filtros de tareas no son validos");
+  if (!parseo.success) throw new ErrorDeNegocio("Los filtros de tareas no son válidos");
   const { estado, asignado, q } = parseo.data;
   return prisma.tarea.findMany({
     where: {

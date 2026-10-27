@@ -147,7 +147,7 @@ export function FormularioBloque({
 
       <div className="flex items-center gap-2 border-t border-border pt-5">
         <SubmitButton className="justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover">
-          {modo === "crear" ? "Agregar bloque" : "Guardar cambios"}
+          {modo === "crear" ? "Agregar tiempo ocupado" : "Guardar cambios"}
         </SubmitButton>
         <Link
           href={volverA}

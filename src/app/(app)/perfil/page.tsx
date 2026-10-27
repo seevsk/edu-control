@@ -62,7 +62,7 @@ export default async function PerfilPage({
             </select>
           </label>
           <label className="flex flex-col gap-1 text-sm">
-            Institucion
+            Institución
             <input
               name="institucion"
               maxLength={160}
@@ -91,7 +91,7 @@ export default async function PerfilPage({
             />
           </label>
           <label className="flex flex-col gap-1 text-sm sm:col-span-2">
-            Biografia
+            Biografía
             <textarea
               name="biografia"
               maxLength={300}
@@ -102,11 +102,11 @@ export default async function PerfilPage({
           </label>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" name="trabaja" defaultChecked={perfil.trabaja} />
-            Trabajo ademas de estudiar
+            Trabajo además de estudiar
           </label>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" name="visibleEnBusqueda" defaultChecked={perfil.visibleEnBusqueda} />
-            Que otros me encuentren al buscar companeros
+            Permitir que otros me encuentren al buscar compañeros
           </label>
           <SubmitButton className="mt-1 w-fit rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover sm:col-span-2">
             Guardar cambios

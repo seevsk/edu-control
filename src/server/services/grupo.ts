@@ -169,7 +169,7 @@ export async function invitarIntegrante(idActor: number, idGrupo: number, idUsua
       },
     });
     if (invitacionesUltimaHora >= LIMITE_INVITACIONES_POR_HORA) {
-      throw new ErrorDeNegocio("Llegaste al limite de invitaciones por hora, intenta mas tarde");
+      throw new ErrorDeNegocio("Llegaste al límite de invitaciones por hora, intenta más tarde");
     }
 
     const invitado = await tx.usuario.findUnique({ where: { idUsuario: idUsuarioInvitado } });
@@ -206,7 +206,7 @@ export async function responderInvitacion(
       include: { grupo: true },
     });
     if (!integrante || integrante.estadoInvitacion !== "pendiente") {
-      throw new ErrorDeNegocio("No tienes una invitacion pendiente a ese grupo");
+      throw new ErrorDeNegocio("No tienes una invitación pendiente a ese grupo");
     }
     if (integrante.grupo.estado !== "activo") {
       throw new ErrorDeNegocio("El grupo está finalizado y es de solo lectura");
@@ -223,6 +223,38 @@ export async function responderInvitacion(
     idUsuario: integrante.grupo.idCreador,
     tipo: "invitacion_respondida",
     ...plantillasNotificacion.invitacionRespondida(integrante.grupo.nombre, idGrupo, respuesta),
+  });
+}
+
+/**
+ * Preferencia personal por grupo: la campana siempre permanece activa y solo se silencian los
+ * correos de actividad. Los correos importantes no dependen de este valor (AGENTS.md 8.6).
+ */
+export async function actualizarPreferenciaCorreoActividad(
+  idUsuario: number,
+  idGrupo: number,
+  correoActividad: boolean,
+) {
+  return ejecutarCambioDeGrupo(async (tx) => {
+    const integrante = await tx.grupoIntegrante.findUnique({
+      where: { idGrupo_idUsuario: { idGrupo, idUsuario } },
+      include: { grupo: { select: { estado: true } } },
+    });
+
+    if (!integrante || integrante.estadoInvitacion !== "aceptada") {
+      throw new ErrorDeNegocio("No eres integrante de este grupo");
+    }
+    if (integrante.rol === "observador") {
+      throw new ErrorDeNegocio("Los observadores no reciben avisos de actividad");
+    }
+    if (integrante.grupo.estado !== "activo") {
+      throw new ErrorDeNegocio("El grupo está finalizado y es de solo lectura");
+    }
+
+    await tx.grupoIntegrante.update({
+      where: { idGrupo_idUsuario: { idGrupo, idUsuario } },
+      data: { correoActividad },
+    });
   });
 }
 

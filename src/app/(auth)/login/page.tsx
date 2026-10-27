@@ -8,7 +8,7 @@ const vistaPrevia = [
 
 const mensajesError: Record<string, string> = {
   google: "No pudimos completar el login con Google. Intenta de nuevo.",
-  sesion_expirada: "El login tardo demasiado y expiro. Intenta de nuevo.",
+  sesion_expirada: "El inicio de sesión tardó demasiado y expiró. Intenta de nuevo.",
 };
 
 export default async function LoginPage({
@@ -52,7 +52,7 @@ export default async function LoginPage({
           <p className="text-lg font-semibold md:hidden">EduControl</p>
           <h2 className="mt-4 text-xl font-semibold md:mt-0">Entra con tu cuenta de Google</h2>
           <p className="mt-2 text-sm text-text-muted">
-            La primera vez que entras creamos tu cuenta automaticamente. No pedimos acceso a tu
+            La primera vez que entras creamos tu cuenta automáticamente. No pedimos acceso a tu
             Gmail ni a tu calendario.
           </p>
 
