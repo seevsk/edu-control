@@ -11,20 +11,33 @@ import { ChipModalidad } from "@/components/chip-modalidad";
 import { EncabezadoTarjeta } from "@/components/encabezado-tarjeta";
 import { formatearFechaLima } from "@/lib/dates";
 import { etiquetaRelativa } from "@/lib/calendario";
+import { IconAgregar } from "@/components/icons";
 
 export default async function GruposPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; nuevo?: string }>;
 }) {
   const sesion = await requerirSesion();
-  const { error } = await searchParams;
+  const { error, nuevo } = await searchParams;
   const grupos = await listarMisGrupos(sesion.idUsuario);
   const evaluaciones = await listarEvaluacionesDelUsuario(sesion.idUsuario);
 
   return (
     <div className="animate-page-in mx-auto flex max-w-3xl flex-col gap-6">
-      <h1 className="text-xl font-semibold">Grupos</h1>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold">Grupos</h1>
+          <p className="mt-1 text-sm text-text-muted">Coordina tareas, integrantes y reuniones de tus trabajos.</p>
+        </div>
+        <Link
+          href="/grupos?nuevo=1#crear-grupo"
+          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-hover"
+        >
+          <IconAgregar className="size-4" aria-hidden />
+          Crear grupo
+        </Link>
+      </div>
 
       {error ? (
         <p className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
@@ -86,11 +99,20 @@ export default async function GruposPage({
           );
         })}
         {grupos.length === 0 ? (
-          <p className="text-sm text-text-muted sm:col-span-2">Todavia no perteneces a ningun grupo.</p>
+          <div className="rounded-md border border-dashed border-border-strong px-4 py-6 text-center sm:col-span-2">
+            <p className="text-sm text-text-muted">Todavía no perteneces a ningún grupo.</p>
+            <a href="#crear-grupo" className="mt-2 inline-block text-sm font-medium text-primary hover:underline">
+              Crear tu primer grupo
+            </a>
+          </div>
         ) : null}
       </ul>
 
-      <details className="rounded-md border border-border bg-surface p-4" open={grupos.length === 0}>
+      <details
+        id="crear-grupo"
+        className="scroll-mt-4 rounded-md border border-border bg-surface p-4"
+        open={grupos.length === 0 || nuevo === "1"}
+      >
         <summary className="cursor-pointer text-sm font-medium">Crear grupo</summary>
         <form action={crearGrupoAction} className="mt-4 grid gap-3">
           <label className="flex flex-col gap-1 text-sm">
@@ -103,7 +125,7 @@ export default async function GruposPage({
             />
           </label>
           <label className="flex flex-col gap-1 text-sm">
-            Descripcion (opcional)
+            Descripción (opcional)
             <textarea
               name="descripcion"
               maxLength={500}
@@ -121,13 +143,13 @@ export default async function GruposPage({
           </label>
           {evaluaciones.length > 0 ? (
             <label className="flex flex-col gap-1 text-sm">
-              Precargar fecha limite desde una evaluacion (opcional)
+              Usar la fecha límite de una evaluación (opcional)
               <select
                 name="idEvaluacion"
                 defaultValue=""
                 className="rounded-md border border-border-strong bg-surface px-3 py-1.5 text-sm"
               >
-                <option value="">Sin evaluacion</option>
+                <option value="">Sin evaluación relacionada</option>
                 {evaluaciones.map((evaluacion) => (
                   <option key={evaluacion.idEvaluacion} value={evaluacion.idEvaluacion}>
                     {evaluacion.curso.nombre} · {evaluacion.nombre}

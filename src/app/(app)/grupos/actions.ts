@@ -22,7 +22,7 @@ export async function crearGrupoAction(formData: FormData) {
 
   const grupo = await grupoService.crearGrupo(sesion.idUsuario, parseo.data);
   revalidatePath("/grupos");
-  redirect(`/grupos/${grupo.idGrupo}`);
+  redirect(`/grupos/${grupo.idGrupo}?nuevo=1`);
 }
 
 export async function actualizarGrupoAction(idGrupo: number, formData: FormData) {
@@ -32,14 +32,14 @@ export async function actualizarGrupoAction(idGrupo: number, formData: FormData)
   const parseo = actualizarGrupoSchema.safeParse(leerFormData(formData));
 
   if (!parseo.success) {
-    redirect(`/grupos/${idGrupo}?error=${encodeURIComponent(parseo.error.issues[0].message)}`);
+    redirect(`/grupos/${idGrupo}/configuracion?error=${encodeURIComponent(parseo.error.issues[0].message)}`);
   }
 
   try {
     await grupoService.actualizarGrupo(sesion.idUsuario, grupoId.data, parseo.data);
   } catch (error) {
     const mensaje = mensajeParaUsuario(error, "No se pudo actualizar el grupo");
-    redirect(`/grupos/${idGrupo}?error=${encodeURIComponent(mensaje)}`);
+    redirect(`/grupos/${idGrupo}/configuracion?error=${encodeURIComponent(mensaje)}`);
   }
   revalidatePath(`/grupos/${idGrupo}`);
   revalidatePath(`/grupos/${idGrupo}/tareas`);
@@ -47,7 +47,7 @@ export async function actualizarGrupoAction(idGrupo: number, formData: FormData)
   revalidatePath("/invitaciones");
   revalidatePath("/");
   revalidatePath("/grupos");
-  redirect("/grupos");
+  redirect(`/grupos/${idGrupo}/configuracion?toast=${encodeURIComponent("Cambios guardados")}`);
 }
 
 export async function invitarIntegranteAction(idGrupo: number, formData: FormData) {
@@ -57,18 +57,19 @@ export async function invitarIntegranteAction(idGrupo: number, formData: FormDat
   const parseo = invitacionGrupoSchema.safeParse({ idGrupo: grupoId.data, idUsuario: formData.get("idUsuario") });
 
   if (!parseo.success) {
-    redirect(`/grupos/${idGrupo}?error=${encodeURIComponent("Selecciona a alguien de la busqueda")}`);
+    redirect(`/grupos/${idGrupo}/integrantes?error=${encodeURIComponent("Selecciona a alguien de la búsqueda")}`);
   }
 
   try {
     await grupoService.invitarIntegrante(sesion.idUsuario, parseo.data.idGrupo, parseo.data.idUsuario);
   } catch (error) {
     const mensaje = mensajeParaUsuario(error, "No se pudo invitar");
-    redirect(`/grupos/${idGrupo}?error=${encodeURIComponent(mensaje)}`);
+    redirect(`/grupos/${idGrupo}/integrantes?error=${encodeURIComponent(mensaje)}`);
   }
 
   revalidatePath(`/grupos/${idGrupo}`);
-  redirect(`/grupos/${idGrupo}`);
+  revalidatePath(`/grupos/${idGrupo}/integrantes`);
+  redirect(`/grupos/${idGrupo}/integrantes`);
 }
 
 export async function responderInvitacionAction(
@@ -108,14 +109,15 @@ export async function retirarIntegranteAction(idGrupo: number, idUsuarioObjetivo
     await grupoService.retirarIntegrante(sesion.idUsuario, grupoId.data, usuarioId.data);
   } catch (error) {
     const mensaje = mensajeParaUsuario(error, "No se pudo retirar");
-    redirect(`/grupos/${idGrupo}?error=${encodeURIComponent(mensaje)}`);
+    redirect(`/grupos/${idGrupo}/integrantes?error=${encodeURIComponent(mensaje)}`);
   }
 
   revalidatePath(`/grupos/${idGrupo}`);
+  revalidatePath(`/grupos/${idGrupo}/integrantes`);
   revalidatePath(`/grupos/${idGrupo}/tareas`);
   revalidatePath(`/grupos/${idGrupo}/tareas/[idTarea]`, "page");
   revalidatePath(`/grupos/${idGrupo}/actividad`);
   revalidatePath("/calendario");
   revalidatePath("/");
-  redirect(`/grupos/${idGrupo}`);
+  redirect(`/grupos/${idGrupo}/integrantes`);
 }

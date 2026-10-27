@@ -36,14 +36,14 @@ export async function importarCursoAction(idGrupo: number, volverA: string) {
   try {
     await cursoService.importarCursoDesdeGrupo(sesion.idUsuario, idGrupo);
   } catch (error) {
-    const mensaje = mensajeParaUsuario(error, "No se pudo importar el curso");
+    const mensaje = mensajeParaUsuario(error, "No se pudo añadir el curso");
     redirect(`${volverA}?error=${encodeURIComponent(mensaje)}`);
   }
 
   revalidatePath("/cursos");
   revalidatePath(volverA);
   const separador = volverA.includes("?") ? "&" : "?";
-  redirect(`${volverA}${separador}toast=${encodeURIComponent("Curso importado")}`);
+  redirect(`${volverA}${separador}toast=${encodeURIComponent("Curso añadido a tus cursos")}`);
 }
 
 export async function crearCursoAction(formData: FormData) {
@@ -55,9 +55,9 @@ export async function crearCursoAction(formData: FormData) {
     redirect(`/cursos?error=${encodeURIComponent(parseo.error.issues[0].message)}`);
   }
 
-  await cursoService.crearCurso(sesion.idUsuario, parseo.data);
+  const curso = await cursoService.crearCurso(sesion.idUsuario, parseo.data);
   revalidatePath("/cursos");
-  redirect(`/cursos?toast=${encodeURIComponent("Curso creado")}`);
+  redirect(`/cursos/${curso.idCurso}?nuevo=1`);
 }
 
 export async function actualizarCursoAction(idCurso: number, formData: FormData) {

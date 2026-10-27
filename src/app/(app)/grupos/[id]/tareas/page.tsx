@@ -11,6 +11,7 @@ import { TabsGrupo } from "../_components/tabs-grupo";
 import { crearTareaAction } from "./actions";
 import { AccionesTarea } from "./_components/acciones-tarea";
 import { filtrosTareaSchema, idRegistroSchema } from "@/lib/validation/tarea";
+import { IconAgregar } from "@/components/icons";
 
 export default async function TareasGrupoPage({
   params,
@@ -27,6 +28,7 @@ export default async function TareasGrupoPage({
   const parametros = await searchParams;
   const filtros = filtrosTareaSchema.safeParse(parametros);
   const { vista, estado, asignado, q } = filtros.success ? filtros.data : filtrosTareaSchema.parse({});
+  const abrirNuevaTarea = parametros.nueva === "1";
   const error = !filtros.success ? "Los filtros de tareas no son válidos" :
     typeof parametros.error === "string" ? parametros.error : undefined;
 
@@ -101,14 +103,25 @@ export default async function TareasGrupoPage({
 
   return (
     <div className="animate-page-in mx-auto flex max-w-5xl flex-col gap-6">
-      <div>
-        <Link href="/grupos" className="text-sm text-primary hover:underline">
-          Grupos
-        </Link>
-        <h1 className="mt-1 text-xl font-semibold">{grupo.nombre}</h1>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <Link href="/grupos" className="text-sm text-primary hover:underline">
+            Grupos
+          </Link>
+          <h1 className="mt-1 text-xl font-semibold">{grupo.nombre}</h1>
+        </div>
+        {puedeGestionar ? (
+          <Link
+            href={`/grupos/${idGrupo}/tareas?nueva=1#nueva-tarea`}
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-hover"
+          >
+            <IconAgregar className="size-4" aria-hidden />
+            Nueva tarea
+          </Link>
+        ) : null}
       </div>
 
-      <TabsGrupo idGrupo={idGrupo} activa="tareas" />
+      <TabsGrupo idGrupo={idGrupo} activa="tareas" mostrarConfiguracion={rolActual === "lider"} />
 
       {error ? (
         <p className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
@@ -121,7 +134,11 @@ export default async function TareasGrupoPage({
       ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <form className="flex flex-wrap items-center gap-2 text-sm">
+        <details className="rounded-md border border-border-strong bg-surface px-3 py-2" open={hayFiltros}>
+          <summary className="cursor-pointer text-sm font-medium">
+            Filtros{hayFiltros ? " activos" : ""}
+          </summary>
+        <form className="mt-3 flex flex-wrap items-end gap-2 text-sm">
           <input type="hidden" name="vista" value={vista ?? "tablero"} />
           <label className="flex flex-col gap-1 text-xs">
             Buscar por título
@@ -164,6 +181,7 @@ export default async function TareasGrupoPage({
             <Link href={`?vista=${esVistaLista ? "lista" : "tablero"}`} className="text-primary hover:underline">Limpiar filtros</Link>
           ) : null}
         </form>
+        </details>
 
         <div className="flex overflow-hidden rounded-md border border-border-strong text-sm">
           <Link
@@ -181,6 +199,10 @@ export default async function TareasGrupoPage({
         </div>
       </div>
 
+      <p className="text-xs text-text-muted">
+        El peso indica el tamaño o impacto de una tarea: 1 es menor y 3 es mayor. Se usa para calcular el avance y la carga del equipo.
+      </p>
+
       {!esVistaLista && tareas.length === 0 ? <p className="text-sm text-text-muted">{mensajeVacio}</p> : null}
 
       {esVistaLista ? (
@@ -188,11 +210,11 @@ export default async function TareasGrupoPage({
           <table className="w-full text-left text-sm">
             <thead className="border-b border-border text-xs text-text-muted">
               <tr>
-                <th className="px-3 py-2 font-medium">Titulo</th>
+                <th className="px-3 py-2 font-medium">Título</th>
                 <th className="px-3 py-2 font-medium">Asignado a</th>
                 <th className="px-3 py-2 font-medium">Estado</th>
                 <th className="px-3 py-2 font-medium">Peso</th>
-                <th className="px-3 py-2 font-medium">Fecha limite</th>
+                <th className="px-3 py-2 font-medium">Fecha límite</th>
                 {puedeGestionar ? <th className="px-3 py-2 font-medium">Acciones</th> : null}
               </tr>
             </thead>
@@ -275,11 +297,15 @@ export default async function TareasGrupoPage({
       )}
 
       {puedeGestionar ? (
-        <details className="rounded-md border border-border bg-surface p-4">
+        <details
+          id="nueva-tarea"
+          className="scroll-mt-4 rounded-md border border-border bg-surface p-4"
+          open={abrirNuevaTarea}
+        >
           <summary className="cursor-pointer text-sm font-medium">Nueva tarea</summary>
           <form action={crearTareaConId} className="mt-4 grid gap-3 sm:grid-cols-2">
             <label className="flex flex-col gap-1 text-sm sm:col-span-2">
-              Titulo
+              Título
               <input
                 name="titulo"
                 required
@@ -288,7 +314,7 @@ export default async function TareasGrupoPage({
               />
             </label>
             <label className="flex flex-col gap-1 text-sm sm:col-span-2">
-              Descripcion (opcional)
+              Descripción (opcional)
               <textarea
                 name="descripcion"
                 maxLength={1000}
@@ -312,7 +338,7 @@ export default async function TareasGrupoPage({
               </select>
             </label>
             <label className="flex flex-col gap-1 text-sm">
-              Peso (1 a 3)
+              Peso de la tarea
               <select
                 name="peso"
                 defaultValue="1"
@@ -324,7 +350,7 @@ export default async function TareasGrupoPage({
               </select>
             </label>
             <label className="flex flex-col gap-1 text-sm">
-              Fecha limite (opcional)
+              Fecha límite (opcional)
               <input
                 type="date"
                 name="fechaLimite"

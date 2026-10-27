@@ -17,6 +17,8 @@ import { IconoCurso } from "@/components/icono-curso";
 import { DatosTarjeta } from "@/components/datos-tarjeta";
 import { ChipModalidad } from "@/components/chip-modalidad";
 import { EncabezadoTarjeta } from "@/components/encabezado-tarjeta";
+import { BotonConfirmacion } from "@/components/boton-confirmacion";
+import { IconAgregar } from "@/components/icons";
 
 /** La siguiente sesion desde ahora (en Lima): una clase de hoy que ya empezo pasa a la proxima semana. */
 function proximaClase(horarios: { diaSemana: number; horaInicio: Date }[], ahora: Date) {
@@ -54,9 +56,22 @@ export default async function CursosPage({
     <div className="animate-page-in mx-auto flex max-w-4xl flex-col gap-6">
       <Toast mensaje={toast} />
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">Cursos</h1>
-        <div className="flex overflow-hidden rounded-md border border-border-strong text-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold">Cursos</h1>
+          <p className="mt-1 text-sm text-text-muted">Organiza tus clases, horarios y evaluaciones del ciclo.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {!verInactivos ? (
+            <Link
+              href="/cursos?nuevo=1#agregar-curso"
+              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-hover"
+            >
+              <IconAgregar className="size-4" aria-hidden />
+              Agregar curso
+            </Link>
+          ) : null}
+          <div className="flex overflow-hidden rounded-md border border-border-strong text-sm">
           <Link
             href="/cursos"
             className={`px-3 py-1.5 ${!verInactivos ? "bg-primary-soft text-primary" : "hover:bg-bg"}`}
@@ -69,6 +84,7 @@ export default async function CursosPage({
           >
             Inactivos
           </Link>
+          </div>
         </div>
       </div>
 
@@ -109,7 +125,7 @@ export default async function CursosPage({
                       className="shrink-0 text-xs font-medium text-primary hover:underline"
                       pendingText="Actualizando..."
                     >
-                      Traer actualizaciones
+                      Actualizar desde el original
                     </SubmitButton>
                   </form>
                 ) : (
@@ -118,7 +134,7 @@ export default async function CursosPage({
                       className="shrink-0 text-xs font-medium text-primary hover:underline"
                       pendingText="Importando..."
                     >
-                      Importar
+                      Añadir a mis cursos
                     </SubmitButton>
                   </form>
                 )}
@@ -157,9 +173,12 @@ export default async function CursosPage({
                       </button>
                     </form>
                     <form action={eliminarCursoAction.bind(null, curso.idCurso)}>
-                      <button type="submit" className="w-full px-3 py-1.5 text-left text-sm text-danger hover:bg-danger/10">
+                      <BotonConfirmacion
+                        mensaje={`¿Eliminar el curso ${curso.nombre}? También se eliminarán sus horarios y evaluaciones.`}
+                        className="w-full px-3 py-1.5 text-left text-sm text-danger hover:bg-danger/10"
+                      >
                         Eliminar
-                      </button>
+                      </BotonConfirmacion>
                     </form>
                   </MenuAcciones>
                 </div>
@@ -194,8 +213,8 @@ export default async function CursosPage({
       {cursos.length === 0 ? (
         <p className="text-sm text-text-muted">
           {verInactivos
-            ? "No tenes cursos inactivos."
-            : "Todavia no registraste ningun curso. Agrega el primero abajo."}
+            ? "No tienes cursos inactivos."
+            : "Todavía no registraste ningún curso. Agrega el primero para comenzar."}
         </p>
       ) : null}
 
@@ -217,7 +236,7 @@ export default async function CursosPage({
               />
             </label>
             <label className="flex flex-col gap-1 text-sm">
-              Codigo
+              Código
               <input
                 name="codigo"
                 maxLength={30}

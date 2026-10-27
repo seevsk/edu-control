@@ -41,7 +41,9 @@ export function AccionesTarea({
         <p className="w-full text-xs text-text-muted">Pendiente de aprobación por otro integrante.</p>
       ) : null}
       <details className="ml-auto">
-        <summary className="cursor-pointer text-sm text-text-muted hover:text-text">Reasignar</summary>
+        <summary className="cursor-pointer list-none rounded-md px-2.5 py-1.5 text-xs font-medium text-text-muted hover:bg-bg hover:text-text [&::-webkit-details-marker]:hidden">
+          Cambiar responsable
+        </summary>
         <form
           action={reasignarTareaAction.bind(null, idGrupo, tarea.idTarea, destino)}
           className="mt-2 flex flex-wrap items-end gap-2"

@@ -9,6 +9,6 @@ import { env } from "@/lib/env";
  */
 export async function GET() {
   await cerrarSesion();
-  const mensaje = "Tu sesion ya no es valida, entra de nuevo";
+  const mensaje = "Tu sesión ya no es válida, entra de nuevo";
   return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(mensaje)}`, env.APP_URL));
 }

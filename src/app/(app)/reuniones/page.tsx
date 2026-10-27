@@ -12,6 +12,7 @@ import {
 import { Avatar } from "@/components/avatar";
 import { IconAgregar } from "@/components/icons";
 import { Toast } from "@/components/toast";
+import { BotonConfirmacion } from "@/components/boton-confirmacion";
 import { cancelarReunionAction, responderReunionAction } from "./actions";
 
 type Listado = Awaited<ReturnType<typeof listarMisReuniones>>;
@@ -203,9 +204,12 @@ function FilaReunion({ reunion, idUsuario, rol }: { reunion: Reunion; idUsuario:
           </div>
           {puedeCancelar ? (
             <form action={cancelarReunionAction.bind(null, reunion.idReunion)}>
-              <button type="submit" className="rounded-sm px-2 py-1 text-xs font-medium text-danger hover:bg-danger/10">
+              <BotonConfirmacion
+                mensaje={`¿Cancelar la reunión “${reunion.titulo}”? Esta acción la quitará para todos los asistentes.`}
+                className="rounded-sm px-2 py-1 text-xs font-medium text-danger hover:bg-danger/10"
+              >
                 Cancelar reunión
-              </button>
+              </BotonConfirmacion>
             </form>
           ) : null}
         </div>

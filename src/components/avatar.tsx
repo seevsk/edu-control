@@ -1,4 +1,7 @@
+"use client";
+
 import Image from "next/image";
+import { useState } from "react";
 
 function iniciales(nombre: string, apellidos?: string | null) {
   const segunda = apellidos?.trim()[0] ?? "";
@@ -23,14 +26,17 @@ export function Avatar({
   tamano?: keyof typeof TAMANOS;
 }) {
   const { clase, px } = TAMANOS[tamano];
+  const [imagenConError, setImagenConError] = useState(false);
 
-  if (fotoUrl) {
+  if (fotoUrl && !imagenConError) {
     return (
       <Image
         src={fotoUrl}
         alt=""
         width={px}
         height={px}
+        unoptimized
+        onError={() => setImagenConError(true)}
         className={`${clase} shrink-0 rounded-full object-cover`}
       />
     );
