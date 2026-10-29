@@ -42,16 +42,22 @@ export async function crearNotificacion(datos: {
 
   if (estadoCorreo === "pendiente") {
     const destinatario = await prisma.usuario.findUnique({ where: { idUsuario: datos.idUsuario } });
-    if (destinatario) {
+    if (destinatario?.correo.trim()) {
       const resultado = await emailSender.enviar({
         idNotificacion: notificacion.idNotificacion,
         destinatario: destinatario.correo,
         asunto: datos.asunto,
         cuerpo: datos.mensaje,
+        enlace: datos.enlace,
       });
       await prisma.notificacion.update({
         where: { idNotificacion: notificacion.idNotificacion },
         data: { estadoCorreo: resultado.ok ? "enviado" : "fallido" },
+      });
+    } else {
+      await prisma.notificacion.update({
+        where: { idNotificacion: notificacion.idNotificacion },
+        data: { estadoCorreo: "fallido" },
       });
     }
   }
