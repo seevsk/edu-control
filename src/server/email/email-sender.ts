@@ -3,6 +3,7 @@ export interface DatosEmail {
   destinatario: string;
   asunto: string;
   cuerpo: string;
+  enlace?: string;
 }
 
 export interface ResultadoEnvio {

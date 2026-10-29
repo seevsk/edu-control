@@ -79,7 +79,7 @@ Nació como proyecto del curso *Proyecto Tecnológico* (NRC 3708, ISIL, metodolo
 | ORM y migraciones | Prisma |
 | Validación | Zod (esquemas compartidos entre cliente y servidor) |
 | Autenticación | Google OAuth únicamente, flujo manual con `openid-client` + `jose` (ver 8.1) |
-| Correo | Resend (cuando exista dominio verificado; ver 8.6) |
+| Correo | Resend mediante `EmailSender` configurable por entorno (ver 8.6) |
 | Entorno local | Docker solo para PostgreSQL |
 | Control de versiones | GitHub |
 | Gestión del proyecto | Azure DevOps |
@@ -99,7 +99,7 @@ Notas:
 
 - Next.js con `npm run dev`.
 - PostgreSQL en un contenedor Docker (ver sección 11). La app **no** se ejecuta dentro de Docker.
-- Los correos no se envían de verdad: se registran en consola (ver 8.6).
+- Por defecto los correos se registran en consola; se pueden probar con Resend configurando las variables de entorno (ver 8.6).
 
 ### Próximamente (prepara el código para esto, sin implementarlo)
 
@@ -285,7 +285,7 @@ Reglas de arquitectura:
 - `enlace` es una **ruta relativa** (por ejemplo `/grupos/12/tareas/45`), generada siempre por el servidor. Nunca la construyas con texto que escriba un usuario. Al enviar un correo, arma la URL completa con `APP_URL`.
 - **Un enlace no es seguridad:** la página de destino debe verificar que quien entra es integrante del grupo.
 - **Nunca notifiques a quien realizó la acción.** Los observadores no reciben notificaciones de tareas en el MVP.
-- Eventos y destinatarios (política por defecto = "solo lo que importa por correo"; pendiente de confirmar, ver sección 13):
+- Eventos y destinatarios (política "solo lo que importa por correo", confirmada por el usuario el 2026-10-29):
 
 | Evento | `tipo` | Destinatarios | ¿Correo? |
 |---|---|---|---|
@@ -303,7 +303,7 @@ Reglas de arquitectura:
 - `estado_correo`: `no_aplica` | `pendiente` | `enviado` | `fallido`. Los avisos solo dentro de la app usan `no_aplica`. Tras intentar el envío, actualiza a `enviado` o `fallido`. No construyas reintentos automáticos en el MVP.
 - **Envío de correo detrás de una interfaz `EmailSender`** con dos implementaciones:
   - `ConsoleEmailSender` (desarrollo): imprime el correo en consola.
-  - `ResendEmailSender` (cuando exista dominio verificado): usa el `id_notificacion` como clave de idempotencia para que un reintento no duplique el correo.
+  - `ResendEmailSender` (demo/producción): usa el `id_notificacion` como clave de idempotencia para que un reintento no duplique el correo.
 - Límites de Resend en el plan gratuito: tope diario de envíos para toda la app y necesidad de verificar un dominio propio para escribir a terceros. Por eso el correo se reserva para lo que exige acción de alguien.
 
 ### 8.7 Reuniones (confirmado)
@@ -394,7 +394,7 @@ Variables de entorno (documéntalas en `.env.example` sin valores reales; los no
 DATABASE_URL=postgresql://educontrol:educontrol_dev@localhost:5432/educontrol?schema=public
 APP_URL=http://localhost:3000
 # Google OAuth: ID y secreto del cliente, y secreto para firmar la sesión
-# Correo (cuando exista dominio verificado): RESEND_API_KEY y EMAIL_FROM
+# Correo: EMAIL_PROVIDER (`console` | `resend`); con Resend, RESEND_API_KEY y EMAIL_FROM
 ```
 
 Comandos habituales (confirma los scripts reales en `package.json`):
@@ -426,8 +426,7 @@ Datos de ejemplo (`prisma/seed.ts`, **solo desarrollo**): varios usuarios de pru
 
 ## 13. Decisiones pendientes (pregunta antes de implementar)
 
-- **Política de correos:** todos los cambios a todos, solo lo importante (supuesto actual) o lo importante más un resumen periódico.
-- **Dominio y Resend:** aún no hay dominio verificado. Mientras tanto, los correos se registran en consola.
+- **Dominio definitivo de producción:** la demo ya puede usar un dominio temporal verificado mediante `EMAIL_FROM`; antes de producción se debe elegir y verificar el dominio definitivo del equipo.
 - **Reapertura** de una tarea `completada` y transiciones de estado adicionales.
 - **Framework de pruebas**, librería de formularios, librería de componentes e íconos, y React Compiler.
 - **Privacidad:** con usuarios reales aplica la Ley 29733 de Protección de Datos Personales (Perú). Antes de abrir la app hacen falta política de privacidad, términos y consentimiento; lo decide el equipo, no lo improvises.
