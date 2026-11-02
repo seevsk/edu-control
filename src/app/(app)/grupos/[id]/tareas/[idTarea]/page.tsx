@@ -10,13 +10,15 @@ import { Avatar } from "@/components/avatar";
 import { TabsGrupo } from "../../_components/tabs-grupo";
 import { HistorialTareas } from "../../_components/historial-tareas";
 import { AccionesTarea } from "../_components/acciones-tarea";
+import { Toast } from "@/components/toast";
+import { etiquetaRelativa } from "@/lib/calendario";
 
 export default async function TareaDetallePage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string; idTarea: string }>;
-  searchParams: Promise<{ error?: string | string[] }>;
+  searchParams: Promise<{ error?: string | string[]; toast?: string | string[] }>;
 }) {
   const ruta = await params;
   const grupoId = idRegistroSchema.safeParse(ruta.id);
@@ -32,7 +34,7 @@ export default async function TareaDetallePage({
   if (!tarea) notFound();
 
   const { grupo, rolActual } = resultado;
-  const { error } = await searchParams;
+  const { error, toast } = await searchParams;
   const puedeGestionar = rolActual !== "observador" && grupo.estado === "activo";
   const asignables = grupo.integrantes.filter((integrante) =>
     integrante.estadoInvitacion === "aceptada" && integrante.rol !== "observador",
@@ -43,7 +45,8 @@ export default async function TareaDetallePage({
   ]));
 
   return (
-    <div className="animate-page-in mx-auto flex max-w-3xl flex-col gap-6">
+    <div className="animate-page-in mx-auto flex max-w-5xl flex-col gap-6">
+      <Toast mensaje={typeof toast === "string" ? toast : undefined} />
       <nav aria-label="Migas de pan" className="flex flex-wrap items-center gap-2 text-sm">
         <Link href="/grupos" className="text-primary hover:underline">Grupos</Link>
         <span aria-hidden>/</span>
@@ -61,44 +64,51 @@ export default async function TareaDetallePage({
         <p className="rounded-md bg-primary-soft px-3 py-2 text-sm">Este grupo está finalizado. La tarea es de solo lectura.</p>
       ) : null}
 
-      <section className="rounded-md border border-border bg-surface p-4 sm:p-5">
-        <h1 className="break-words text-xl font-semibold">{tarea.titulo}</h1>
-        <p className="mt-2 flex items-center gap-2 text-sm">
-          <span className="size-2 rounded-full" style={{ backgroundColor: COLOR_ESTADO_TAREA[tarea.estado] }} aria-hidden />
-          {ETIQUETA_ESTADO_TAREA[tarea.estado]}
-        </p>
-        <dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2">
-          <div>
-            <dt className="text-xs text-text-muted">Responsable</dt>
-            <dd className="mt-1 flex items-center gap-2">
-              {tarea.asignado ? (
-                <>
-                  <Avatar nombre={tarea.asignado.nombre} apellidos={tarea.asignado.apellidos} fotoUrl={tarea.asignado.fotoUrl} tamano="sm" />
-                  {tarea.asignado.nombre} {tarea.asignado.apellidos ?? ""}
-                </>
-              ) : "Sin asignar"}
-            </dd>
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+        <section className="rounded-md border border-border bg-surface p-4 shadow-sm sm:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <h1 className="break-words text-xl font-semibold">{tarea.titulo}</h1>
+            <span className="inline-flex items-center gap-2 rounded-full bg-bg px-2.5 py-1 text-xs font-medium">
+              <span className="size-2 rounded-full" style={{ backgroundColor: COLOR_ESTADO_TAREA[tarea.estado] }} aria-hidden />
+              {ETIQUETA_ESTADO_TAREA[tarea.estado]}
+            </span>
           </div>
-          <div><dt className="text-xs text-text-muted">Peso</dt><dd className="mt-1">{tarea.peso} de 3</dd></div>
-          <div><dt className="text-xs text-text-muted">Fecha límite</dt><dd className="mt-1">{tarea.fechaLimite ? formatearFechaHoraLima(tarea.fechaLimite) : "Sin fecha límite"}</dd></div>
-          <div><dt className="text-xs text-text-muted">Creada por</dt><dd className="mt-1">{tarea.creador.nombre} {tarea.creador.apellidos ?? ""}</dd></div>
-        </dl>
-        <div className="mt-5 border-t border-border pt-4">
-          <h2 className="text-sm font-medium">Descripción</h2>
-          <p className="mt-2 whitespace-pre-wrap break-words text-sm text-text-muted">{tarea.descripcion || "Sin descripción."}</p>
-        </div>
-        {puedeGestionar ? (
-          <div className="mt-5 border-t border-border pt-4">
-            <h2 className="mb-2 text-sm font-medium">Acciones</h2>
-            <AccionesTarea idGrupo={idGrupo} tarea={tarea} idUsuario={sesion.idUsuario} rol={rolActual} asignables={asignables} destino="detalle" />
+          <dl className="mt-5 grid gap-4 border-y border-border py-4 text-sm sm:grid-cols-2">
+            <div>
+              <dt className="text-xs text-text-muted">Responsable</dt>
+              <dd className="mt-1 flex items-center gap-2">
+                {tarea.asignado ? (
+                  <>
+                    <Avatar nombre={tarea.asignado.nombre} apellidos={tarea.asignado.apellidos} fotoUrl={tarea.asignado.fotoUrl} tamano="sm" />
+                    {tarea.asignado.nombre} {tarea.asignado.apellidos ?? ""}
+                  </>
+                ) : <span className="text-danger">Sin asignar</span>}
+              </dd>
+            </div>
+            <div><dt className="text-xs text-text-muted">Peso</dt><dd className="mt-1">{tarea.peso} de 3</dd></div>
+            <div>
+              <dt className="text-xs text-text-muted">Fecha límite</dt>
+              <dd className="mt-1">{tarea.fechaLimite ? <><span className="font-medium">{etiquetaRelativa(tarea.fechaLimite)}</span><span className="block text-xs text-text-muted">{formatearFechaHoraLima(tarea.fechaLimite)}</span></> : "Sin fecha límite"}</dd>
+            </div>
+            <div><dt className="text-xs text-text-muted">Creada por</dt><dd className="mt-1">{tarea.creador.nombre} {tarea.creador.apellidos ?? ""}</dd></div>
+          </dl>
+          <div className="mt-5">
+            <h2 className="text-sm font-semibold">Descripción</h2>
+            <p className="mt-2 whitespace-pre-wrap break-words text-sm text-text-muted">{tarea.descripcion || "Sin descripción."}</p>
           </div>
-        ) : null}
-      </section>
+          {puedeGestionar ? (
+            <div className="mt-5 rounded-md border border-border bg-bg/60 p-3">
+              <h2 className="mb-2 text-sm font-semibold">Siguiente acción</h2>
+              <AccionesTarea idGrupo={idGrupo} tarea={tarea} idUsuario={sesion.idUsuario} rol={rolActual} asignables={asignables} destino="detalle" />
+            </div>
+          ) : null}
+        </section>
 
-      <section aria-labelledby="historial-tarea" className="flex flex-col gap-3">
-        <h2 id="historial-tarea" className="text-base font-semibold">Historial de la tarea</h2>
-        <HistorialTareas entradas={tarea.historial} nombres={nombres} idGrupo={idGrupo} />
-      </section>
+        <section aria-labelledby="historial-tarea" className="flex flex-col gap-3 rounded-md border border-border bg-surface p-4 shadow-sm">
+          <h2 id="historial-tarea" className="text-base font-semibold">Historial de la tarea</h2>
+          <HistorialTareas entradas={tarea.historial} nombres={nombres} idGrupo={idGrupo} />
+        </section>
+      </div>
     </div>
   );
 }

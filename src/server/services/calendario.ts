@@ -2,11 +2,10 @@ import { prisma } from "@/server/db/client";
 import { diasDeLaSemana, sumarDiasISO } from "@/lib/calendario";
 import { reunionesDelUsuarioEntre } from "@/server/services/reunion";
 
-export async function obtenerSemanaCalendario(idUsuario: number, lunesISO: string) {
-  const dias = diasDeLaSemana(lunesISO);
-  const desde = new Date(`${lunesISO}T00:00:00-05:00`);
-  const hasta = new Date(`${sumarDiasISO(lunesISO, 7)}T00:00:00-05:00`);
-
+/** Datos del calendario entre dos fechas de Lima; `hastaISO` es exclusivo. */
+export async function obtenerCalendarioEntre(idUsuario: number, desdeISO: string, hastaISO: string) {
+  const desde = new Date(`${desdeISO}T00:00:00-05:00`);
+  const hasta = new Date(`${hastaISO}T00:00:00-05:00`);
   const [cursos, bloquesOcupados, evaluaciones, tareas, reuniones] = await Promise.all([
     prisma.curso.findMany({
       where: { idUsuario, activo: true },
@@ -36,5 +35,11 @@ export async function obtenerSemanaCalendario(idUsuario: number, lunesISO: strin
     })),
   );
 
-  return { dias, horarios, bloquesOcupados, evaluaciones, tareas, reuniones };
+  return { horarios, bloquesOcupados, evaluaciones, tareas, reuniones };
+}
+
+export async function obtenerSemanaCalendario(idUsuario: number, lunesISO: string) {
+  const dias = diasDeLaSemana(lunesISO);
+  const datos = await obtenerCalendarioEntre(idUsuario, lunesISO, sumarDiasISO(lunesISO, 7));
+  return { dias, ...datos };
 }

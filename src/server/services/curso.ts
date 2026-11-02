@@ -6,6 +6,7 @@ import type {
   crearCursoSchema,
   actualizarCursoSchema,
   crearHorarioSchema,
+  actualizarHorarioCursoSchema,
   crearEvaluacionSchema,
 } from "@/lib/validation/curso";
 import type { z } from "zod";
@@ -59,9 +60,16 @@ export async function crearCurso(idUsuario: number, datos: z.infer<typeof crearC
     data: {
       idUsuario,
       nombre: datos.nombre,
-      codigo: datos.codigo || null,
+      codigo: datos.codigo,
       docente: datos.docente || null,
       modalidad: datos.modalidad,
+      horarios: {
+        create: datos.dias.map((diaSemana) => ({
+          diaSemana,
+          horaInicio: horaATime(datos.horaInicio),
+          horaFin: horaATime(datos.horaFin),
+        })),
+      },
     },
   });
 }
@@ -308,20 +316,37 @@ export async function agregarHorario(
   idCurso: number,
   datos: z.infer<typeof crearHorarioSchema>,
 ) {
-  await obtenerCursoDelUsuario(idUsuario, idCurso);
-  return prisma.horarioCurso.create({
-    data: {
+  const curso = await obtenerCursoDelUsuario(idUsuario, idCurso);
+  if (curso.horarios.length > 0) {
+    throw new ErrorDeNegocio("El curso ya tiene un horario; puedes editar sus sesiones existentes");
+  }
+  return prisma.horarioCurso.createMany({
+    data: datos.dias.map((diaSemana) => ({
       idCurso,
+      diaSemana,
+      horaInicio: horaATime(datos.horaInicio),
+      horaFin: horaATime(datos.horaFin),
+    })),
+  });
+}
+
+export async function actualizarHorarioCurso(
+  idUsuario: number,
+  idCurso: number,
+  idHorario: number,
+  datos: z.infer<typeof actualizarHorarioCursoSchema>,
+) {
+  await obtenerCursoDelUsuario(idUsuario, idCurso);
+  const resultado = await prisma.horarioCurso.updateMany({
+    where: { idHorario, idCurso },
+    data: {
       diaSemana: datos.diaSemana,
       horaInicio: horaATime(datos.horaInicio),
       horaFin: horaATime(datos.horaFin),
     },
   });
-}
-
-export async function eliminarHorario(idUsuario: number, idCurso: number, idHorario: number) {
-  await obtenerCursoDelUsuario(idUsuario, idCurso);
-  await prisma.horarioCurso.deleteMany({ where: { idHorario, idCurso } });
+  if (resultado.count === 0) throw new ErrorDeNegocio("La sesión del horario ya no existe");
+  return resultado;
 }
 
 export async function agregarEvaluacion(

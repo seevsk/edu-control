@@ -27,7 +27,9 @@ export async function crearReunionAction(formData: FormData) {
 
   revalidatePath("/reuniones");
   revalidatePath("/calendario");
-  redirect(con("/reuniones", "toast", "Reunión programada"));
+  revalidatePath(`/grupos/${parseo.data.idGrupo}/horarios`);
+  const horariosGrupo = `/grupos/${parseo.data.idGrupo}/horarios?semana=${parseo.data.fecha}`;
+  redirect(con(horariosGrupo, "toast", "Reunión programada"));
 }
 
 export async function responderReunionAction(idReunion: number, formData: FormData) {

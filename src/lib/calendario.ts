@@ -48,6 +48,39 @@ export function diasDeLaSemana(lunesISO: string): string[] {
   return Array.from({ length: 7 }, (_, i) => sumarDiasISO(lunesISO, i));
 }
 
+/** "2026-10" para el mes actual de Lima. */
+export function mesEnZonaLimaISO(fecha: Date): string {
+  return fechaLimaISO(fecha).slice(0, 7);
+}
+
+export function esMesISO(valor: string | undefined): valor is string {
+  if (!valor || !/^\d{4}-\d{2}$/.test(valor)) return false;
+  const mes = Number(valor.slice(5));
+  return mes >= 1 && mes <= 12;
+}
+
+/** Suma meses sin depender de la zona horaria del proceso de Node. */
+export function sumarMesesISO(mesISO: string, cantidad: number): string {
+  const [anio, mes] = mesISO.split("-").map(Number);
+  return fechaLimaISO(new Date(Date.UTC(anio, mes - 1 + cantidad, 15, 12))).slice(0, 7);
+}
+
+/**
+ * Dias visibles de la cuadricula mensual, alineados de lunes a domingo. Incluye los dias
+ * adyacentes necesarios y al menos cinco semanas para que el alto no cambie bruscamente.
+ */
+export function diasDeVistaMes(mesISO: string): string[] {
+  const primero = `${mesISO}-01`;
+  const inicio = sumarDiasISO(primero, -(diaSemanaISO(primero) - 1));
+  const ultimo = sumarDiasISO(`${sumarMesesISO(mesISO, 1)}-01`, -1);
+  const fin = sumarDiasISO(ultimo, 7 - diaSemanaISO(ultimo));
+  const dias: string[] = [];
+
+  for (let dia = inicio; dia <= fin; dia = sumarDiasISO(dia, 1)) dias.push(dia);
+  while (dias.length < 35) dias.push(sumarDiasISO(dias.at(-1)!, 1));
+  return dias;
+}
+
 export function fechaEnZonaLimaISO(fecha: Date): string {
   return fechaLimaISO(fecha);
 }
@@ -87,6 +120,13 @@ const MESES_LARGOS = [
   "noviembre",
   "diciembre",
 ];
+
+/** "2026-10" -> "Octubre 2026". */
+export function etiquetaMes(mesISO: string): string {
+  const [anio, mes] = mesISO.split("-").map(Number);
+  const nombre = MESES_LARGOS[mes - 1];
+  return `${nombre.charAt(0).toUpperCase()}${nombre.slice(1)} ${anio}`;
+}
 
 /**
  * "Desde el 5 hasta el 11 de octubre" / "Desde el 28 de septiembre hasta el 4 de octubre".

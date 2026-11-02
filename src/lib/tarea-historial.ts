@@ -1,5 +1,21 @@
 import { ETIQUETA_ESTADO_TAREA } from "@/lib/estado-tarea";
 
+const SEPARADOR_MOTIVO_DEVOLUCION = "\n\nMotivo de devolución: ";
+
+export function valorHistorialDevolucion(motivo: string): string {
+  return `en_progreso${SEPARADOR_MOTIVO_DEVOLUCION}${motivo}`;
+}
+
+export function leerValorEstadoHistorial(valor: string | null): { estado: string | null; motivo: string | null } {
+  if (!valor) return { estado: valor, motivo: null };
+  const indice = valor.indexOf(SEPARADOR_MOTIVO_DEVOLUCION);
+  if (indice === -1) return { estado: valor, motivo: null };
+  return {
+    estado: valor.slice(0, indice),
+    motivo: valor.slice(indice + SEPARADOR_MOTIVO_DEVOLUCION.length),
+  };
+}
+
 export interface EntradaHistorialTarea {
   idHistorial: number;
   accion: "creada" | "estado" | "reasignada";
@@ -16,8 +32,11 @@ export function describirCambioTarea(
 ): string {
   if (entrada.accion === "creada") return "Creó la tarea";
   if (entrada.accion === "estado") {
+    const anterior = leerValorEstadoHistorial(entrada.valorAnterior);
+    const nuevo = leerValorEstadoHistorial(entrada.valorNuevo);
     const etiqueta = (valor: string | null) => valor ? ETIQUETA_ESTADO_TAREA[valor] ?? valor : "Sin estado";
-    return `Cambió el estado de ${etiqueta(entrada.valorAnterior)} a ${etiqueta(entrada.valorNuevo)}`;
+    const cambio = `Cambió el estado de ${etiqueta(anterior.estado)} a ${etiqueta(nuevo.estado)}`;
+    return nuevo.motivo ? `${cambio}. Motivo: ${nuevo.motivo}` : cambio;
   }
   const responsable = (valor: string | null) => valor === null
     ? "Sin asignar"

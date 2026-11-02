@@ -31,9 +31,9 @@ export const plantillasNotificacion = {
       asunto: `Tarea en revision: ${titulo}`,
     };
   },
-  tareaDevuelta(titulo: string, idGrupo: number) {
+  tareaDevuelta(titulo: string, idGrupo: number, motivo: string) {
     return {
-      mensaje: `Te devolvieron "${titulo}".`,
+      mensaje: `Te devolvieron "${titulo}". Motivo: ${motivo}`,
       enlace: `/grupos/${idGrupo}/tareas`,
       asunto: `Te devolvieron una tarea: ${titulo}`,
     };

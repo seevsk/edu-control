@@ -16,18 +16,18 @@ export default async function EditarBloquePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ semana?: string; vista?: string; error?: string }>;
+  searchParams: Promise<{ semana?: string; vista?: string; modo?: string; mes?: string; error?: string }>;
 }) {
   const { id } = await params;
   const idBloqueOcupado = Number(id);
   if (!Number.isInteger(idBloqueOcupado)) notFound();
 
   const sesion = await requerirSesion();
-  const { semana, vista, error } = await searchParams;
+  const { semana, vista, modo, mes, error } = await searchParams;
   const bloque = await obtenerBloqueOcupado(sesion.idUsuario, idBloqueOcupado);
   if (!bloque) notFound();
 
-  const consulta = consultaCalendario(semana, vista);
+  const consulta = consultaCalendario(semana, vista, modo, mes);
   const volverA = `/calendario${consulta}`;
 
   return (

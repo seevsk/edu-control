@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { DIAS_CORTOS, DIAS_LARGOS, OPCIONES_HORA, etiquetaMinutos } from "@/lib/calendario";
 import { SubmitButton } from "@/components/submit-button";
+import { SelectorHorarioSemanal } from "@/components/selector-horario-semanal";
 
 type Tipo = "laboral" | "familiar" | "personal";
 
@@ -27,19 +27,7 @@ const TIPOS: { valor: Tipo; label: string; punto: string; marcado: string }[] = 
 
 const OPCION =
   "flex cursor-pointer select-none items-center gap-2 rounded-md border border-border-strong bg-surface px-3 py-1.5 text-sm transition-colors duration-150 hover:bg-bg has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-primary";
-const OPCION_DIA = `${OPCION} min-w-12 justify-center px-2.5 has-[:checked]:border-primary has-[:checked]:bg-primary-soft has-[:checked]:font-medium has-[:checked]:text-primary`;
 const CAMPO = "rounded-md border border-border-strong bg-surface px-3 py-1.5 text-sm font-normal";
-
-/** Si el bloque guardado tiene una hora fuera de los saltos de 30 min, se agrega para no perderla. */
-function opcionesCon(...valores: string[]) {
-  const opciones = [...OPCIONES_HORA];
-  for (const valor of valores) {
-    if (opciones.some((opcion) => opcion.valor === valor)) continue;
-    const [h, m] = valor.split(":").map(Number);
-    opciones.push({ valor, etiqueta: etiquetaMinutos(h * 60 + m) });
-  }
-  return opciones.sort((a, b) => a.valor.localeCompare(b.valor));
-}
 
 export type ValoresBloque = {
   tipo: Tipo;
@@ -62,8 +50,6 @@ export function FormularioBloque({
   volverA: string;
   origen: string;
 }) {
-  const opcionesHora = opcionesCon(valores.horaInicio, valores.horaFin);
-
   return (
     <form action={action} className="flex flex-col gap-6">
       <input type="hidden" name="volverA" value={volverA} />
@@ -89,48 +75,12 @@ export function FormularioBloque({
         </div>
       </fieldset>
 
-      <fieldset>
-        <legend className="text-sm font-medium">{modo === "crear" ? "Días" : "Día"}</legend>
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {DIAS_CORTOS.map((dia, i) => (
-            <label key={dia} className={OPCION_DIA}>
-              <input
-                type={modo === "crear" ? "checkbox" : "radio"}
-                name={modo === "crear" ? "dias" : "diaSemana"}
-                value={i + 1}
-                defaultChecked={valores.dias.includes(i + 1)}
-                required={modo === "editar"}
-                className="sr-only"
-                aria-label={DIAS_LARGOS[i]}
-              />
-              {dia}
-            </label>
-          ))}
-        </div>
-      </fieldset>
-
-      <div className="grid max-w-md grid-cols-2 gap-3">
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          Desde
-          <select name="horaInicio" defaultValue={valores.horaInicio} required className={`${CAMPO} tabular-nums`}>
-            {opcionesHora.map((opcion) => (
-              <option key={opcion.valor} value={opcion.valor}>
-                {opcion.etiqueta}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          Hasta
-          <select name="horaFin" defaultValue={valores.horaFin} required className={`${CAMPO} tabular-nums`}>
-            {opcionesHora.map((opcion) => (
-              <option key={opcion.valor} value={opcion.valor}>
-                {opcion.etiqueta}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+      <SelectorHorarioSemanal
+        modo={modo === "crear" ? "multiple" : "unico"}
+        diasSeleccionados={valores.dias}
+        horaInicio={valores.horaInicio}
+        horaFin={valores.horaFin}
+      />
 
       <label className="flex max-w-md flex-col gap-1 text-sm font-medium">
         <span>

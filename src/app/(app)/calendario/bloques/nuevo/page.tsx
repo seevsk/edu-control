@@ -7,11 +7,11 @@ import { consultaCalendario } from "../../_components/rutas";
 export default async function NuevoBloquePage({
   searchParams,
 }: {
-  searchParams: Promise<{ semana?: string; vista?: string; error?: string }>;
+  searchParams: Promise<{ semana?: string; vista?: string; modo?: string; mes?: string; error?: string }>;
 }) {
   await requerirSesion();
-  const { semana, vista, error } = await searchParams;
-  const consulta = consultaCalendario(semana, vista);
+  const { semana, vista, modo, mes, error } = await searchParams;
+  const consulta = consultaCalendario(semana, vista, modo, mes);
 
   return (
     <div className="animate-page-in mx-auto flex max-w-2xl flex-col gap-5">

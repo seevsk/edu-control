@@ -2,8 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requerirSesion } from "@/server/auth/session";
 import { obtenerGrupoDelUsuario } from "@/server/services/grupo";
-import { listarTareasDelGrupo } from "@/server/services/tarea";
+import { listarTareasDelGrupo, obtenerResumenTareasGrupo } from "@/server/services/tarea";
 import { formatearFechaLima } from "@/lib/dates";
+import { diasHasta, etiquetaRelativa, fechaEnZonaLimaISO } from "@/lib/calendario";
 import { ESTADOS_TAREA_ORDEN, ETIQUETA_ESTADO_TAREA, COLOR_ESTADO_TAREA } from "@/lib/estado-tarea";
 import { Avatar } from "@/components/avatar";
 import { SubmitButton } from "@/components/submit-button";
@@ -11,7 +12,8 @@ import { TabsGrupo } from "../_components/tabs-grupo";
 import { crearTareaAction } from "./actions";
 import { AccionesTarea } from "./_components/acciones-tarea";
 import { filtrosTareaSchema, idRegistroSchema } from "@/lib/validation/tarea";
-import { IconAgregar } from "@/components/icons";
+import { IconAgregar, IconBuscar, IconCalendario } from "@/components/icons";
+import { Toast } from "@/components/toast";
 
 export default async function TareasGrupoPage({
   params,
@@ -27,8 +29,9 @@ export default async function TareasGrupoPage({
   const sesion = await requerirSesion();
   const parametros = await searchParams;
   const filtros = filtrosTareaSchema.safeParse(parametros);
-  const { vista, estado, asignado, q } = filtros.success ? filtros.data : filtrosTareaSchema.parse({});
+  const { vista, estado, asignado, q, foco } = filtros.success ? filtros.data : filtrosTareaSchema.parse({});
   const abrirNuevaTarea = parametros.nueva === "1";
+  const toast = typeof parametros.toast === "string" ? parametros.toast : undefined;
   const error = !filtros.success ? "Los filtros de tareas no son válidos" :
     typeof parametros.error === "string" ? parametros.error : undefined;
 
@@ -39,18 +42,29 @@ export default async function TareasGrupoPage({
   const puedeGestionar = rolActual !== "observador" && grupo.estado === "activo";
   const esVistaLista = vista === "lista";
 
-  const tareas = filtros.success ? await listarTareasDelGrupo(sesion.idUsuario, idGrupo, {
-    estado: estado || undefined,
-    idAsignado: asignado || undefined,
-    q,
-  }) : [];
-  const hayFiltros = Boolean(q || estado || asignado);
+  const [tareas, resumen] = filtros.success
+    ? await Promise.all([
+        listarTareasDelGrupo(sesion.idUsuario, idGrupo, {
+          estado: estado || undefined,
+          idAsignado: asignado || undefined,
+          q,
+          foco: foco || undefined,
+        }),
+        obtenerResumenTareasGrupo(sesion.idUsuario, idGrupo),
+      ])
+    : [[], await obtenerResumenTareasGrupo(sesion.idUsuario, idGrupo)];
+  const hayFiltros = Boolean(q || estado || asignado || foco);
   const mensajeVacio = hayFiltros ? "No hay tareas que coincidan con los filtros." : "Sin tareas todavía.";
   const parametrosVista = {
     ...(q ? { q } : {}),
     ...(estado ? { estado } : {}),
     ...(asignado ? { asignado: String(asignado) } : {}),
+    ...(foco ? { foco } : {}),
   };
+  const filtrosRetorno = { q, estado, asignado, foco };
+  const ahora = new Date();
+  const hoyISO = fechaEnZonaLimaISO(ahora);
+  const limiteGrupoISO = grupo.fechaLimite ? fechaEnZonaLimaISO(grupo.fechaLimite) : undefined;
 
   const asignables = grupo.integrantes.filter(
     (i) => i.estadoInvitacion === "aceptada" && i.rol !== "observador",
@@ -58,10 +72,37 @@ export default async function TareasGrupoPage({
 
   const crearTareaConId = crearTareaAction.bind(null, idGrupo);
 
+  function hrefConFiltros(cambios: Record<string, string | undefined>) {
+    const parametrosDestino = new URLSearchParams({
+      ...parametrosVista,
+      vista: esVistaLista ? "lista" : "tablero",
+    });
+    for (const [clave, valor] of Object.entries(cambios)) {
+      if (valor) parametrosDestino.set(clave, valor);
+      else parametrosDestino.delete(clave);
+    }
+    return `?${parametrosDestino.toString()}`;
+  }
+
+  function PresentacionFecha({ fecha, completada = false }: { fecha: Date | null; completada?: boolean }) {
+    if (!fecha) return <span className="text-text-muted">Sin fecha límite</span>;
+    const dias = diasHasta(fecha, ahora);
+    const urgente = !completada && dias <= 2;
+    return (
+      <span className={`inline-flex items-center gap-1.5 ${urgente ? "font-medium text-danger" : "text-text-muted"}`}>
+        <IconCalendario className="size-3.5 shrink-0" aria-hidden />
+        <span title={formatearFechaLima(fecha)}>{completada ? formatearFechaLima(fecha) : etiquetaRelativa(fecha, ahora)}</span>
+      </span>
+    );
+  }
+
   function TarjetaTarea({ tarea }: { tarea: (typeof tareas)[number] }) {
     return (
-      <li className="flex flex-col gap-2 rounded-md border border-border bg-surface p-3 text-sm">
-        <Link href={`/grupos/${idGrupo}/tareas/${tarea.idTarea}`} className="break-words font-medium text-primary hover:underline">
+      <li
+        className="flex flex-col gap-3 rounded-md border border-border bg-surface p-3 text-sm shadow-sm transition-shadow hover:shadow-md"
+        style={{ borderTopColor: COLOR_ESTADO_TAREA[tarea.estado], borderTopWidth: 3 }}
+      >
+        <Link href={`/grupos/${idGrupo}/tareas/${tarea.idTarea}`} className="break-words font-semibold text-text hover:text-primary hover:underline">
           {tarea.titulo}
         </Link>
         <div className="flex items-center justify-between text-xs text-text-muted">
@@ -90,19 +131,25 @@ export default async function TareasGrupoPage({
             ))}
           </span>
         </div>
-        {tarea.fechaLimite ? (
-          <p className="text-xs text-text-muted">Limite: {formatearFechaLima(tarea.fechaLimite)}</p>
-        ) : null}
+        <p className="text-xs"><PresentacionFecha fecha={tarea.fechaLimite} completada={tarea.estado === "completada"} /></p>
 
         {puedeGestionar ? (
-          <AccionesTarea idGrupo={idGrupo} tarea={tarea} idUsuario={sesion.idUsuario} rol={rolActual} asignables={asignables} />
+          <AccionesTarea
+            idGrupo={idGrupo}
+            tarea={tarea}
+            idUsuario={sesion.idUsuario}
+            rol={rolActual}
+            asignables={asignables}
+            filtros={filtrosRetorno}
+          />
         ) : null}
       </li>
     );
   }
 
   return (
-    <div className="animate-page-in mx-auto flex max-w-5xl flex-col gap-6">
+    <div className="animate-page-in mx-auto flex max-w-6xl flex-col gap-6">
+      <Toast mensaje={toast} />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <Link href="/grupos" className="text-sm text-primary hover:underline">
@@ -123,6 +170,25 @@ export default async function TareasGrupoPage({
 
       <TabsGrupo idGrupo={idGrupo} activa="tareas" mostrarConfiguracion={rolActual === "lider"} />
 
+      <section aria-label="Resumen de tareas" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Link href={hrefConFiltros({ foco: "abiertas", estado: undefined, asignado: undefined })} className={`rounded-md border bg-surface p-3 hover:border-primary/50 hover:shadow-sm ${foco === "abiertas" ? "border-primary ring-1 ring-primary/20" : "border-border"}`}>
+          <span className="text-xs text-text-muted">Tareas abiertas</span>
+          <strong className="mt-1 block text-2xl font-semibold">{resumen.abiertas}</strong>
+        </Link>
+        <Link href={hrefConFiltros({ foco: "mias", estado: undefined, asignado: undefined })} className={`rounded-md border bg-surface p-3 hover:border-primary/50 hover:shadow-sm ${foco === "mias" ? "border-primary ring-1 ring-primary/20" : "border-border"}`}>
+          <span className="text-xs text-text-muted">Mis tareas abiertas</span>
+          <strong className="mt-1 block text-2xl font-semibold text-primary">{resumen.mias}</strong>
+        </Link>
+        <Link href={hrefConFiltros({ foco: "vencidas", estado: undefined, asignado: undefined })} className={`rounded-md border bg-surface p-3 hover:border-danger/50 hover:shadow-sm ${foco === "vencidas" ? "border-danger ring-1 ring-danger/20" : "border-border"}`}>
+          <span className="text-xs text-text-muted">Vencidas</span>
+          <strong className={`mt-1 block text-2xl font-semibold ${resumen.vencidas ? "text-danger" : ""}`}>{resumen.vencidas}</strong>
+        </Link>
+        <Link href={hrefConFiltros({ estado: "en_revision", foco: undefined, asignado: undefined })} className={`rounded-md border bg-surface p-3 hover:border-primary/50 hover:shadow-sm ${estado === "en_revision" && !foco ? "border-primary ring-1 ring-primary/20" : "border-border"}`}>
+          <span className="text-xs text-text-muted">Esperando revisión</span>
+          <strong className="mt-1 block text-2xl font-semibold">{resumen.enRevision}</strong>
+        </Link>
+      </section>
+
       {error ? (
         <p className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
           {error}
@@ -133,57 +199,56 @@ export default async function TareasGrupoPage({
         <p className="rounded-md bg-primary-soft px-3 py-2 text-sm">Este grupo está finalizado. Las tareas son de solo lectura.</p>
       ) : null}
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <details className="rounded-md border border-border-strong bg-surface px-3 py-2" open={hayFiltros}>
-          <summary className="cursor-pointer text-sm font-medium">
-            Filtros{hayFiltros ? " activos" : ""}
-          </summary>
-        <form className="mt-3 flex flex-wrap items-end gap-2 text-sm">
+      <section aria-label="Filtros de tareas" className="rounded-md border border-border bg-surface p-3">
+        <form className="flex flex-wrap items-end gap-2 text-sm">
           <input type="hidden" name="vista" value={vista ?? "tablero"} />
-          <label className="flex flex-col gap-1 text-xs">
-            Buscar por título
-            <input type="search" name="q" defaultValue={q} maxLength={160} placeholder="Título de la tarea"
-              className="rounded-md border border-border-strong px-2 py-1.5 text-sm" />
+          <label className="flex min-w-52 flex-1 flex-col gap-1 text-xs">
+            Buscar
+            <span className="relative">
+              <IconBuscar className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-text-muted" aria-hidden />
+              <input type="search" name="q" defaultValue={q} maxLength={160} placeholder="Título o descripción"
+                className="w-full rounded-md border border-border-strong py-1.5 pl-8 pr-2 text-sm" />
+            </span>
           </label>
-          <select
-            name="estado"
-            aria-label="Filtrar por estado"
-            defaultValue={estado ?? ""}
-            className="rounded-md border border-border-strong bg-surface px-2 py-1.5 text-sm"
-          >
-            <option value="">Todos los estados</option>
-            {ESTADOS_TAREA_ORDEN.map((e) => (
-              <option key={e} value={e}>
-                {ETIQUETA_ESTADO_TAREA[e]}
-              </option>
-            ))}
-          </select>
-          <select
-            name="asignado"
-            aria-label="Filtrar por responsable"
-            defaultValue={asignado ?? ""}
-            className="rounded-md border border-border-strong bg-surface px-2 py-1.5 text-sm"
-          >
-            <option value="">Todos los asignados</option>
-            {asignables.map((i) => (
-              <option key={i.idUsuario} value={i.idUsuario}>
-                {i.usuario.nombre}
-              </option>
-            ))}
-          </select>
+          <label className="flex flex-col gap-1 text-xs">Estado
+            <select name="estado" defaultValue={estado ?? ""} className="rounded-md border border-border-strong bg-surface px-2 py-1.5 text-sm">
+              <option value="">Todos</option>
+              {ESTADOS_TAREA_ORDEN.map((e) => <option key={e} value={e}>{ETIQUETA_ESTADO_TAREA[e]}</option>)}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs">Responsable
+            <select name="asignado" defaultValue={asignado ?? ""} className="rounded-md border border-border-strong bg-surface px-2 py-1.5 text-sm">
+              <option value="">Todos</option>
+              {asignables.map((i) => <option key={i.idUsuario} value={i.idUsuario}>{i.usuario.nombre}</option>)}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs">Vista rápida
+            <select name="foco" defaultValue={foco ?? ""} className="rounded-md border border-border-strong bg-surface px-2 py-1.5 text-sm">
+              <option value="">Todas</option>
+              <option value="abiertas">Abiertas</option>
+              <option value="mias">Mis tareas</option>
+              <option value="sin_asignar">Sin asignar</option>
+              <option value="vencidas">Vencidas</option>
+            </select>
+          </label>
           <button
             type="submit"
-            className="rounded-md border border-border-strong px-3 py-1.5 text-sm hover:bg-bg"
+            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-hover"
           >
             Filtrar
           </button>
           {hayFiltros ? (
-            <Link href={`?vista=${esVistaLista ? "lista" : "tablero"}`} className="text-primary hover:underline">Limpiar filtros</Link>
+            <Link href={`?vista=${esVistaLista ? "lista" : "tablero"}`} className="px-2 py-1.5 text-primary hover:underline">Limpiar</Link>
           ) : null}
         </form>
-        </details>
+      </section>
 
-        <div className="flex overflow-hidden rounded-md border border-border-strong text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs text-text-muted">
+          {resumen.sinAsignar > 0 ? `${resumen.sinAsignar} ${resumen.sinAsignar === 1 ? "tarea abierta sin responsable" : "tareas abiertas sin responsable"}. ` : ""}
+          El peso representa el impacto de cada tarea en el avance del grupo.
+        </p>
+        <div className="flex overflow-hidden rounded-md border border-border-strong bg-surface text-sm">
           <Link
             href={`?${new URLSearchParams({ ...parametrosVista, vista: "tablero" })}`}
             className={`px-3 py-1.5 ${!esVistaLista ? "bg-primary-soft text-primary" : "hover:bg-bg"}`}
@@ -198,10 +263,6 @@ export default async function TareasGrupoPage({
           </Link>
         </div>
       </div>
-
-      <p className="text-xs text-text-muted">
-        El peso indica el tamaño o impacto de una tarea: 1 es menor y 3 es mayor. Se usa para calcular el avance y la carga del equipo.
-      </p>
 
       {!esVistaLista && tareas.length === 0 ? <p className="text-sm text-text-muted">{mensajeVacio}</p> : null}
 
@@ -253,11 +314,11 @@ export default async function TareasGrupoPage({
                   </td>
                   <td className="px-3 py-2">{tarea.peso}</td>
                   <td className="px-3 py-2">
-                    {tarea.fechaLimite ? formatearFechaLima(tarea.fechaLimite) : "-"}
+                    <PresentacionFecha fecha={tarea.fechaLimite} completada={tarea.estado === "completada"} />
                   </td>
                   {puedeGestionar ? (
                     <td className="min-w-64 px-3 py-2">
-                      <AccionesTarea idGrupo={idGrupo} tarea={tarea} idUsuario={sesion.idUsuario} rol={rolActual} asignables={asignables} destino="tabla" />
+                      <AccionesTarea idGrupo={idGrupo} tarea={tarea} idUsuario={sesion.idUsuario} rol={rolActual} asignables={asignables} destino="tabla" filtros={filtrosRetorno} />
                     </td>
                   ) : null}
                 </tr>
@@ -274,32 +335,32 @@ export default async function TareasGrupoPage({
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {ESTADOS_TAREA_ORDEN.map((columnaEstado) => (
-            <div key={columnaEstado} className="flex flex-col gap-3">
-              <p className="flex items-center gap-2 text-sm font-medium">
+          {ESTADOS_TAREA_ORDEN.map((columnaEstado) => {
+            const tareasColumna = tareas.filter((tarea) => tarea.estado === columnaEstado);
+            return (
+            <section key={columnaEstado} className="flex min-h-64 flex-col gap-3 rounded-md border border-border bg-bg/60 p-2.5">
+              <h2 className="flex items-center gap-2 px-1 text-sm font-semibold">
                 <span
                   className="size-2 rounded-full"
                   style={{ backgroundColor: COLOR_ESTADO_TAREA[columnaEstado] }}
                   aria-hidden
                 />
                 {ETIQUETA_ESTADO_TAREA[columnaEstado]}
-              </p>
+                <span className="ml-auto rounded-full bg-surface px-2 py-0.5 text-xs font-normal text-text-muted">{tareasColumna.length}</span>
+              </h2>
               <ul className="flex flex-col gap-2">
-                {tareas
-                  .filter((t) => t.estado === columnaEstado)
-                  .map((tarea) => (
-                    <TarjetaTarea key={tarea.idTarea} tarea={tarea} />
-                  ))}
+                {tareasColumna.map((tarea) => <TarjetaTarea key={tarea.idTarea} tarea={tarea} />)}
               </ul>
-            </div>
-          ))}
+              {tareasColumna.length === 0 ? <p className="m-auto px-3 text-center text-xs text-text-muted">No hay tareas en este estado.</p> : null}
+            </section>
+          );})}
         </div>
       )}
 
       {puedeGestionar ? (
         <details
           id="nueva-tarea"
-          className="scroll-mt-4 rounded-md border border-border bg-surface p-4"
+          className="scroll-mt-4 rounded-md border border-border bg-surface p-4 shadow-sm"
           open={abrirNuevaTarea}
         >
           <summary className="cursor-pointer text-sm font-medium">Nueva tarea</summary>
@@ -323,16 +384,17 @@ export default async function TareasGrupoPage({
               />
             </label>
             <label className="flex flex-col gap-1 text-sm">
-              Asignado a (opcional)
+              Responsable
               <select
                 name="idAsignado"
                 defaultValue=""
+                required
                 className="rounded-md border border-border-strong bg-surface px-3 py-1.5 text-sm"
               >
-                <option value="">Sin asignar</option>
+                <option value="" disabled>Selecciona un responsable</option>
                 {asignables.map((i) => (
                   <option key={i.idUsuario} value={i.idUsuario}>
-                    {i.usuario.nombre}
+                    {i.usuario.nombre} · carga abierta {resumen.pesoAbiertoPorUsuario[i.idUsuario] ?? 0}
                   </option>
                 ))}
               </select>
@@ -350,12 +412,18 @@ export default async function TareasGrupoPage({
               </select>
             </label>
             <label className="flex flex-col gap-1 text-sm">
-              Fecha límite (opcional)
+              Fecha límite
               <input
                 type="date"
                 name="fechaLimite"
+                min={hoyISO}
+                max={limiteGrupoISO}
+                required
                 className="rounded-md border border-border-strong px-3 py-1.5 text-sm"
               />
+              <span className="text-xs text-text-muted">
+                {grupo.fechaLimite ? `Hasta la fecha límite del grupo: ${formatearFechaLima(grupo.fechaLimite)}` : "No puede estar en el pasado."}
+              </span>
             </label>
             <SubmitButton className="mt-1 w-fit rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover sm:col-span-2">
               Crear tarea

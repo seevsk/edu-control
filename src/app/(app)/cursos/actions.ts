@@ -7,6 +7,7 @@ import {
   crearCursoSchema,
   actualizarCursoSchema,
   crearHorarioSchema,
+  actualizarHorarioCursoSchema,
   crearEvaluacionSchema,
 } from "@/lib/validation/curso";
 import * as cursoService from "@/server/services/curso";
@@ -27,6 +28,7 @@ export async function sincronizarCursoAction(idCurso: number) {
   }
 
   revalidatePath(`/cursos/${idCurso}`);
+  revalidatePath("/calendario");
   redirect(`/cursos/${idCurso}`);
 }
 
@@ -42,21 +44,23 @@ export async function importarCursoAction(idGrupo: number, volverA: string) {
 
   revalidatePath("/cursos");
   revalidatePath(volverA);
+  revalidatePath("/calendario");
   const separador = volverA.includes("?") ? "&" : "?";
   redirect(`${volverA}${separador}toast=${encodeURIComponent("Curso añadido a tus cursos")}`);
 }
 
 export async function crearCursoAction(formData: FormData) {
   const sesion = await requerirSesion();
-  const datos = leerFormData(formData);
+  const datos = { ...leerFormData(formData), dias: formData.getAll("dias") };
   const parseo = crearCursoSchema.safeParse(datos);
 
   if (!parseo.success) {
-    redirect(`/cursos?error=${encodeURIComponent(parseo.error.issues[0].message)}`);
+    redirect(`/cursos?nuevo=1&error=${encodeURIComponent(parseo.error.issues[0].message)}#agregar-curso`);
   }
 
   const curso = await cursoService.crearCurso(sesion.idUsuario, parseo.data);
   revalidatePath("/cursos");
+  revalidatePath("/calendario");
   redirect(`/cursos/${curso.idCurso}?nuevo=1`);
 }
 
@@ -75,6 +79,7 @@ export async function actualizarCursoAction(idCurso: number, formData: FormData)
   await cursoService.actualizarCurso(sesion.idUsuario, idCurso, parseo.data);
   revalidatePath(`/cursos/${idCurso}`);
   revalidatePath("/cursos");
+  revalidatePath("/calendario");
   redirect(`/cursos?toast=${encodeURIComponent("Cambios guardados")}`);
 }
 
@@ -88,6 +93,7 @@ export async function alternarActivoCursoAction(idCurso: number) {
   }
 
   revalidatePath("/cursos");
+  revalidatePath("/calendario");
   redirect(`/cursos?toast=${encodeURIComponent("Curso actualizado")}`);
 }
 
@@ -101,6 +107,7 @@ export async function eliminarCursoAction(idCurso: number) {
   }
 
   revalidatePath("/cursos");
+  revalidatePath("/calendario");
   redirect(`/cursos?toast=${encodeURIComponent("Curso eliminado")}`);
 }
 
@@ -108,7 +115,7 @@ export async function agregarHorarioAction(idCurso: number, formData: FormData) 
   const sesion = await requerirSesion();
   const datos = leerFormData(formData);
   const parseo = crearHorarioSchema.safeParse({
-    diaSemana: Number(datos.diaSemana),
+    dias: formData.getAll("dias"),
     horaInicio: datos.horaInicio,
     horaFin: datos.horaFin,
   });
@@ -117,16 +124,36 @@ export async function agregarHorarioAction(idCurso: number, formData: FormData) 
     redirect(`/cursos/${idCurso}?error=${encodeURIComponent(parseo.error.issues[0].message)}`);
   }
 
-  await cursoService.agregarHorario(sesion.idUsuario, idCurso, parseo.data);
+  try {
+    await cursoService.agregarHorario(sesion.idUsuario, idCurso, parseo.data);
+  } catch (error) {
+    redirect(`/cursos/${idCurso}?error=${encodeURIComponent(mensajeParaUsuario(error))}`);
+  }
   revalidatePath(`/cursos/${idCurso}`);
-  redirect(`/cursos/${idCurso}`);
+  revalidatePath("/calendario");
+  redirect(`/cursos/${idCurso}?toast=${encodeURIComponent("Horario configurado")}`);
 }
 
-export async function eliminarHorarioAction(idCurso: number, idHorario: number) {
+export async function actualizarHorarioCursoAction(idCurso: number, idHorario: number, formData: FormData) {
   const sesion = await requerirSesion();
-  await cursoService.eliminarHorario(sesion.idUsuario, idCurso, idHorario);
+  const parseo = actualizarHorarioCursoSchema.safeParse({
+    diaSemana: formData.get("diaSemana"),
+    horaInicio: formData.get("horaInicio"),
+    horaFin: formData.get("horaFin"),
+  });
+
+  if (!parseo.success) {
+    redirect(`/cursos/${idCurso}?error=${encodeURIComponent(parseo.error.issues[0].message)}`);
+  }
+
+  try {
+    await cursoService.actualizarHorarioCurso(sesion.idUsuario, idCurso, idHorario, parseo.data);
+  } catch (error) {
+    redirect(`/cursos/${idCurso}?error=${encodeURIComponent(mensajeParaUsuario(error))}`);
+  }
   revalidatePath(`/cursos/${idCurso}`);
-  redirect(`/cursos/${idCurso}`);
+  revalidatePath("/calendario");
+  redirect(`/cursos/${idCurso}?toast=${encodeURIComponent("Horario actualizado")}`);
 }
 
 export async function agregarEvaluacionAction(idCurso: number, formData: FormData) {
