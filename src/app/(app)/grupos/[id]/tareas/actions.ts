@@ -8,8 +8,10 @@ import {
   reasignarTareaSchema,
   contextoTareaSchema,
   cambiarEstadoTareaSchema,
+  filtrosTareaSchema,
   idRegistroSchema,
   type DestinoTarea,
+  type FiltrosTarea,
 } from "@/lib/validation/tarea";
 import * as tareaService from "@/server/services/tarea";
 import { mensajeParaUsuario } from "@/lib/errores";
@@ -18,13 +20,16 @@ function leerFormData(formData: FormData) {
   return Object.fromEntries(formData.entries());
 }
 
-function redirigirConError(idGrupo: number, mensaje: string): never {
-  redirect(`/grupos/${idGrupo}/tareas?error=${encodeURIComponent(mensaje)}`);
-}
-
-function rutaTarea(idGrupo: number, idTarea: number, destino: DestinoTarea) {
+function rutaTarea(idGrupo: number, idTarea: number, destino: DestinoTarea, filtros: FiltrosTarea = {}) {
   if (destino === "detalle") return `/grupos/${idGrupo}/tareas/${idTarea}`;
-  return `/grupos/${idGrupo}/tareas${destino === "tabla" ? "?vista=lista" : ""}`;
+  const parametros = new URLSearchParams();
+  if (destino === "tabla") parametros.set("vista", "lista");
+  if (filtros.q) parametros.set("q", filtros.q);
+  if (filtros.estado) parametros.set("estado", filtros.estado);
+  if (filtros.asignado) parametros.set("asignado", String(filtros.asignado));
+  if (filtros.foco) parametros.set("foco", filtros.foco);
+  const consulta = parametros.toString();
+  return `/grupos/${idGrupo}/tareas${consulta ? `?${consulta}` : ""}`;
 }
 
 function redirigirErrorTarea(ruta: string, mensaje: string): never {
@@ -46,28 +51,37 @@ export async function crearTareaAction(idGrupo: number, formData: FormData) {
   if (!grupoId.success) redirect("/grupos");
   const parseo = crearTareaSchema.safeParse(leerFormData(formData));
 
-  if (!parseo.success) redirigirConError(idGrupo, parseo.error.issues[0].message);
+  if (!parseo.success) {
+    redirect(`/grupos/${idGrupo}/tareas?nueva=1&error=${encodeURIComponent(parseo.error.issues[0].message)}#nueva-tarea`);
+  }
 
   try {
     await tareaService.crearTarea(sesion.idUsuario, grupoId.data, parseo.data);
   } catch (error) {
-    redirigirConError(idGrupo, mensajeParaUsuario(error, "No se pudo crear la tarea"));
+    redirect(`/grupos/${idGrupo}/tareas?nueva=1&error=${encodeURIComponent(mensajeParaUsuario(error, "No se pudo crear la tarea"))}#nueva-tarea`);
   }
 
   revalidatePath(`/grupos/${idGrupo}/tareas`);
-  redirect(`/grupos/${idGrupo}/tareas`);
+  redirect(`/grupos/${idGrupo}/tareas?toast=${encodeURIComponent("Tarea creada")}`);
 }
 
 export async function reasignarTareaAction(
   idGrupo: number,
   idTarea: number,
   destino: DestinoTarea,
+  filtros: FiltrosTarea,
   formData: FormData,
 ) {
   const sesion = await requerirSesion();
   const contexto = contextoTareaSchema.safeParse({ idGrupo, idTarea, destino });
   if (!contexto.success) redirect("/grupos");
-  const ruta = rutaTarea(contexto.data.idGrupo, contexto.data.idTarea, contexto.data.destino);
+  const filtrosValidados = filtrosTareaSchema.safeParse(filtros);
+  const ruta = rutaTarea(
+    contexto.data.idGrupo,
+    contexto.data.idTarea,
+    contexto.data.destino,
+    filtrosValidados.success ? filtrosValidados.data : {},
+  );
   const parseo = reasignarTareaSchema.safeParse(leerFormData(formData));
   if (!parseo.success) redirigirErrorTarea(ruta, parseo.error.issues[0].message);
 
@@ -86,14 +100,28 @@ export async function cambiarEstadoTareaAction(
   idTarea: number,
   nuevoEstado: "pendiente" | "en_progreso" | "en_revision" | "completada",
   destino: DestinoTarea,
+  filtros: FiltrosTarea,
+  formData: FormData,
 ) {
   const sesion = await requerirSesion();
   const contexto = cambiarEstadoTareaSchema.safeParse({ idGrupo, idTarea, nuevoEstado, destino });
   if (!contexto.success) redirect("/grupos");
-  const ruta = rutaTarea(contexto.data.idGrupo, contexto.data.idTarea, contexto.data.destino);
+  const filtrosValidados = filtrosTareaSchema.safeParse(filtros);
+  const ruta = rutaTarea(
+    contexto.data.idGrupo,
+    contexto.data.idTarea,
+    contexto.data.destino,
+    filtrosValidados.success ? filtrosValidados.data : {},
+  );
 
   try {
-    await tareaService.cambiarEstadoTarea(sesion.idUsuario, contexto.data.idGrupo, contexto.data.idTarea, contexto.data.nuevoEstado);
+    await tareaService.cambiarEstadoTarea(
+      sesion.idUsuario,
+      contexto.data.idGrupo,
+      contexto.data.idTarea,
+      contexto.data.nuevoEstado,
+      String(formData.get("motivoDevolucion") ?? ""),
+    );
   } catch (error) {
     redirigirErrorTarea(ruta, mensajeParaUsuario(error, "No se pudo cambiar el estado"));
   }

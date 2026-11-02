@@ -27,7 +27,7 @@ export function accionesDisponiblesTarea({
 }): { estado: (typeof ESTADOS_TAREA_ORDEN)[number]; etiqueta: string }[] {
   if (rol === "observador") return [];
   const esAsignado = idAsignado === idUsuario;
-  if (estado === "pendiente" && (esAsignado || rol === "lider")) {
+  if (estado === "pendiente" && idAsignado !== null && (esAsignado || rol === "lider")) {
     return [{ estado: "en_progreso", etiqueta: "Empezar tarea" }];
   }
   if (estado === "en_progreso" && esAsignado) {

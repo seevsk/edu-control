@@ -3,7 +3,8 @@ import { crearNotificacion } from "@/server/notifications/crear-notificacion";
 import { plantillasNotificacion } from "@/server/notifications/templates";
 import { finDeDiaLimaAUtc } from "@/lib/dates";
 import { ErrorDeNegocio } from "@/lib/errores";
-import { filtrosTareaSchema, type crearTareaSchema } from "@/lib/validation/tarea";
+import { filtrosTareaSchema, motivoDevolucionSchema, type crearTareaSchema } from "@/lib/validation/tarea";
+import { valorHistorialDevolucion } from "@/lib/tarea-historial";
 import type { z } from "zod";
 import type { Prisma } from "../../../generated/prisma/client";
 import { ejecutarCambioDeGrupo } from "./cambio-grupo";
@@ -14,7 +15,7 @@ type RolDb = "lider" | "miembro" | "observador";
 async function requerirIntegranteActivo(idUsuario: number, idGrupo: number, db: Prisma.TransactionClient = prisma) {
   const integrante = await db.grupoIntegrante.findUnique({
     where: { idGrupo_idUsuario: { idGrupo, idUsuario } },
-    include: { grupo: { select: { estado: true } } },
+    include: { grupo: { select: { estado: true, fechaLimite: true } } },
   });
   if (!integrante || integrante.estadoInvitacion !== "aceptada") {
     throw new ErrorDeNegocio("No eres integrante de este grupo");
@@ -42,13 +43,15 @@ async function validarAsignable(idGrupo: number, idUsuario: number, tx: Prisma.T
 export function verificarTransicion(params: {
   estadoActual: EstadoDb;
   nuevoEstado: EstadoDb;
+  tieneAsignado: boolean;
   actorEsAsignado: boolean;
   actorRol: RolDb;
 }) {
-  const { estadoActual, nuevoEstado, actorEsAsignado, actorRol } = params;
+  const { estadoActual, nuevoEstado, tieneAsignado, actorEsAsignado, actorRol } = params;
   if (actorRol === "observador") throw new ErrorDeNegocio("Los observadores no pueden cambiar tareas");
 
   if (estadoActual === "pendiente" && nuevoEstado === "en_progreso") {
+    if (!tieneAsignado) throw new ErrorDeNegocio("Asigna un responsable antes de empezar la tarea");
     if (!actorEsAsignado && actorRol !== "lider") {
       throw new ErrorDeNegocio("Solo el asignado o el lider pueden empezarla");
     }
@@ -66,6 +69,15 @@ export function verificarTransicion(params: {
     return;
   }
   throw new ErrorDeNegocio(`No se puede pasar de "${estadoActual}" a "${nuevoEstado}"`);
+}
+
+/** La fecha es opcional, pero si existe debe servir para coordinar el trabajo real del grupo. */
+export function validarFechaLimiteTarea(fechaLimite: Date | null, fechaLimiteGrupo: Date | null, ahora = new Date()) {
+  if (!fechaLimite) return;
+  if (fechaLimite < ahora) throw new ErrorDeNegocio("La fecha límite de la tarea no puede estar en el pasado");
+  if (fechaLimiteGrupo && fechaLimite > fechaLimiteGrupo) {
+    throw new ErrorDeNegocio("La fecha límite de la tarea no puede superar la fecha límite del grupo");
+  }
 }
 
 /** Para el "Inicio": tareas activas asignadas al usuario en cualquiera de sus grupos. */
@@ -101,22 +113,61 @@ export async function listarTareasAsignadasAlUsuario(idUsuario: number, limite =
 export async function listarTareasDelGrupo(
   idUsuario: number,
   idGrupo: number,
-  filtros: { estado?: EstadoDb; idAsignado?: number; q?: string } = {},
+  filtros: { estado?: EstadoDb; idAsignado?: number; q?: string; foco?: "abiertas" | "mias" | "sin_asignar" | "vencidas" } = {},
 ) {
   await requerirIntegranteActivo(idUsuario, idGrupo);
   const parseo = filtrosTareaSchema.safeParse({ ...filtros, asignado: filtros.idAsignado });
   if (!parseo.success) throw new ErrorDeNegocio("Los filtros de tareas no son válidos");
-  const { estado, asignado, q } = parseo.data;
+  const { estado, asignado, q, foco } = parseo.data;
+  const condiciones = [
+    estado ? { estado } : {},
+    asignado ? { idAsignado: asignado } : {},
+    q
+      ? {
+          OR: [
+            { titulo: { contains: q, mode: "insensitive" as const } },
+            { descripcion: { contains: q, mode: "insensitive" as const } },
+          ],
+        }
+      : {},
+    foco === "abiertas" ? { estado: { not: "completada" as const } } : {},
+    foco === "mias" ? { idAsignado: idUsuario, estado: { not: "completada" as const } } : {},
+    foco === "sin_asignar" ? { idAsignado: null, estado: { not: "completada" as const } } : {},
+    foco === "vencidas" ? { fechaLimite: { lt: new Date() }, estado: { not: "completada" as const } } : {},
+  ];
   return prisma.tarea.findMany({
     where: {
       idGrupo,
-      ...(estado ? { estado } : {}),
-      ...(asignado ? { idAsignado: asignado } : {}),
-      ...(q ? { titulo: { contains: q, mode: "insensitive" } } : {}),
+      AND: condiciones,
     },
     include: { asignado: true, creador: true },
     orderBy: [{ fechaCreacion: "desc" }],
   });
+}
+
+export async function obtenerResumenTareasGrupo(idUsuario: number, idGrupo: number) {
+  await requerirIntegranteActivo(idUsuario, idGrupo);
+  const tareas = await prisma.tarea.findMany({
+    where: { idGrupo },
+    select: { estado: true, idAsignado: true, fechaLimite: true, peso: true },
+  });
+  const ahora = new Date();
+  return {
+    total: tareas.length,
+    abiertas: tareas.filter((tarea) => tarea.estado !== "completada").length,
+    mias: tareas.filter((tarea) => tarea.idAsignado === idUsuario && tarea.estado !== "completada").length,
+    vencidas: tareas.filter(
+      (tarea) => tarea.estado !== "completada" && tarea.fechaLimite !== null && tarea.fechaLimite < ahora,
+    ).length,
+    enRevision: tareas.filter((tarea) => tarea.estado === "en_revision").length,
+    sinAsignar: tareas.filter((tarea) => tarea.idAsignado === null && tarea.estado !== "completada").length,
+    pesoAbiertoPorUsuario: tareas
+      .filter((tarea) => tarea.estado !== "completada" && tarea.idAsignado !== null)
+      .reduce<Record<number, number>>((pesos, tarea) => {
+        pesos[tarea.idAsignado!] = (pesos[tarea.idAsignado!] ?? 0) + tarea.peso;
+        return pesos;
+      }, {}),
+  };
 }
 
 export async function obtenerTareaDelGrupo(idUsuario: number, idGrupo: number, idTarea: number) {
@@ -141,10 +192,14 @@ export async function crearTarea(
   idGrupo: number,
   datos: z.infer<typeof crearTareaSchema>,
 ) {
-  const idAsignado = datos.idAsignado ? Number(datos.idAsignado) : null;
+  if (!datos.idAsignado) throw new ErrorDeNegocio("Selecciona un responsable");
+  if (!datos.fechaLimite) throw new ErrorDeNegocio("La fecha límite es obligatoria");
+  const idAsignado = Number(datos.idAsignado);
   const tarea = await ejecutarCambioDeGrupo(async (tx) => {
-    await requerirIntegranteQuePuedeModificar(idActor, idGrupo, tx);
-    if (idAsignado) await validarAsignable(idGrupo, idAsignado, tx);
+    const integrante = await requerirIntegranteQuePuedeModificar(idActor, idGrupo, tx);
+    await validarAsignable(idGrupo, idAsignado, tx);
+    const fechaLimite = finDeDiaLimaAUtc(datos.fechaLimite);
+    validarFechaLimiteTarea(fechaLimite, integrante.grupo.fechaLimite);
     return tx.tarea.create({
       data: {
         idGrupo,
@@ -153,7 +208,7 @@ export async function crearTarea(
         titulo: datos.titulo,
         descripcion: datos.descripcion || null,
         peso: datos.peso,
-        fechaLimite: datos.fechaLimite ? finDeDiaLimaAUtc(datos.fechaLimite) : null,
+        fechaLimite,
         historial: { create: [{ idUsuario: idActor, accion: "creada" }] },
       },
     });
@@ -179,13 +234,27 @@ export async function reasignarTarea(
 ) {
   const nuevoIdAsignado = nuevoIdAsignadoRaw ? Number(nuevoIdAsignadoRaw) : null;
   const resultado = await ejecutarCambioDeGrupo(async (tx) => {
-    await requerirIntegranteQuePuedeModificar(idActor, idGrupo, tx);
+    const integrante = await requerirIntegranteQuePuedeModificar(idActor, idGrupo, tx);
     const tarea = await tx.tarea.findFirst({ where: { idTarea, idGrupo } });
     if (!tarea) throw new ErrorDeNegocio("Tarea no encontrada");
+    if (tarea.estado === "completada") throw new ErrorDeNegocio("Una tarea completada no se puede reasignar");
+    if (tarea.estado === "en_revision") {
+      throw new ErrorDeNegocio("Devuelve la tarea a progreso antes de cambiar su responsable");
+    }
+    if (tarea.estado === "en_progreso" && integrante.rol !== "lider") {
+      throw new ErrorDeNegocio("Solo el líder puede reasignar una tarea en progreso");
+    }
     if (nuevoIdAsignado === tarea.idAsignado) return { tarea, cambio: false };
     if (nuevoIdAsignado) await validarAsignable(idGrupo, nuevoIdAsignado, tx);
 
-    const actualizada = await tx.tarea.update({ where: { idTarea }, data: { idAsignado: nuevoIdAsignado } });
+    const vuelveAPendiente = tarea.estado === "en_progreso";
+    const actualizada = await tx.tarea.update({
+      where: { idTarea },
+      data: {
+        idAsignado: nuevoIdAsignado,
+        ...(vuelveAPendiente ? { estado: "pendiente", fechaTerminada: null } : {}),
+      },
+    });
     await tx.tareaHistorial.create({
       data: {
         idTarea,
@@ -195,6 +264,17 @@ export async function reasignarTarea(
         valorNuevo: nuevoIdAsignado ? String(nuevoIdAsignado) : null,
       },
     });
+    if (vuelveAPendiente) {
+      await tx.tareaHistorial.create({
+        data: {
+          idTarea,
+          idUsuario: idActor,
+          accion: "estado",
+          valorAnterior: "en_progreso",
+          valorNuevo: "pendiente",
+        },
+      });
+    }
     return { tarea: actualizada, cambio: true };
   });
   const { tarea, cambio } = resultado;
@@ -216,6 +296,7 @@ export async function cambiarEstadoTarea(
   idGrupo: number,
   idTarea: number,
   nuevoEstado: EstadoDb,
+  motivoDevolucion = "",
 ) {
   const tarea = await ejecutarCambioDeGrupo(async (tx) => {
     const integrante = await requerirIntegranteQuePuedeModificar(idActor, idGrupo, tx);
@@ -225,9 +306,16 @@ export async function cambiarEstadoTarea(
     verificarTransicion({
       estadoActual: tarea.estado,
       nuevoEstado,
+      tieneAsignado: tarea.idAsignado !== null,
       actorEsAsignado: tarea.idAsignado === idActor,
       actorRol: integrante.rol,
     });
+
+    const esDevolucion = tarea.estado === "en_revision" && nuevoEstado === "en_progreso";
+    const motivoValidado = esDevolucion ? motivoDevolucionSchema.safeParse(motivoDevolucion) : null;
+    if (motivoValidado && !motivoValidado.success) {
+      throw new ErrorDeNegocio(motivoValidado.error.issues[0].message);
+    }
 
     const estadoAnterior = tarea.estado;
     const fechaTerminada =
@@ -244,7 +332,9 @@ export async function cambiarEstadoTarea(
         idUsuario: idActor,
         accion: "estado",
         valorAnterior: estadoAnterior,
-        valorNuevo: nuevoEstado,
+        valorNuevo: esDevolucion
+          ? valorHistorialDevolucion(motivoValidado!.data)
+          : nuevoEstado,
       },
     });
     return tarea;
@@ -268,7 +358,7 @@ export async function cambiarEstadoTarea(
       idUsuario: tarea.idAsignado,
       tipo: "tarea_devuelta",
       idGrupo,
-      ...plantillasNotificacion.tareaDevuelta(tarea.titulo, idGrupo),
+        ...plantillasNotificacion.tareaDevuelta(tarea.titulo, idGrupo, motivoDevolucion.trim()),
     });
   } else if (nuevoEstado === "completada" && tarea.idAsignado) {
     await crearNotificacion({

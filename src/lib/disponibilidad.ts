@@ -1,3 +1,5 @@
+import { diaSemanaISO, fechaEnZonaLimaISO, minutosDelDiaLima } from "@/lib/calendario";
+
 /**
  * Disponibilidad comun de un grupo, calculada (nunca guardada, AGENTS.md 8.5). Trabaja sobre la
  * semana tipo: minutos desde el lunes 00:00 (0) hasta el domingo 24:00 (10080). Solo maneja
@@ -111,4 +113,23 @@ export function diasLibresParaTodos(mapa: Franja[][]): number[] {
   return mapa
     .filter((franjas) => franjas.length > 0 && franjas.every((franja) => franja.ocupados.length === 0))
     .map((franjas) => franjas[0].diaSemana);
+}
+
+export type ReunionPuntual = { inicio: Date; fin: Date };
+
+/**
+ * Superpone reuniones de una sola vez sobre la semana tipo usada para los proximos 7 dias.
+ * La reunion bloquea la franja completa del grupo, pero no modifica el patron semanal guardado.
+ */
+export function bloquearReunionesParaTodos<T extends Integrante>(integrantes: T[], reuniones: ReunionPuntual[]): T[] {
+  const intervalos: Intervalo[] = reuniones.map((reunion) => {
+    const fechaISO = fechaEnZonaLimaISO(reunion.inicio);
+    const base = (diaSemanaISO(fechaISO) - 1) * MIN_DIA;
+    return [base + minutosDelDiaLima(reunion.inicio), base + minutosDelDiaLima(reunion.fin)];
+  });
+
+  return integrantes.map((integrante) => ({
+    ...integrante,
+    ocupados: [...integrante.ocupados, ...intervalos],
+  }));
 }

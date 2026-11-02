@@ -221,9 +221,12 @@ Reglas de arquitectura:
 ### 8.2 Cursos, horarios, evaluaciones y calendario
 
 - Cada usuario registra **sus propios cursos** a mano (no hay importación de Moodle ni de ningún sistema externo). `modalidad`: `presencial` | `remoto`. `activo = false` cuando termina el ciclo.
+- **Creación de cursos (confirmado por el usuario, 2026-11-02):** nombre, código y al menos un día del horario semanal son obligatorios. La selección del horario usa el mismo patrón que "Agregar tiempo ocupado": chips de días y horas en intervalos de 30 minutos; se pueden marcar varios días con la misma franja. El curso y sus sesiones iniciales se crean de forma atómica, para que un horario inválido no deje un curso incompleto.
 - **Importar curso desde un grupo (confirmado):** si un grupo nace de la evaluación de otro usuario (`grupo.id_evaluacion` -> `evaluacion.id_curso`), un integrante invitado (nunca el dueño del curso) puede traerse ese curso a los suyos con una acción explícita, no automática. Si ya tiene un curso propio con el mismo `codigo`, se **sobrescriben** `nombre`/`docente`/`modalidad` en vez de duplicar la fila (cada quien conserva su propio `id_curso`, no hay colisión de PK posible). El curso resultante queda enlazado vía `importado_de_id_curso`, y esa sincronización es **automática y continua**: cuando el dueño edita su curso, `nombre`/`docente`/`modalidad` se propagan solos a todas las copias importadas (nunca `activo`, que es de cada quien).
 - **Horario y evaluaciones al importar:** la importación también trae `horario_curso` y `evaluacion` (enlazados vía `importado_de_id_horario` / `importado_de_id_evaluacion`), porque son parte del curso. A diferencia de los campos escalares del curso, estas son listas: la sincronización posterior **no es automática**, es una acción manual ("traer actualizaciones") que agrega lo nuevo y actualiza lo existente (por el id importado, nunca por nombre) sin borrar nada que ya esté; `fecha_entrega` de una evaluación nunca se pisa, es autodeclarada por cada quien.
-- `horario_curso` es un patrón **semanal** (día 1 = lunes … 7 = domingo), pero en la práctica los cursos no dictan clase en domingo: la UI y la validación limitan `horario_curso` a **1-6 (lunes a sábado)**. `bloque_ocupado` sí usa el rango completo 1-7. Un curso puede tener varias sesiones.
+- `horario_curso` es un patrón **semanal** (día 1 = lunes … 7 = domingo), pero en la práctica los cursos no dictan clase en domingo: la UI y la validación limitan `horario_curso` a **1-6 (lunes a sábado)**. `bloque_ocupado` sí usa el rango completo 1-7. Un curso puede tener varias sesiones. La hora de fin debe ser estrictamente posterior a la hora de inicio; las sesiones no cruzan la medianoche.
+- **Horario estable del curso (confirmado por el usuario, 2026-11-02):** una vez que el curso tiene horario, no se pueden agregar ni eliminar sesiones manualmente; solo editar el día y la franja de cada sesión existente. El formulario para configurar horario solo aparece en cursos antiguos o importados que todavía no tengan ninguna sesión. La sincronización manual de un curso importado conserva su comportamiento aprobado y puede traer sesiones nuevas desde el curso original.
+- Los horarios de un curso solo aparecen en el Calendario mientras `curso.activo = true`. Al desactivar el curso se conservan sus sesiones en la base de datos, pero se retiran inmediatamente del Calendario; al reactivarlo vuelven a mostrarse.
 - `bloque_ocupado` es un patrón semanal **personal**: `laboral` | `familiar` | `personal`. `dia_semana` indica el día del bloque. La hora de fin debe ser estrictamente posterior a la hora de inicio; no se permiten bloques que crucen la medianoche (decisión del usuario, 2026-10-19).
 - **Tiempo ocupado** de un usuario = `horario_curso` de sus cursos activos + sus `bloque_ocupado`. **El tiempo libre se calcula restando; nunca se guarda.** Los solapes se calculan en TypeScript.
 - `evaluacion`: pertenece a un curso. `fecha_cierre` es obligatoria. `fecha_apertura` es opcional (una evaluación presencial no tiene ventana). Si el usuario solo indica el día, usa **23:59 (America/Lima)** como hora de cierre. `requiere_entrega` indica si se sube algo; `fecha_entrega` la marca el propio usuario (`NULL` = aún no entrega) y es autodeclarada, no verificada.
@@ -250,6 +253,8 @@ Reglas de arquitectura:
 
 - Las tareas pertenecen siempre a un grupo. `id_asignado` debe ser un integrante `aceptada` que no sea observador (o `NULL` si está sin asignar).
 - `peso`: 1 a 3, lo define el grupo al crear la tarea.
+- **Restricciones adicionales (confirmadas por el usuario, 2026-11-02):** al crear una tarea, el responsable y la fecha límite son obligatorios. La fecha no puede estar en el pasado ni superar `grupo.fecha_limite`. Después de crearla puede quedar sin responsable por una reasignación o por el retiro de un integrante, pero necesita responsable antes de pasar a `en_progreso`. Una tarea `en_revision` o `completada` no se reasigna. Una tarea `en_progreso` solo la puede reasignar el líder y, al hacerlo, vuelve a `pendiente`; se registran tanto la reasignación como el cambio de estado en el historial. Las tareas `pendiente` sí pueden reasignarlas líder y miembros.
+- Un grupo no puede pasar a `finalizado` mientras tenga tareas que no estén `completada`.
 - Estados: `pendiente` → `en_progreso` → `en_revision` → `completada`.
 
 | Transición | Quién |
@@ -257,12 +262,13 @@ Reglas de arquitectura:
 | `pendiente` → `en_progreso` | El asignado (o el líder) |
 | `en_progreso` → `en_revision` | El asignado. Significa "terminé". Se llena `fecha_terminada` |
 | `en_revision` → `completada` | Cualquier integrante aceptado (no observador) que no sea el asignado (confirmado) |
-| `en_revision` → `en_progreso` | Otro integrante, al devolverla. Se borra `fecha_terminada` |
+| `en_revision` → `en_progreso` | Otro integrante, al devolverla. Debe escribir obligatoriamente un motivo y se borra `fecha_terminada` |
 
   Rechaza cualquier otra transición. Si el equipo pide más flexibilidad, se amplía esta tabla. La revisión del trabajo real ocurre fuera de la app (el revisor abre el documento del grupo); la app solo registra quién confirmó y cuándo.
 - **Cada cambio de `estado` o de `id_asignado` escribe una fila en `tarea_historial` dentro de la misma transacción que actualiza la tarea.** Lee el valor anterior **antes** de actualizar:
   - `accion`: `creada` | `estado` | `reasignada`.
   - `valor_anterior` y `valor_nuevo`: texto. En `reasignada` guarda el **id del usuario**, no el nombre. En `creada` ambos son `NULL`.
+  - Al devolver una tarea, `valor_nuevo` conserva `en_progreso` junto con el motivo en el mismo texto usando el formato interpretado por `src/lib/tarea-historial.ts`; así se muestra en el historial sin agregar columnas.
   - `id_usuario` sale de la sesión del servidor.
 - El historial nunca se edita ni se borra.
 - No hay evidencia adjunta por tarea. Como mucho, el `enlace_trabajo` del grupo.
@@ -276,7 +282,7 @@ Reglas de arquitectura:
 - Excluye a los observadores de todas las métricas.
 - **No hay ranking ni puntaje único.** Muestra carga y cumplimiento lado a lado.
 - **Feed de actividad del grupo** = lectura de `tarea_historial`. No lleva tabla propia.
-- **Disponibilidad del grupo** (pestaña "Horarios", `src/lib/disponibilidad.ts`): ocupado de cada integrante aceptado no observador = `horario_curso` de sus cursos activos + sus `bloque_ocupado`, sobre la semana tipo. Se muestra en franjas de 30 min entre 7 AM y 11 PM, con cuántos están libres y **quién falta por nombre**, nunca el motivo (tipo de bloque ni curso). Huecos en común = franjas consecutivas de 1 h o más con todos libres; si no hay, los de "falta una persona". Los observadores no ven esta pestaña.
+- **Disponibilidad del grupo** (pestaña "Horarios", `src/lib/disponibilidad.ts`): ocupado de cada integrante aceptado no observador = `horario_curso` de sus cursos activos + sus `bloque_ocupado`, sobre la semana tipo. La vista abre en la semana calendario actual (lunes a domingo) y permite navegar a la semana anterior o siguiente. Las reuniones ya programadas de ese mismo grupo dentro de la semana visible se superponen al patrón: bloquean la franja para todo el grupo, se muestran en la pestaña y se excluyen de las sugerencias, sin convertirse en eventos recurrentes. Se muestra en franjas de 30 min entre 7 AM y 11 PM, con cuántos están libres y **quién falta por nombre**, nunca el motivo (tipo de bloque ni curso). Huecos en común = franjas consecutivas de 1 h o más con todos libres; si no hay, los de "falta una persona". Los observadores no ven esta pestaña.
 
 ### 8.6 Notificaciones
 
@@ -310,6 +316,7 @@ Reglas de arquitectura:
 
 - Módulo propio en el sidebar: `/reuniones` lista las de todos mis grupos (filtro por grupo) y `/reuniones/nueva?grupo=` las programa. También se llega desde la pestaña "Horarios" del grupo (botón o un hueco en común, que precarga la próxima fecha de ese día).
 - Las programan el líder y los miembros (aceptados, no observadores) de un grupo `activo`. Son de **una sola vez** (sin repetición) y empiezan y terminan el mismo día. No se programan en el pasado.
+- Al programar una reunión, vuelve a la pestaña **Horarios** del grupo y abre la semana que contiene la reunión creada.
 - **El sistema sugiere, no obliga** (decisión del usuario): el formulario muestra como sugerencias los huecos en común de los próximos 7 días y el mapa del grupo. Se puede elegir cualquier otra hora; si pisa el horario semanal de alguien, se avisa en vivo ("Choca con el horario de …") pero se permite programarla.
 - `enlace` se valida con Zod (`https://` o `http://`), igual que `grupo.enlace_trabajo`.
 - Al crearla se inserta una fila de `reunion_asistente` por integrante aceptado no observador en el mismo `create` anidado: quien la programa queda `asistire`, el resto `pendiente`. Quien se une al grupo después puede responder igual (upsert).

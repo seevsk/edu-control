@@ -60,7 +60,13 @@ async function verificar() {
             for (const nuevoEstado of ESTADOS_TAREA_ORDEN) {
               let permitido = true;
               try {
-                tareaService.verificarTransicion({ estadoActual: estado, nuevoEstado, actorEsAsignado: idAsignado === 1, actorRol: rol });
+                tareaService.verificarTransicion({
+                  estadoActual: estado,
+                  nuevoEstado,
+                  tieneAsignado: idAsignado !== null,
+                  actorEsAsignado: idAsignado === 1,
+                  actorRol: rol,
+                });
               } catch (error) {
                 assert.ok(error instanceof ErrorDeNegocio);
                 permitido = false;
@@ -87,6 +93,7 @@ async function verificar() {
       } }),
     ));
     const [lider, ana, luis, observador, invitado, externo] = usuarios.map((usuario) => usuario.idUsuario);
+    const fechaLimitePrueba = "2099-12-30";
     async function crearGrupo() {
       const grupo = await grupoService.crearGrupo(lider, { nombre: "Grupo de prueba" });
       await db!.grupoIntegrante.createMany({ data: [
@@ -156,7 +163,7 @@ async function verificar() {
       await grupoService.responderInvitacion(invitado, grupo, "rechazada");
       assert.equal((await db!.grupoIntegrante.findUniqueOrThrow({ where: { idGrupo_idUsuario: { idGrupo: grupo, idUsuario: invitado } } })).estadoInvitacion, "rechazada");
     });
-    const tarea = await tareaService.crearTarea(ana, idGrupo, { titulo: "Informe", peso: 2, idAsignado: String(ana) });
+    const tarea = await tareaService.crearTarea(ana, idGrupo, { titulo: "Informe", peso: 2, idAsignado: String(ana), fechaLimite: fechaLimitePrueba });
     await caso("el creador queda como líder aceptado y la tarea registra su creación", async () => {
       const miembro = await db!.grupoIntegrante.findUniqueOrThrow({ where: { idGrupo_idUsuario: { idGrupo, idUsuario: lider } } });
       assert.equal(miembro.rol, "lider");
@@ -165,7 +172,7 @@ async function verificar() {
     });
     for (const actor of [observador, invitado, externo]) {
       await caso(`crear y modificar tareas rechaza al usuario sin permisos ${actor}`, async () => {
-        await assert.rejects(tareaService.crearTarea(actor, idGrupo, { titulo: "No permitida", peso: 1 }), ErrorDeNegocio);
+        await assert.rejects(tareaService.crearTarea(actor, idGrupo, { titulo: "No permitida", peso: 1, idAsignado: String(actor), fechaLimite: fechaLimitePrueba }), ErrorDeNegocio);
         await assert.rejects(tareaService.reasignarTarea(actor, idGrupo, tarea.idTarea, String(luis)), ErrorDeNegocio);
         await assert.rejects(tareaService.cambiarEstadoTarea(actor, idGrupo, tarea.idTarea, "en_progreso"), ErrorDeNegocio);
       });
@@ -174,6 +181,40 @@ async function verificar() {
       for (const asignado of [observador, invitado, externo]) {
         await assert.rejects(tareaService.reasignarTarea(lider, idGrupo, tarea.idTarea, String(asignado)), ErrorDeNegocio);
       }
+    });
+    await caso("crear exige responsable y fecha, y una tarea desasignada no puede empezar", async () => {
+      const { crearTareaSchema } = await import("../src/lib/validation/tarea");
+      assert.equal(crearTareaSchema.safeParse({ titulo: "Incompleta", peso: 1 }).success, false);
+      const sinAsignar = await tareaService.crearTarea(ana, idGrupo, {
+        titulo: "Pendiente de asignación", peso: 1, idAsignado: String(ana), fechaLimite: fechaLimitePrueba,
+      });
+      await tareaService.reasignarTarea(ana, idGrupo, sinAsignar.idTarea, "");
+      await assert.rejects(
+        tareaService.cambiarEstadoTarea(lider, idGrupo, sinAsignar.idTarea, "en_progreso"),
+        ErrorDeNegocio,
+      );
+      assert.equal((await db!.tarea.findUniqueOrThrow({ where: { idTarea: sinAsignar.idTarea } })).estado, "pendiente");
+      await tareaService.reasignarTarea(lider, idGrupo, sinAsignar.idTarea, String(luis));
+      await tareaService.cambiarEstadoTarea(luis, idGrupo, sinAsignar.idTarea, "en_progreso");
+      await tareaService.cambiarEstadoTarea(luis, idGrupo, sinAsignar.idTarea, "en_revision");
+      await tareaService.cambiarEstadoTarea(lider, idGrupo, sinAsignar.idTarea, "completada");
+    });
+    await caso("las fechas de tarea no admiten pasado ni superar el límite del grupo", async () => {
+      const ahora = new Date("2026-11-02T17:00:00.000Z");
+      assert.doesNotThrow(() => tareaService.validarFechaLimiteTarea(null, null, ahora));
+      assert.doesNotThrow(() => tareaService.validarFechaLimiteTarea(new Date("2026-11-03T04:59:00.000Z"), null, ahora));
+      assert.throws(
+        () => tareaService.validarFechaLimiteTarea(new Date("2026-11-01T04:59:00.000Z"), null, ahora),
+        ErrorDeNegocio,
+      );
+      assert.throws(
+        () => tareaService.validarFechaLimiteTarea(
+          new Date("2026-11-05T04:59:00.000Z"),
+          new Date("2026-11-04T04:59:00.000Z"),
+          ahora,
+        ),
+        ErrorDeNegocio,
+      );
     });
     await caso("dos cambios de estado simultáneos producen un único cambio y su historial", async () => {
       const resultados = await Promise.allSettled([
@@ -234,7 +275,7 @@ async function verificar() {
         assert.equal(await db!.notificacion.count(), notificaciones);
         await assert.rejects(tareaService.cambiarEstadoTarea(antes.idAsignado!, idGrupo, tarea.idTarea, "en_revision"));
         assert.deepEqual(await db!.tarea.findUniqueOrThrow({ where: { idTarea: tarea.idTarea } }), antes);
-        await assert.rejects(tareaService.crearTarea(ana, idGrupo, { titulo: "Creación revertida", peso: 1 }));
+        await assert.rejects(tareaService.crearTarea(ana, idGrupo, { titulo: "Creación revertida", peso: 1, idAsignado: String(ana), fechaLimite: fechaLimitePrueba }));
         assert.equal(await db!.tarea.count({ where: { titulo: "Creación revertida" } }), 0);
       } finally {
         await db!.$executeRawUnsafe("DROP TRIGGER rechazar_historial ON tarea_historial");
@@ -243,6 +284,7 @@ async function verificar() {
     });
     await caso("el asignado entrega y otra persona confirma; las fechas se conservan", async () => {
       const actual = await db!.tarea.findUniqueOrThrow({ where: { idTarea: tarea.idTarea } });
+      await tareaService.cambiarEstadoTarea(actual.idAsignado!, idGrupo, tarea.idTarea, "en_progreso");
       await tareaService.cambiarEstadoTarea(actual.idAsignado!, idGrupo, tarea.idTarea, "en_revision");
       const revision = await db!.tarea.findUniqueOrThrow({ where: { idTarea: tarea.idTarea } });
       assert.ok(revision.fechaTerminada);
@@ -252,10 +294,14 @@ async function verificar() {
       assert.deepEqual((await db!.tarea.findUniqueOrThrow({ where: { idTarea: tarea.idTarea } })).fechaTerminada, revision.fechaTerminada);
     });
     await caso("un miembro puede devolver y completar, con historial y aviso al responsable", async () => {
-      const revision = await tareaService.crearTarea(ana, idGrupo, { titulo: "Revisión del equipo", peso: 3, idAsignado: String(ana) });
+      const revision = await tareaService.crearTarea(ana, idGrupo, { titulo: "Revisión del equipo", peso: 3, idAsignado: String(ana), fechaLimite: fechaLimitePrueba });
       await tareaService.cambiarEstadoTarea(ana, idGrupo, revision.idTarea, "en_progreso");
       await tareaService.cambiarEstadoTarea(ana, idGrupo, revision.idTarea, "en_revision");
-      await tareaService.cambiarEstadoTarea(luis, idGrupo, revision.idTarea, "en_progreso");
+      await assert.rejects(
+        tareaService.cambiarEstadoTarea(luis, idGrupo, revision.idTarea, "en_progreso"),
+        ErrorDeNegocio,
+      );
+      await tareaService.cambiarEstadoTarea(luis, idGrupo, revision.idTarea, "en_progreso", "Debe corregir las conclusiones");
       assert.equal((await db!.tarea.findUniqueOrThrow({ where: { idTarea: revision.idTarea } })).fechaTerminada, null);
       await tareaService.cambiarEstadoTarea(ana, idGrupo, revision.idTarea, "en_revision");
       const avisosAntes = await db!.notificacion.count({ where: { tipo: "tarea_completada", idUsuario: ana } });
@@ -263,7 +309,7 @@ async function verificar() {
       assert.equal(await db!.notificacion.count({ where: { tipo: "tarea_completada", idUsuario: ana } }), avisosAntes + 1);
       const historial = await db!.tareaHistorial.findMany({ where: { idTarea: revision.idTarea, accion: "estado" }, orderBy: { idHistorial: "asc" } });
       assert.deepEqual(historial.map((cambio) => [cambio.valorAnterior, cambio.valorNuevo]), [
-        ["pendiente", "en_progreso"], ["en_progreso", "en_revision"], ["en_revision", "en_progreso"],
+        ["pendiente", "en_progreso"], ["en_progreso", "en_revision"], ["en_revision", "en_progreso\n\nMotivo de devolución: Debe corregir las conclusiones"],
         ["en_progreso", "en_revision"], ["en_revision", "completada"],
       ]);
       assert.equal(historial.at(-1)?.idUsuario, luis);
@@ -275,10 +321,10 @@ async function verificar() {
     });
     await caso("retirar mientras se asignan tareas nunca deja tareas abiertas del retirado", async () => {
       const grupo = await crearGrupo();
-      await tareaService.crearTarea(ana, grupo, { titulo: "Abierta", peso: 1, idAsignado: String(ana) });
+      await tareaService.crearTarea(ana, grupo, { titulo: "Abierta", peso: 1, idAsignado: String(ana), fechaLimite: fechaLimitePrueba });
       const resultados = await Promise.allSettled([
         grupoService.retirarIntegrante(lider, grupo, ana),
-        tareaService.crearTarea(lider, grupo, { titulo: "Asignación simultánea", peso: 1, idAsignado: String(ana) }),
+        tareaService.crearTarea(ana, grupo, { titulo: "Asignación simultánea", peso: 1, idAsignado: String(ana), fechaLimite: fechaLimitePrueba }),
       ]);
       for (const resultado of resultados) {
         if (resultado.status === "rejected") assert.ok(resultado.reason instanceof ErrorDeNegocio);
@@ -291,9 +337,13 @@ async function verificar() {
         assert.ok(abierta.historial.some((cambio) => cambio.accion === "reasignada" && cambio.valorAnterior === String(ana) && cambio.valorNuevo === null));
       }
     });
-    const abierta = await tareaService.crearTarea(ana, idGrupo, { titulo: "Consulta posterior", peso: 1, idAsignado: String(ana) });
+    const abierta = await tareaService.crearTarea(ana, idGrupo, { titulo: "Consulta posterior", peso: 1, idAsignado: String(ana), fechaLimite: fechaLimitePrueba });
     await caso("solo el líder puede finalizar el grupo", async () => {
       await assert.rejects(grupoService.actualizarGrupo(ana, idGrupo, { nombre: "Grupo", estado: "finalizado" }), ErrorDeNegocio);
+      await assert.rejects(grupoService.actualizarGrupo(lider, idGrupo, { nombre: "Grupo", estado: "finalizado" }), ErrorDeNegocio);
+      await tareaService.cambiarEstadoTarea(ana, idGrupo, abierta.idTarea, "en_progreso");
+      await tareaService.cambiarEstadoTarea(ana, idGrupo, abierta.idTarea, "en_revision");
+      await tareaService.cambiarEstadoTarea(lider, idGrupo, abierta.idTarea, "completada");
       await grupoService.actualizarGrupo(lider, idGrupo, { nombre: "Grupo finalizado", estado: "finalizado" });
     });
     await caso("un grupo finalizado bloquea edición, reapertura, invitaciones, retiros y tareas", async () => {
@@ -307,7 +357,7 @@ async function verificar() {
         await assert.rejects(grupoService.responderInvitacion(invitado, idGrupo, respuesta), ErrorDeNegocio);
       }
       await assert.rejects(grupoService.retirarIntegrante(lider, idGrupo, ana), ErrorDeNegocio);
-      await assert.rejects(tareaService.crearTarea(lider, idGrupo, { titulo: "No permitida", peso: 1 }), ErrorDeNegocio);
+      await assert.rejects(tareaService.crearTarea(lider, idGrupo, { titulo: "No permitida", peso: 1, idAsignado: String(lider), fechaLimite: fechaLimitePrueba }), ErrorDeNegocio);
       await assert.rejects(tareaService.reasignarTarea(lider, idGrupo, abierta.idTarea, String(luis)), ErrorDeNegocio);
       await assert.rejects(tareaService.cambiarEstadoTarea(ana, idGrupo, abierta.idTarea, "en_progreso"), ErrorDeNegocio);
       await assert.rejects(

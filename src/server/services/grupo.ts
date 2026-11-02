@@ -17,6 +17,9 @@ export async function listarMisGrupos(idUsuario: number) {
     include: {
       integrantes: { include: { usuario: true }, orderBy: { fechaInvitacion: "asc" } },
       evaluacion: { include: { curso: { select: { nombre: true, codigo: true, modalidad: true } } } },
+      tareas: {
+        select: { idTarea: true, peso: true, estado: true, idAsignado: true, fechaLimite: true },
+      },
     },
     orderBy: { fechaCreacion: "desc" },
   });
@@ -98,6 +101,16 @@ export async function actualizarGrupo(
 ) {
   return ejecutarCambioDeGrupo(async (tx) => {
     await requerirLiderDelGrupo(idUsuario, idGrupo, tx);
+    if (datos.estado === "finalizado") {
+      const tareasAbiertas = await tx.tarea.count({
+        where: { idGrupo, estado: { not: "completada" } },
+      });
+      if (tareasAbiertas > 0) {
+        throw new ErrorDeNegocio(
+          `Completa las ${tareasAbiertas} ${tareasAbiertas === 1 ? "tarea pendiente" : "tareas pendientes"} antes de finalizar el grupo`,
+        );
+      }
+    }
     return tx.grupo.update({
       where: { idGrupo },
       data: {

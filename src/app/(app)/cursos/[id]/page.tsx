@@ -2,11 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requerirSesion } from "@/server/auth/session";
 import { obtenerCursoDelUsuario, hayActualizacionesDeCursoImportado } from "@/server/services/curso";
-import { formatearFechaLima, timeAHora, DIAS_SEMANA, DIAS_SEMANA_CURSO } from "@/lib/dates";
+import { formatearFechaLima, timeAHora, DIAS_SEMANA } from "@/lib/dates";
 import {
   actualizarCursoAction,
   agregarHorarioAction,
-  eliminarHorarioAction,
+  actualizarHorarioCursoAction,
   agregarEvaluacionAction,
   eliminarEvaluacionAction,
   marcarEvaluacionEntregadaAction,
@@ -14,20 +14,26 @@ import {
 } from "../actions";
 import { SubmitButton } from "@/components/submit-button";
 import { BotonConfirmacion } from "@/components/boton-confirmacion";
+import { SelectorHorarioSemanal } from "@/components/selector-horario-semanal";
+import { Toast } from "@/components/toast";
+
+function timeAValor(fecha: Date) {
+  return `${String(fecha.getUTCHours()).padStart(2, "0")}:${String(fecha.getUTCMinutes()).padStart(2, "0")}`;
+}
 
 export default async function CursoDetallePage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; nuevo?: string }>;
+  searchParams: Promise<{ error?: string; nuevo?: string; toast?: string }>;
 }) {
   const { id } = await params;
   const idCurso = Number(id);
   if (!Number.isInteger(idCurso)) notFound();
 
   const sesion = await requerirSesion();
-  const { error, nuevo } = await searchParams;
+  const { error, nuevo, toast } = await searchParams;
 
   let curso;
   try {
@@ -45,6 +51,7 @@ export default async function CursoDetallePage({
 
   return (
     <div className="animate-page-in mx-auto flex max-w-3xl flex-col gap-8">
+      <Toast mensaje={toast} />
       <div>
         <Link href="/cursos" className="text-sm text-primary hover:underline">
           Cursos
@@ -132,25 +139,42 @@ export default async function CursoDetallePage({
       </section>
 
       <section className="rounded-md border border-border bg-surface p-4">
-        <h2 className="text-sm font-medium">Horario semanal</h2>
+        <div>
+          <h2 className="text-sm font-medium">Horario semanal</h2>
+          <p className="mt-1 text-xs text-text-muted">
+            El horario se conserva durante el ciclo. Puedes editar sus sesiones, pero no eliminarlas ni agregar otras.
+          </p>
+        </div>
         <ul className="mt-3 flex flex-col gap-2">
           {curso.horarios.map((horario) => (
-            <li
-              key={horario.idHorario}
-              className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm"
-            >
-              <span>
-                {DIAS_SEMANA.find((d) => d.valor === horario.diaSemana)?.nombre}{" "}
-                {timeAHora(horario.horaInicio)} - {timeAHora(horario.horaFin)}
-              </span>
-              <form action={eliminarHorarioAction.bind(null, idCurso, horario.idHorario)}>
-                <BotonConfirmacion
-                  mensaje="¿Quitar esta sesión del horario semanal?"
-                  className="text-xs text-danger hover:underline"
+            <li key={horario.idHorario} className="rounded-md border border-border text-sm">
+              <details>
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 hover:bg-bg [&::-webkit-details-marker]:hidden">
+                  <span className="font-medium">
+                    {DIAS_SEMANA.find((dia) => dia.valor === horario.diaSemana)?.nombre}{" "}
+                    <span className="font-normal text-text-muted">
+                      {timeAHora(horario.horaInicio)} - {timeAHora(horario.horaFin)}
+                    </span>
+                  </span>
+                  <span className="text-xs font-medium text-primary">Editar</span>
+                </summary>
+                <form
+                  action={actualizarHorarioCursoAction.bind(null, idCurso, horario.idHorario)}
+                  className="border-t border-border bg-bg/50 p-4"
                 >
-                  Quitar
-                </BotonConfirmacion>
-              </form>
+                  <SelectorHorarioSemanal
+                    modo="unico"
+                    incluirDomingo={false}
+                    diasSeleccionados={[horario.diaSemana]}
+                    horaInicio={timeAValor(horario.horaInicio)}
+                    horaFin={timeAValor(horario.horaFin)}
+                    tituloDias="Día de clase"
+                  />
+                  <SubmitButton className="mt-5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-hover">
+                    Guardar horario
+                  </SubmitButton>
+                </form>
+              </details>
             </li>
           ))}
           {curso.horarios.length === 0 ? (
@@ -158,46 +182,26 @@ export default async function CursoDetallePage({
           ) : null}
         </ul>
 
-        <form action={agregarHorarioConId} className="mt-4 flex flex-wrap items-end gap-3">
-          <label className="flex flex-col gap-1 text-sm">
-            Día
-            <select
-              name="diaSemana"
-              required
-              className="rounded-md border border-border-strong bg-surface px-3 py-1.5 text-sm"
+        {curso.horarios.length === 0 ? (
+          <form action={agregarHorarioConId} className="mt-4 rounded-md border border-border bg-bg/50 p-4">
+            <p className="mb-4 text-xs text-text-muted">
+              Este curso todavía no tiene horario. Configúralo una vez para comenzar.
+            </p>
+            <SelectorHorarioSemanal
+              incluirDomingo={false}
+              diasSeleccionados={[]}
+              horaInicio="09:00"
+              horaFin="11:00"
+              tituloDias="Días de clase"
+            />
+            <button
+              type="submit"
+              className="mt-5 rounded-md border border-border-strong bg-surface px-3 py-1.5 text-sm font-medium hover:bg-bg"
             >
-              {DIAS_SEMANA_CURSO.map((dia) => (
-                <option key={dia.valor} value={dia.valor}>
-                  {dia.nombre}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            Inicio
-            <input
-              type="time"
-              name="horaInicio"
-              required
-              className="rounded-md border border-border-strong px-3 py-1.5 text-sm"
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            Fin
-            <input
-              type="time"
-              name="horaFin"
-              required
-              className="rounded-md border border-border-strong px-3 py-1.5 text-sm"
-            />
-          </label>
-          <button
-            type="submit"
-            className="rounded-md border border-border-strong px-3 py-1.5 text-sm font-medium hover:bg-bg"
-          >
-            Agregar sesión
-          </button>
-        </form>
+              Configurar horario
+            </button>
+          </form>
+        ) : null}
       </section>
 
       <section className="rounded-md border border-border bg-surface p-4">

@@ -1,17 +1,18 @@
 import Link from "next/link";
 import { requerirSesion } from "@/server/auth/session";
-import { gruposParaProgramar } from "@/server/services/reunion";
+import { gruposParaProgramar, reunionesDelGrupoEntre } from "@/server/services/reunion";
 import { obtenerDisponibilidadGrupo } from "@/server/services/disponibilidad";
 import {
   DIAS_CORTOS,
   DIAS_LARGOS,
+  diaSemanaISO,
   etiquetaMinutos,
   fechaEnZonaLimaISO,
   minutosDelDiaLima,
   proximaFechaDelDia,
   sumarDiasISO,
 } from "@/lib/calendario";
-import { huecos, mapaDeDisponibilidad, type Franja } from "@/lib/disponibilidad";
+import { bloquearReunionesParaTodos, huecos, mapaDeDisponibilidad, type Franja } from "@/lib/disponibilidad";
 import { MapaSemanal } from "@/components/mapa-semanal";
 import { FormularioReunion, type Sugerencia } from "./formulario-reunion";
 
@@ -22,10 +23,10 @@ function hhmm(minutos: number) {
 }
 
 function nivelDeFranja(libres: number, total: number) {
-  if (libres === total) return "bg-estado-completada";
-  if (libres / total >= 0.5) return "bg-estado-completada/45";
-  if (libres > 0) return "bg-estado-completada/15";
-  return "bg-border";
+  if (libres === total) return "bg-estado-completada/15 text-estado-completada";
+  if (libres / total >= 0.5) return "bg-estado-completada/25 text-estado-completada";
+  if (libres > 0) return "bg-estado-revision/20 text-estado-revision";
+  return "bg-border-strong/35 text-text-muted";
 }
 
 export default async function NuevaReunionPage({
@@ -43,28 +44,48 @@ export default async function NuevaReunionPage({
   const hoyISO = fechaEnZonaLimaISO(ahora);
   const ahoraMin = minutosDelDiaLima(ahora);
 
-  const integrantes = idGrupo ? await obtenerDisponibilidadGrupo(sesion.idUsuario, idGrupo) : [];
-  const total = integrantes.length;
-  const nombres = new Map(integrantes.map((i) => [i.idUsuario, i.idUsuario === sesion.idUsuario ? "ti" : i.nombre]));
-  const mapa = idGrupo ? mapaDeDisponibilidad(integrantes) : null;
+  const finPeriodoISO = sumarDiasISO(hoyISO, 7);
+  const desdePeriodo = new Date(`${hoyISO}T00:00:00-05:00`);
+  const hastaPeriodo = new Date(`${finPeriodoISO}T00:00:00-05:00`);
+  const [integrantesBase, reuniones] = idGrupo
+    ? await Promise.all([
+        obtenerDisponibilidadGrupo(sesion.idUsuario, idGrupo),
+        reunionesDelGrupoEntre(sesion.idUsuario, idGrupo, desdePeriodo, hastaPeriodo),
+      ])
+    : [[], []];
+  const integrantesConReuniones = bloquearReunionesParaTodos(integrantesBase, reuniones);
+  const total = integrantesBase.length;
+  const nombres = new Map(integrantesBase.map((i) => [i.idUsuario, i.idUsuario === sesion.idUsuario ? "ti" : i.nombre]));
+  const mapa = idGrupo ? mapaDeDisponibilidad(integrantesConReuniones) : null;
+  const fechasDias = Array.from({ length: 7 }, (_, indice) => proximaFechaDelDia(hoyISO, indice + 1));
+  const eventosMapa = reuniones.map((reunion) => ({
+    clave: `reunion-${reunion.idReunion}`,
+    diaSemana: diaSemanaISO(fechaEnZonaLimaISO(reunion.inicio)),
+    inicioMin: minutosDelDiaLima(reunion.inicio),
+    finMin: minutosDelDiaLima(reunion.fin),
+    titulo: reunion.titulo,
+    subtitulo: reunion.lugar,
+    href: `/reuniones?grupo=${idGrupo}#reunion-${reunion.idReunion}`,
+  }));
 
   let sugerencias: Sugerencia[] = [];
   if (mapa) {
     const comunes = huecos(mapa);
     const base = comunes.length > 0 ? comunes : total > 2 ? huecos(mapa, { toleranciaFaltantes: 1 }) : [];
     sugerencias = base
-      .map((hueco) => {
-        let dia = proximaFechaDelDia(hoyISO, hueco.diaSemana);
-        if (dia === hoyISO && hueco.finMin <= ahoraMin + 30) dia = sumarDiasISO(dia, 7);
+      .map((hueco): Sugerencia | null => {
+        const dia = proximaFechaDelDia(hoyISO, hueco.diaSemana);
         const desde = dia === hoyISO ? Math.max(hueco.inicioMin, Math.ceil((ahoraMin + 1) / 30) * 30) : hueco.inicioMin;
+        if (desde + 60 > hueco.finMin) return null;
         return {
           fecha: dia,
           inicio: hhmm(desde),
-          fin: hhmm(Math.min(desde + 60, hueco.finMin)),
-          etiqueta: `${DIAS_CORTOS[hueco.diaSemana - 1]} ${Number(dia.slice(8))} · ${etiquetaMinutos(desde)} – ${etiquetaMinutos(hueco.finMin)}`,
+          fin: hhmm(desde + 60),
+          etiqueta: `${DIAS_CORTOS[hueco.diaSemana - 1]} ${Number(dia.slice(8))} · ${etiquetaMinutos(desde)} – ${etiquetaMinutos(desde + 60)}`,
           faltan: hueco.faltan.map((id) => nombres.get(id) ?? "").join(", ") || null,
         };
       })
+      .filter((sugerencia): sugerencia is Sugerencia => sugerencia !== null)
       .sort((a, b) => (a.fecha + a.inicio).localeCompare(b.fecha + b.inicio))
       .slice(0, 8);
   }
@@ -102,7 +123,13 @@ export default async function NuevaReunionPage({
           grupos={grupos}
           idGrupo={idGrupo}
           hoyISO={hoyISO}
-          integrantes={integrantes.map((i) => ({ idUsuario: i.idUsuario, nombre: nombres.get(i.idUsuario) ?? i.nombre, ocupados: i.ocupados }))}
+          integrantes={integrantesBase.map((i) => ({ idUsuario: i.idUsuario, nombre: nombres.get(i.idUsuario) ?? i.nombre, ocupados: i.ocupados }))}
+          reunionesProgramadas={reuniones.map((reunion) => ({
+            titulo: reunion.titulo,
+            fecha: fechaEnZonaLimaISO(reunion.inicio),
+            inicioMin: minutosDelDiaLima(reunion.inicio),
+            finMin: minutosDelDiaLima(reunion.fin),
+          }))}
           sugerencias={sugerencias}
           iniciales={{
             fecha: fecha && /^\d{4}-\d{2}-\d{2}$/.test(fecha) && fecha >= hoyISO ? fecha : "",
@@ -114,15 +141,22 @@ export default async function NuevaReunionPage({
 
       {mapa ? (
         <MapaSemanal
-          etiqueta="Disponibilidad semanal del grupo"
+          etiqueta="Disponibilidad del grupo durante los próximos 7 días"
+          titulo="Disponibilidad de los próximos 7 días"
+          descripcion="Las reuniones ya programadas aparecen como horas ocupadas y no se ofrecen nuevamente como sugerencias."
+          fechasDias={fechasDias}
+          hoyISO={hoyISO}
+          ahoraMin={ahoraMin}
+          eventos={eventosMapa}
           mapa={mapa}
           claseDeFranja={(franja) => nivelDeFranja(total - franja.ocupados.length, total)}
           describirFranja={describirFranja}
           leyenda={[
-            { clase: "bg-estado-completada", texto: "Todos libres" },
+            { clase: "bg-estado-completada/30", texto: "Todos libres" },
             { clase: "bg-estado-completada/45", texto: "La mayoría" },
-            { clase: "bg-estado-completada/15", texto: "Algunos" },
-            { clase: "bg-border", texto: "Nadie" },
+            { clase: "bg-estado-revision/30", texto: "Algunos" },
+            { clase: "bg-border-strong/50", texto: "Nadie" },
+            ...(reuniones.length > 0 ? [{ clase: "bg-cat-reunion", texto: "Reunión programada" }] : []),
           ]}
         />
       ) : null}

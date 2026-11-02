@@ -167,3 +167,13 @@ export async function reunionesDelUsuarioEntre(idUsuario: number, desde: Date, h
     orderBy: { inicio: "asc" },
   });
 }
+
+/** Reuniones puntuales del grupo para bloquear sus sugerencias de disponibilidad. */
+export async function reunionesDelGrupoEntre(idUsuario: number, idGrupo: number, desde: Date, hasta: Date) {
+  await requerirParticipante(idUsuario, idGrupo);
+  return prisma.reunion.findMany({
+    where: { idGrupo, inicio: { lt: hasta }, fin: { gt: desde } },
+    select: { idReunion: true, titulo: true, inicio: true, fin: true, lugar: true },
+    orderBy: { inicio: "asc" },
+  });
+}

@@ -71,6 +71,17 @@ export type Entrega = {
   titulo: string;
   contexto: string;
   hora: string;
+  inicioMin: number;
+  href: string;
+};
+
+export type ReunionFecha = {
+  clave: string;
+  diaISO: string;
+  titulo: string;
+  contexto: string;
+  hora: string;
+  inicioMin: number;
   href: string;
 };
 
@@ -184,20 +195,40 @@ export function construirReuniones(reuniones: SemanaCalendario["reuniones"]): It
   });
 }
 
+/** Reuniones con su fecha concreta para las celdas de la vista mensual. */
+export function construirReunionesFecha(reuniones: SemanaCalendario["reuniones"]): ReunionFecha[] {
+  return reuniones.map((reunion) => {
+    const inicioMin = minutosDelDiaLima(reunion.inicio);
+    return {
+      clave: `r-${reunion.idReunion}`,
+      diaISO: fechaEnZonaLimaISO(reunion.inicio),
+      titulo: reunion.titulo,
+      contexto: reunion.grupo.nombre,
+      hora: etiquetaMinutos(inicioMin),
+      inicioMin,
+      href: `/reuniones#reunion-${reunion.idReunion}`,
+    };
+  });
+}
+
 export function construirEntregas(
   evaluaciones: SemanaCalendario["evaluaciones"],
   tareas: SemanaCalendario["tareas"],
 ): Entrega[] {
   return [
-    ...evaluaciones.map((e) => ({
-      clave: `e-${e.idEvaluacion}`,
-      diaISO: fechaEnZonaLimaISO(e.fechaCierre),
-      tipo: "evaluacion" as const,
-      titulo: e.nombre,
-      contexto: e.curso.nombre,
-      hora: etiquetaMinutos(minutosDelDiaLima(e.fechaCierre)),
-      href: `/cursos/${e.idCurso}`,
-    })),
+    ...evaluaciones.map((e) => {
+      const inicioMin = minutosDelDiaLima(e.fechaCierre);
+      return {
+        clave: `e-${e.idEvaluacion}`,
+        diaISO: fechaEnZonaLimaISO(e.fechaCierre),
+        tipo: "evaluacion" as const,
+        titulo: e.nombre,
+        contexto: e.curso.nombre,
+        hora: etiquetaMinutos(inicioMin),
+        inicioMin,
+        href: `/cursos/${e.idCurso}`,
+      };
+    }),
     ...tareas.flatMap((t) =>
       t.fechaLimite
         ? [
@@ -208,6 +239,7 @@ export function construirEntregas(
               titulo: t.titulo,
               contexto: t.grupo.nombre,
               hora: etiquetaMinutos(minutosDelDiaLima(t.fechaLimite)),
+              inicioMin: minutosDelDiaLima(t.fechaLimite),
               href: `/grupos/${t.idGrupo}/tareas`,
             },
           ]

@@ -8,6 +8,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { crearReunionAction } from "../actions";
 
 export type Sugerencia = { fecha: string; inicio: string; fin: string; etiqueta: string; faltan: string | null };
+type ReunionProgramada = { titulo: string; fecha: string; inicioMin: number; finMin: number };
 
 const CAMPO = "rounded-md border border-border-strong bg-surface px-3 py-1.5 text-sm font-normal";
 
@@ -25,6 +26,7 @@ export function FormularioReunion({
   idGrupo,
   hoyISO,
   integrantes,
+  reunionesProgramadas,
   sugerencias,
   iniciales,
 }: {
@@ -32,6 +34,7 @@ export function FormularioReunion({
   idGrupo: number | null;
   hoyISO: string;
   integrantes: { idUsuario: number; nombre: string; ocupados: Intervalo[] }[];
+  reunionesProgramadas: ReunionProgramada[];
   sugerencias: Sugerencia[];
   iniciales: { fecha: string; inicio: string; fin: string };
 }) {
@@ -42,6 +45,7 @@ export function FormularioReunion({
 
   const finAntesDeInicio = aMinutos(fin) <= aMinutos(inicio);
   let chocan: string[] | null = null;
+  let reunionesQueChocan: string[] | null = null;
   if (idGrupo && fecha && !finAntesDeInicio) {
     const base = (diaSemanaISO(fecha) - 1) * 24 * 60;
     const desde = base + aMinutos(inicio);
@@ -49,6 +53,9 @@ export function FormularioReunion({
     chocan = integrantes
       .filter((i) => i.ocupados.some(([a, b]) => a < hasta && b > desde))
       .map((i) => i.nombre);
+    reunionesQueChocan = reunionesProgramadas
+      .filter((reunion) => reunion.fecha === fecha && reunion.inicioMin < aMinutos(fin) && reunion.finMin > aMinutos(inicio))
+      .map((reunion) => reunion.titulo);
   }
 
   return (
@@ -148,16 +155,21 @@ export function FormularioReunion({
             <p role="alert" className="text-sm text-danger">
               La hora de fin debe ser después de la de inicio.
             </p>
-          ) : chocan === null ? null : chocan.length === 0 ? (
+          ) : chocan === null || reunionesQueChocan === null ? null : chocan.length === 0 && reunionesQueChocan.length === 0 ? (
             <p aria-live="polite" className="flex items-center gap-2 text-sm text-estado-completada">
               <span className="size-2 rounded-full bg-estado-completada" aria-hidden />
               Todos libres
             </p>
           ) : (
-            <p aria-live="polite" className="flex items-center gap-2 rounded-md bg-cat-laboral-bg px-3 py-2 text-sm text-cat-laboral-fg">
-              <span className="size-2 shrink-0 rounded-full bg-cat-laboral" aria-hidden />
-              Choca con el horario de {chocan.join(", ")}
-            </p>
+            <div aria-live="polite" className="flex items-start gap-2 rounded-md bg-cat-laboral-bg px-3 py-2 text-sm text-cat-laboral-fg">
+              <span className="mt-1 size-2 shrink-0 rounded-full bg-cat-laboral" aria-hidden />
+              <span>
+                {reunionesQueChocan.length > 0 ? (
+                  <span className="block">Coincide con {reunionesQueChocan.length === 1 ? "la reunión" : "las reuniones"} {reunionesQueChocan.map((titulo) => `“${titulo}”`).join(", ")}.</span>
+                ) : null}
+                {chocan.length > 0 ? <span className="block">Choca con el horario de {chocan.join(", ")}.</span> : null}
+              </span>
+            </div>
           )}
 
           <div className="grid gap-3 sm:grid-cols-2">
