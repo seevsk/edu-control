@@ -8,6 +8,7 @@ import { diasHasta, etiquetaRelativa, fechaEnZonaLimaISO } from "@/lib/calendari
 import { ESTADOS_TAREA_ORDEN, ETIQUETA_ESTADO_TAREA, COLOR_ESTADO_TAREA } from "@/lib/estado-tarea";
 import { Avatar } from "@/components/avatar";
 import { SubmitButton } from "@/components/submit-button";
+import { Modal } from "@/components/modal";
 import { TabsGrupo } from "../_components/tabs-grupo";
 import { crearTareaAction } from "./actions";
 import { AccionesTarea } from "./_components/acciones-tarea";
@@ -159,7 +160,7 @@ export default async function TareasGrupoPage({
         </div>
         {puedeGestionar ? (
           <Link
-            href={`/grupos/${idGrupo}/tareas?nueva=1#nueva-tarea`}
+            href={hrefConFiltros({ nueva: "1" })}
             className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-hover"
           >
             <IconAgregar className="size-4" aria-hidden />
@@ -189,7 +190,7 @@ export default async function TareasGrupoPage({
         </Link>
       </section>
 
-      {error ? (
+      {error && !abrirNuevaTarea ? (
         <p className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
           {error}
         </p>
@@ -357,14 +358,18 @@ export default async function TareasGrupoPage({
         </div>
       )}
 
-      {puedeGestionar ? (
-        <details
-          id="nueva-tarea"
-          className="scroll-mt-4 rounded-md border border-border bg-surface p-4 shadow-sm"
-          open={abrirNuevaTarea}
+      {puedeGestionar && abrirNuevaTarea ? (
+        <Modal
+          titulo="Nueva tarea"
+          descripcion="Define el responsable, el peso y una fecha dentro del plazo del grupo."
+          cerrarEn={hrefConFiltros({})}
         >
-          <summary className="cursor-pointer text-sm font-medium">Nueva tarea</summary>
-          <form action={crearTareaConId} className="mt-4 grid gap-3 sm:grid-cols-2">
+          {error ? (
+            <p role="alert" className="mb-4 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
+              {error}
+            </p>
+          ) : null}
+          <form action={crearTareaConId} className="grid gap-3 sm:grid-cols-2">
             <label className="flex flex-col gap-1 text-sm sm:col-span-2">
               Título
               <input
@@ -429,7 +434,7 @@ export default async function TareasGrupoPage({
               Crear tarea
             </SubmitButton>
           </form>
-        </details>
+        </Modal>
       ) : null}
     </div>
   );

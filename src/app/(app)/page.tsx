@@ -55,19 +55,19 @@ export default async function InicioPage({
     {
       titulo: "Registra tu primer curso",
       detalle: "Añade el curso que quieres organizar durante este ciclo.",
-      href: "/cursos?nuevo=1#agregar-curso",
+      href: "/cursos?nuevo=1",
       listo: tieneCurso,
     },
     {
       titulo: "Añade un horario o evaluación",
       detalle: "Esto alimenta tu calendario y tu disponibilidad semanal.",
-      href: tieneCurso ? `/cursos/${cursos[0].idCurso}` : "/cursos?nuevo=1#agregar-curso",
+      href: tieneCurso ? `/cursos/${cursos[0].idCurso}` : "/cursos?nuevo=1",
       listo: tienePlanificacion,
     },
     {
       titulo: "Crea o acepta un grupo",
       detalle: "Después podrás invitar compañeros, repartir tareas y programar reuniones.",
-      href: invitaciones.length > 0 ? "/invitaciones" : "/grupos?nuevo=1#crear-grupo",
+      href: invitaciones.length > 0 ? "/invitaciones" : "/grupos?nuevo=1",
       listo: tieneGrupo,
     },
   ];
@@ -216,7 +216,7 @@ export default async function InicioPage({
             {evaluaciones.length === 0 ? (
               <div className="rounded-md border border-dashed border-border-strong px-4 py-5 text-sm text-text-muted">
                 No tienes evaluaciones próximas.{" "}
-                <Link href={tieneCurso ? `/cursos/${cursos[0].idCurso}` : "/cursos?nuevo=1#agregar-curso"} className="font-medium text-primary hover:underline">
+                <Link href={tieneCurso ? `/cursos/${cursos[0].idCurso}` : "/cursos?nuevo=1"} className="font-medium text-primary hover:underline">
                   {tieneCurso ? "Registrar una evaluación" : "Agregar un curso"}
                 </Link>
               </div>

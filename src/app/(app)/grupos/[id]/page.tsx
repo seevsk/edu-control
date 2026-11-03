@@ -81,7 +81,7 @@ export default async function GrupoDetallePage({
               Programar reunión
             </Link>
             <Link
-              href={`/grupos/${idGrupo}/tareas?nueva=1#nueva-tarea`}
+              href={`/grupos/${idGrupo}/tareas?nueva=1`}
               className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-hover"
             >
               <IconAgregar className="size-4" aria-hidden />
@@ -207,7 +207,7 @@ export default async function GrupoDetallePage({
           <div className="mt-4 rounded-md border border-dashed border-border-strong px-4 py-5 text-center">
             <p className="text-sm text-text-muted">Aún no hay tareas para calcular el avance.</p>
             {puedeParticipar ? (
-              <Link href={`/grupos/${idGrupo}/tareas?nueva=1#nueva-tarea`} className="mt-2 inline-block text-sm font-medium text-primary hover:underline">
+              <Link href={`/grupos/${idGrupo}/tareas?nueva=1`} className="mt-2 inline-block text-sm font-medium text-primary hover:underline">
                 Crear la primera tarea
               </Link>
             ) : null}

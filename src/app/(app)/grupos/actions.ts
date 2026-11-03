@@ -23,7 +23,7 @@ export async function crearGrupoAction(formData: FormData) {
   const parseo = crearGrupoSchema.safeParse(leerFormData(formData));
 
   if (!parseo.success) {
-    redirect(`/grupos?error=${encodeURIComponent(parseo.error.issues[0].message)}`);
+    redirect(`/grupos?nuevo=1&error=${encodeURIComponent(parseo.error.issues[0].message)}`);
   }
 
   const grupo = await grupoService.crearGrupo(sesion.idUsuario, parseo.data);

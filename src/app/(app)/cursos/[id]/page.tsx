@@ -16,6 +16,8 @@ import { SubmitButton } from "@/components/submit-button";
 import { BotonConfirmacion } from "@/components/boton-confirmacion";
 import { SelectorHorarioSemanal } from "@/components/selector-horario-semanal";
 import { Toast } from "@/components/toast";
+import { Modal } from "@/components/modal";
+import { IconAgregar } from "@/components/icons";
 
 function timeAValor(fecha: Date) {
   return `${String(fecha.getUTCHours()).padStart(2, "0")}:${String(fecha.getUTCMinutes()).padStart(2, "0")}`;
@@ -26,14 +28,14 @@ export default async function CursoDetallePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; nuevo?: string; toast?: string }>;
+  searchParams: Promise<{ error?: string; nuevo?: string; nuevaEvaluacion?: string; toast?: string }>;
 }) {
   const { id } = await params;
   const idCurso = Number(id);
   if (!Number.isInteger(idCurso)) notFound();
 
   const sesion = await requerirSesion();
-  const { error, nuevo, toast } = await searchParams;
+  const { error, nuevo, nuevaEvaluacion, toast } = await searchParams;
 
   let curso;
   try {
@@ -59,7 +61,7 @@ export default async function CursoDetallePage({
         <h1 className="mt-1 text-xl font-semibold">{curso.nombre}</h1>
       </div>
 
-      {error ? (
+      {error && nuevaEvaluacion !== "1" ? (
         <p className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
           {error}
         </p>
@@ -205,7 +207,16 @@ export default async function CursoDetallePage({
       </section>
 
       <section className="rounded-md border border-border bg-surface p-4">
-        <h2 className="text-sm font-medium">Evaluaciones</h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-sm font-medium">Evaluaciones</h2>
+          <Link
+            href={`/cursos/${idCurso}?nuevaEvaluacion=1`}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border-strong px-3 py-1.5 text-xs font-medium hover:bg-bg"
+          >
+            <IconAgregar className="size-3.5" aria-hidden />
+            Agregar evaluación
+          </Link>
+        </div>
         <ul className="mt-3 flex flex-col gap-2">
           {curso.evaluaciones.map((evaluacion) => (
             <li
@@ -251,7 +262,20 @@ export default async function CursoDetallePage({
           ) : null}
         </ul>
 
-        <form action={agregarEvaluacionConId} className="mt-4 grid gap-3 sm:grid-cols-2">
+      </section>
+
+      {nuevaEvaluacion === "1" ? (
+        <Modal
+          titulo="Agregar evaluación"
+          descripcion={`Registra una evaluación para ${curso.nombre}.`}
+          cerrarEn={`/cursos/${idCurso}`}
+        >
+          {error ? (
+            <p role="alert" className="mb-4 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
+              {error}
+            </p>
+          ) : null}
+          <form action={agregarEvaluacionConId} className="grid gap-3 sm:grid-cols-2">
           <label className="flex flex-col gap-1 text-sm sm:col-span-2">
             Nombre
             <input
@@ -288,8 +312,9 @@ export default async function CursoDetallePage({
           >
             Agregar evaluacion
           </button>
-        </form>
-      </section>
+          </form>
+        </Modal>
+      ) : null}
     </div>
   );
 }

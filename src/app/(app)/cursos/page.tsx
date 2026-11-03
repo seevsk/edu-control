@@ -24,6 +24,7 @@ import { IconoCurso } from "@/components/icono-curso";
 import { ChipModalidad } from "@/components/chip-modalidad";
 import { BotonConfirmacion } from "@/components/boton-confirmacion";
 import { SelectorHorarioSemanal } from "@/components/selector-horario-semanal";
+import { Modal } from "@/components/modal";
 import {
   IconAgregar,
   IconBuscar,
@@ -94,7 +95,7 @@ export default async function CursosPage({
         </div>
         {!verInactivos ? (
           <Link
-            href="/cursos?nuevo=1#agregar-curso"
+            href="/cursos?nuevo=1"
             className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-hover"
           >
             <IconAgregar className="size-4" aria-hidden />
@@ -103,7 +104,7 @@ export default async function CursosPage({
         ) : null}
       </div>
 
-      {error ? (
+      {error && nuevo !== "1" ? (
         <p role="alert" className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
           {error}
         </p>
@@ -379,21 +380,26 @@ export default async function CursosPage({
               Limpiar búsqueda
             </Link>
           ) : !verInactivos ? (
-            <a href="#agregar-curso" className="mt-3 inline-block text-sm font-medium text-primary hover:underline">
+            <Link href="/cursos?nuevo=1" className="mt-3 inline-block text-sm font-medium text-primary hover:underline">
               Agregar tu primer curso
-            </a>
+            </Link>
           ) : null}
         </div>
       ) : null}
 
-      {!verInactivos ? (
-        <details
-          id="agregar-curso"
-          className="scroll-mt-4 rounded-md border border-border bg-surface"
-          open={cursosActivos.length === 0 || nuevo === "1"}
+      {!verInactivos && nuevo === "1" ? (
+        <Modal
+          titulo="Agregar curso"
+          descripcion="Registra los datos y el horario semanal inicial del curso."
+          cerrarEn="/cursos"
+          tamano="xl"
         >
-          <summary className="cursor-pointer px-4 py-3 text-sm font-medium hover:bg-bg">Agregar un nuevo curso</summary>
-          <form action={crearCursoAction} className="grid grid-cols-2 gap-4 border-t border-border p-4">
+          {error ? (
+            <p role="alert" className="mb-4 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
+              {error}
+            </p>
+          ) : null}
+          <form action={crearCursoAction} className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
               <p className="text-sm font-medium">Datos del curso</p>
               <p className="mt-1 text-xs text-text-muted">
@@ -455,7 +461,7 @@ export default async function CursosPage({
               Guardar curso
             </SubmitButton>
           </form>
-        </details>
+        </Modal>
       ) : null}
     </div>
   );
