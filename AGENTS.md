@@ -302,10 +302,10 @@ Reglas de arquitectura:
 | Devuelven una tarea a `en_progreso` | `tarea_devuelta` | El asignado | Sí |
 | Una tarea queda `completada` | `tarea_completada` | El asignado | No |
 | Cambio a `en_progreso` | — | Nadie (solo queda en el historial) | No |
-| Programan una reunión | `reunion_programada` | Integrantes aceptados no observadores, menos quien la programó | No (confirmado: solo campana) |
+| Programan una reunión | `reunion_programada` | Integrantes aceptados no observadores, menos quien la programó | Sí (confirmado por el usuario, 2026-11-02) |
 
 - Mantén la **lista de eventos que envían correo en un único lugar** (una constante o archivo de configuración), para poder cambiar la política sin tocar la lógica.
-- `grupo_integrante.correo_actividad = false` silencia los correos de **actividad** de ese grupo (revisión, completada). Los importantes (invitaciones, tareas asignadas o devueltas) siguen llegando.
+- `grupo_integrante.correo_actividad = false` silencia los correos de **actividad** de ese grupo (revisión, completada). Los importantes (invitaciones, tareas asignadas o devueltas y reuniones programadas) siguen llegando.
 - `estado_correo`: `no_aplica` | `pendiente` | `enviado` | `fallido`. Los avisos solo dentro de la app usan `no_aplica`. Tras intentar el envío, actualiza a `enviado` o `fallido`. No construyas reintentos automáticos en el MVP.
 - **Envío de correo detrás de una interfaz `EmailSender`** con dos implementaciones:
   - `ConsoleEmailSender` (desarrollo): imprime el correo en consola.
