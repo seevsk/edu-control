@@ -24,6 +24,9 @@ import { AgendaSemana } from "./_components/agenda-semana";
 import { MesGrid } from "./_components/mes-grid";
 import { ResumenMes } from "./_components/resumen-mes";
 import { consultaCalendario } from "./_components/rutas";
+import { Modal } from "@/components/modal";
+import { FormularioBloque } from "./_components/formulario-bloque";
+import { crearBloqueOcupadoAction } from "./actions";
 
 type ModoCalendario = "mes" | "semana";
 
@@ -48,10 +51,11 @@ export default async function CalendarioPage({
     vista?: string;
     error?: string;
     toast?: string;
+    nuevoBloque?: string;
   }>;
 }) {
   const sesion = await requerirSesion();
-  const { semana, mes, modo: modoParam, vista: vistaParam, error, toast } = await searchParams;
+  const { semana, mes, modo: modoParam, vista: vistaParam, error, toast, nuevoBloque } = await searchParams;
   const vista: VistaCalendario = esVista(vistaParam) ? vistaParam : "todo";
   // Los enlaces anteriores a esta mejora solo incluian `semana`; se conservan como vista semanal.
   const modo: ModoCalendario = modoParam === "semana" || (!modoParam && semana) ? "semana" : "mes";
@@ -77,6 +81,8 @@ export default async function CalendarioPage({
     modo,
     modo === "mes" ? mesISO : undefined,
   );
+  const rutaCalendario = `/calendario${consulta}`;
+  const enlaceNuevoBloque = `${rutaCalendario}${consulta ? "&" : "?"}nuevoBloque=1`;
   const todosLosItems = construirItems(horarios, bloquesOcupados, consulta);
   const itemsRecurrentes = todosLosItems.filter((item) => vista === "todo" || item.categoria === vista);
   const itemsSemana = vista === "todo" ? [...itemsRecurrentes, ...construirReuniones(reuniones)] : itemsRecurrentes;
@@ -164,7 +170,7 @@ export default async function CalendarioPage({
         </div>
       </div>
 
-      {error ? (
+      {error && nuevoBloque !== "1" ? (
         <p role="alert" className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
           {error}
         </p>
@@ -186,14 +192,14 @@ export default async function CalendarioPage({
         />
         <div className="flex flex-wrap items-center gap-2">
           <Link
-            href="/cursos?nuevo=1#agregar-curso"
+            href="/cursos?nuevo=1"
             className="inline-flex items-center gap-1.5 rounded-md border border-border-strong bg-surface px-3 py-1.5 text-sm font-medium transition-colors duration-150 hover:bg-bg"
           >
             <IconAgregar className="size-4" aria-hidden />
             Agregar curso
           </Link>
           <Link
-            href={`/calendario/bloques/nuevo${consulta}`}
+            href={enlaceNuevoBloque}
             className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white transition-colors duration-150 hover:bg-primary-hover"
           >
             <IconAgregar className="size-4" aria-hidden />
@@ -238,6 +244,34 @@ export default async function CalendarioPage({
           <AgendaSemana dias={dias} hoyISO={hoyISO} items={itemsSemana} entregas={entregas} textoDiaLibre={textos.diaLibre} />
         </>
       )}
+
+      {nuevoBloque === "1" ? (
+        <Modal
+          titulo="Agregar tiempo ocupado"
+          descripcion="Registra trabajo, compromisos familiares o actividades personales para calcular tu disponibilidad."
+          cerrarEn={rutaCalendario}
+          tamano="xl"
+        >
+          {error ? (
+            <p role="alert" className="mb-4 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
+              {error}
+            </p>
+          ) : null}
+          <FormularioBloque
+            action={crearBloqueOcupadoAction}
+            modo="crear"
+            valores={{
+              tipo: vista === "fam" ? "familiar" : "laboral",
+              dias: [],
+              horaInicio: "09:00",
+              horaFin: "13:00",
+              detalle: "",
+            }}
+            volverA={rutaCalendario}
+            origen={enlaceNuevoBloque}
+          />
+        </Modal>
+      ) : null}
     </div>
   );
 }

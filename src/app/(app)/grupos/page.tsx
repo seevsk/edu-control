@@ -11,6 +11,7 @@ import { formatearFechaLima } from "@/lib/dates";
 import { diasHasta, etiquetaRelativa } from "@/lib/calendario";
 import { calcularAvanceGrupo } from "@/lib/metricas";
 import { IconAgregar, IconBuscar, IconCalendario, IconGrupos } from "@/components/icons";
+import { Modal } from "@/components/modal";
 
 const ETIQUETAS_ROL = {
   lider: "Líder",
@@ -63,7 +64,7 @@ export default async function GruposPage({
           </p>
         </div>
         <Link
-          href="/grupos?nuevo=1#crear-grupo"
+          href="/grupos?nuevo=1"
           className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-hover"
         >
           <IconAgregar className="size-4" aria-hidden />
@@ -71,7 +72,7 @@ export default async function GruposPage({
         </Link>
       </div>
 
-      {error ? (
+      {error && nuevo !== "1" ? (
         <p role="alert" className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
           {error}
         </p>
@@ -321,20 +322,25 @@ export default async function GruposPage({
               Limpiar búsqueda
             </Link>
           ) : !verFinalizados ? (
-            <a href="#crear-grupo" className="mt-3 inline-block text-sm font-medium text-primary hover:underline">
+            <Link href="/grupos?nuevo=1" className="mt-3 inline-block text-sm font-medium text-primary hover:underline">
               Crear tu primer grupo
-            </a>
+            </Link>
           ) : null}
         </div>
       ) : null}
 
-      <details
-        id="crear-grupo"
-        className="scroll-mt-4 rounded-md border border-border bg-surface"
-        open={grupos.length === 0 || nuevo === "1"}
-      >
-        <summary className="cursor-pointer px-4 py-3 text-sm font-medium hover:bg-bg">Crear un nuevo grupo</summary>
-        <form action={crearGrupoAction} className="grid gap-4 border-t border-border p-4 sm:grid-cols-2">
+      {nuevo === "1" ? (
+        <Modal
+          titulo="Crear grupo"
+          descripcion="Registra los datos del trabajo; después podrás invitar integrantes y distribuir las tareas."
+          cerrarEn="/grupos"
+        >
+          {error ? (
+            <p role="alert" className="mb-4 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
+              {error}
+            </p>
+          ) : null}
+          <form action={crearGrupoAction} className="grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <p className="text-sm font-medium">Datos del trabajo</p>
             <p className="mt-1 text-xs text-text-muted">Después podrás invitar integrantes y distribuir las tareas.</p>
@@ -393,8 +399,9 @@ export default async function GruposPage({
           <SubmitButton className="mt-1 w-fit rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover sm:col-span-2">
             Crear grupo
           </SubmitButton>
-        </form>
-      </details>
+          </form>
+        </Modal>
+      ) : null}
     </div>
   );
 }

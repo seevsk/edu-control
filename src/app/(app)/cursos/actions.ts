@@ -55,7 +55,7 @@ export async function crearCursoAction(formData: FormData) {
   const parseo = crearCursoSchema.safeParse(datos);
 
   if (!parseo.success) {
-    redirect(`/cursos?nuevo=1&error=${encodeURIComponent(parseo.error.issues[0].message)}#agregar-curso`);
+    redirect(`/cursos?nuevo=1&error=${encodeURIComponent(parseo.error.issues[0].message)}`);
   }
 
   const curso = await cursoService.crearCurso(sesion.idUsuario, parseo.data);
@@ -167,12 +167,12 @@ export async function agregarEvaluacionAction(idCurso: number, formData: FormDat
   });
 
   if (!parseo.success) {
-    redirect(`/cursos/${idCurso}?error=${encodeURIComponent(parseo.error.issues[0].message)}`);
+    redirect(`/cursos/${idCurso}?nuevaEvaluacion=1&error=${encodeURIComponent(parseo.error.issues[0].message)}`);
   }
 
   await cursoService.agregarEvaluacion(sesion.idUsuario, idCurso, parseo.data);
   revalidatePath(`/cursos/${idCurso}`);
-  redirect(`/cursos/${idCurso}`);
+  redirect(`/cursos/${idCurso}?toast=${encodeURIComponent("Evaluación agregada")}`);
 }
 
 export async function eliminarEvaluacionAction(idCurso: number, idEvaluacion: number) {

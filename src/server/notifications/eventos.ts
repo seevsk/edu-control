@@ -9,8 +9,8 @@ export const EVENTOS_NOTIFICACION = {
   tarea_en_revision: { correo: true, actividad: true },
   tarea_devuelta: { correo: true, actividad: false },
   tarea_completada: { correo: false, actividad: true },
-  // Solo campana (decision del usuario): ahorra cupo de correo.
-  reunion_programada: { correo: false, actividad: false },
+  // Requiere que los invitados confirmen asistencia, por eso se considera importante.
+  reunion_programada: { correo: true, actividad: false },
 } as const;
 
 export type TipoNotificacionConfigurado = keyof typeof EVENTOS_NOTIFICACION;

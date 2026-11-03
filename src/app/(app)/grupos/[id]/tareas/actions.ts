@@ -52,13 +52,13 @@ export async function crearTareaAction(idGrupo: number, formData: FormData) {
   const parseo = crearTareaSchema.safeParse(leerFormData(formData));
 
   if (!parseo.success) {
-    redirect(`/grupos/${idGrupo}/tareas?nueva=1&error=${encodeURIComponent(parseo.error.issues[0].message)}#nueva-tarea`);
+    redirect(`/grupos/${idGrupo}/tareas?nueva=1&error=${encodeURIComponent(parseo.error.issues[0].message)}`);
   }
 
   try {
     await tareaService.crearTarea(sesion.idUsuario, grupoId.data, parseo.data);
   } catch (error) {
-    redirect(`/grupos/${idGrupo}/tareas?nueva=1&error=${encodeURIComponent(mensajeParaUsuario(error, "No se pudo crear la tarea"))}#nueva-tarea`);
+    redirect(`/grupos/${idGrupo}/tareas?nueva=1&error=${encodeURIComponent(mensajeParaUsuario(error, "No se pudo crear la tarea"))}`);
   }
 
   revalidatePath(`/grupos/${idGrupo}/tareas`);
