@@ -16,7 +16,8 @@
   --color-text-muted: #5b6472;
 
   --color-estado-pendiente: #6b7280;
-  --color-estado-progreso: #0078d4;
+  /* Indigo, distinto del primario: el azul de botones y enlaces no debe leerse como un estado. */
+  --color-estado-progreso: #4f5bd5;
   --color-estado-revision: #b7791f;
   --color-estado-completada: #2e7d32;
   --color-danger: #c4314b;
@@ -104,6 +105,11 @@
 
     --color-text: #e6e8eb;
     --color-text-muted: #9aa2ac;
+
+    --color-estado-pendiente: #8b929c;
+    --color-estado-progreso: #8b95f0;
+    --color-estado-revision: #d9a03f;
+    --color-estado-completada: #5fb564;
 
     --color-cat-clases: #3b9cf2;
     --color-cat-clases-bg: #142a40;

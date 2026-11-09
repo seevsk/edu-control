@@ -7,6 +7,8 @@ import { formatearFechaLima } from "@/lib/dates";
 import { diasHasta, etiquetaRelativa, fechaEnZonaLimaISO } from "@/lib/calendario";
 import { ESTADOS_TAREA_ORDEN, ETIQUETA_ESTADO_TAREA, COLOR_ESTADO_TAREA } from "@/lib/estado-tarea";
 import { estaVencida, evaluarEntrega, fechaEstadoActual } from "@/lib/tiempos-tarea";
+import { nombreCorto } from "@/lib/nombres";
+import { PesoTarea } from "@/components/peso-tarea";
 
 /** Como en Jira: el tablero solo muestra lo completado recientemente; el resto queda en la lista. */
 const DIAS_COMPLETADAS_EN_TABLERO = 14;
@@ -102,10 +104,10 @@ export default async function TareasGrupoPage({
     if (!fecha) return <span className="text-text-muted">Sin fecha límite</span>;
     const cerrada = tarea.estado === "completada" || tarea.estado === "descartada";
     const vencida = estaVencida(tarea, ahora);
-    const urgente = !cerrada && diasHasta(fecha, ahora) <= 2;
+    const proxima = !cerrada && !vencida && diasHasta(fecha, ahora) <= 2;
     const conAtraso = tarea.estado === "completada" && evaluarEntrega(tarea, tarea.historial)?.aTiempo === false;
     return (
-      <span className={`inline-flex flex-wrap items-center gap-1.5 ${urgente ? "font-medium text-danger" : "text-text-muted"}`}>
+      <span className={`inline-flex flex-wrap items-center gap-1.5 ${proxima ? "font-medium text-text" : "text-text-muted"}`}>
         <IconCalendario className="size-3.5 shrink-0" aria-hidden />
         <span title={formatearFechaLima(fecha)}>{cerrada ? formatearFechaLima(fecha) : etiquetaRelativa(fecha, ahora)}</span>
         {vencida ? <span className="rounded-full bg-danger/10 px-1.5 py-0.5 text-[11px] font-medium text-danger">Vencida</span> : null}
@@ -116,10 +118,7 @@ export default async function TareasGrupoPage({
 
   function TarjetaTarea({ tarea }: { tarea: (typeof tareas)[number] }) {
     return (
-      <li
-        className="flex flex-col gap-3 rounded-md border border-border bg-surface p-3 text-sm shadow-sm transition-shadow hover:shadow-md"
-        style={{ borderTopColor: COLOR_ESTADO_TAREA[tarea.estado], borderTopWidth: 3 }}
-      >
+      <li className="flex flex-col gap-3 rounded-md border border-border bg-surface p-3 text-sm shadow-sm transition-shadow hover:shadow-md">
         <Link href={`/grupos/${idGrupo}/tareas/${tarea.idTarea}`} className="break-words font-semibold text-text hover:text-primary hover:underline">
           {tarea.titulo}
         </Link>
@@ -133,21 +132,13 @@ export default async function TareasGrupoPage({
                   fotoUrl={tarea.asignado.fotoUrl}
                   tamano="sm"
                 />
-                {tarea.asignado.nombre}
+                {nombreCorto(tarea.asignado.nombre, tarea.asignado.apellidos)}
               </>
             ) : (
               "Sin asignar"
             )}
           </span>
-          <span className="flex items-center gap-1" aria-label={`Peso ${tarea.peso} de 3`}>
-            {[1, 2, 3].map((nivel) => (
-              <span
-                key={nivel}
-                className={`size-1.5 rounded-full ${nivel <= tarea.peso ? "bg-primary" : "bg-border-strong"}`}
-                aria-hidden
-              />
-            ))}
-          </span>
+          <PesoTarea peso={tarea.peso} />
         </div>
         <p className="text-xs"><PresentacionFecha tarea={tarea} /></p>
 
@@ -195,7 +186,7 @@ export default async function TareasGrupoPage({
         </Link>
         <Link href={hrefConFiltros({ foco: "mias", estado: undefined, asignado: undefined })} className={`rounded-md border bg-surface p-3 hover:border-primary/50 hover:shadow-sm ${foco === "mias" ? "border-primary ring-1 ring-primary/20" : "border-border"}`}>
           <span className="text-xs text-text-muted">Mis tareas abiertas</span>
-          <strong className="mt-1 block text-2xl font-semibold text-primary">{resumen.mias}</strong>
+          <strong className="mt-1 block text-2xl font-semibold">{resumen.mias}</strong>
         </Link>
         <Link href={hrefConFiltros({ foco: "vencidas", estado: undefined, asignado: undefined })} className={`rounded-md border bg-surface p-3 hover:border-danger/50 hover:shadow-sm ${foco === "vencidas" ? "border-danger ring-1 ring-danger/20" : "border-border"}`}>
           <span className="text-xs text-text-muted">Vencidas</span>
@@ -238,7 +229,7 @@ export default async function TareasGrupoPage({
           <label className="flex flex-col gap-1 text-xs">Responsable
             <select name="asignado" defaultValue={asignado ?? ""} className="rounded-md border border-border-strong bg-surface px-2 py-1.5 text-sm">
               <option value="">Todos</option>
-              {asignables.map((i) => <option key={i.idUsuario} value={i.idUsuario}>{i.usuario.nombre}</option>)}
+              {asignables.map((i) => <option key={i.idUsuario} value={i.idUsuario}>{nombreCorto(i.usuario.nombre, i.usuario.apellidos)}</option>)}
             </select>
           </label>
           <label className="flex flex-col gap-1 text-xs">Vista rápida
@@ -264,11 +255,10 @@ export default async function TareasGrupoPage({
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-text-muted">
-          {resumen.sinAsignar > 0 ? `${resumen.sinAsignar} ${resumen.sinAsignar === 1 ? "tarea abierta sin responsable" : "tareas abiertas sin responsable"}. ` : ""}
-          El peso representa el impacto de cada tarea en el avance del grupo.
+          {resumen.sinAsignar > 0 ? `${resumen.sinAsignar} ${resumen.sinAsignar === 1 ? "tarea abierta sin responsable" : "tareas abiertas sin responsable"}` : ""}
           {resumen.descartadas > 0 && estado !== "descartada" ? (
             <>
-              {" "}
+              {resumen.sinAsignar > 0 ? " · " : ""}
               <Link href={hrefConFiltros({ estado: "descartada", foco: undefined, vista: "lista" })} className="text-primary hover:underline">
                 Ver descartadas ({resumen.descartadas})
               </Link>
@@ -322,7 +312,7 @@ export default async function TareasGrupoPage({
                             fotoUrl={tarea.asignado.fotoUrl}
                             tamano="sm"
                           />
-                          {tarea.asignado.nombre}
+                          {nombreCorto(tarea.asignado.nombre, tarea.asignado.apellidos)}
                         </>
                       ) : (
                         <span className="text-text-muted">Sin asignar</span>
@@ -339,7 +329,7 @@ export default async function TareasGrupoPage({
                       {ETIQUETA_ESTADO_TAREA[tarea.estado]}
                     </span>
                   </td>
-                  <td className="px-3 py-2">{tarea.peso}</td>
+                  <td className="px-3 py-2"><PesoTarea peso={tarea.peso} /></td>
                   <td className="px-3 py-2">
                     <PresentacionFecha tarea={tarea} />
                   </td>
@@ -379,7 +369,7 @@ export default async function TareasGrupoPage({
               <ul className="flex flex-col gap-2">
                 {tareasColumna.map((tarea) => <TarjetaTarea key={tarea.idTarea} tarea={tarea} />)}
               </ul>
-              {tareasColumna.length === 0 ? <p className="m-auto px-3 text-center text-xs text-text-muted">No hay tareas en este estado.</p> : null}
+              {tareasColumna.length === 0 ? <p className="m-auto px-3 text-center text-xs text-text-muted">Sin tareas</p> : null}
               {ocultas.length > 0 ? (
                 <Link
                   href={hrefConFiltros({ estado: "completada", foco: undefined, vista: "lista" })}
@@ -394,11 +384,7 @@ export default async function TareasGrupoPage({
       )}
 
       {puedeGestionar && abrirNuevaTarea ? (
-        <Modal
-          titulo="Nueva tarea"
-          descripcion="Define el responsable, el peso y una fecha dentro del plazo del grupo."
-          cerrarEn={hrefConFiltros({})}
-        >
+        <Modal titulo="Nueva tarea" cerrarEn={hrefConFiltros({})}>
           {error ? (
             <p role="alert" className="mb-4 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
               {error}
@@ -434,7 +420,7 @@ export default async function TareasGrupoPage({
                 <option value="" disabled>Selecciona un responsable</option>
                 {asignables.map((i) => (
                   <option key={i.idUsuario} value={i.idUsuario}>
-                    {i.usuario.nombre} · carga abierta {resumen.pesoAbiertoPorUsuario[i.idUsuario] ?? 0}
+                    {nombreCorto(i.usuario.nombre, i.usuario.apellidos)} · carga abierta {resumen.pesoAbiertoPorUsuario[i.idUsuario] ?? 0}
                   </option>
                 ))}
               </select>
@@ -461,9 +447,6 @@ export default async function TareasGrupoPage({
                 required
                 className="rounded-md border border-border-strong px-3 py-1.5 text-sm"
               />
-              <span className="text-xs text-text-muted">
-                {grupo.fechaLimite ? `Hasta la fecha límite del grupo: ${formatearFechaLima(grupo.fechaLimite)}` : "No puede estar en el pasado."}
-              </span>
             </label>
             <SubmitButton className="mt-1 w-fit rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover sm:col-span-2">
               Crear tarea

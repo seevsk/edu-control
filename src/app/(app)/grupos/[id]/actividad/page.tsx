@@ -5,6 +5,7 @@ import { obtenerFeedActividad } from "@/server/services/metricas";
 import { obtenerGrupoDelUsuario } from "@/server/services/grupo";
 import { TabsGrupo } from "../_components/tabs-grupo";
 import { HistorialTareas } from "../_components/historial-tareas";
+import { nombreCorto } from "@/lib/nombres";
 
 export default async function ActividadGrupoPage({
   params,
@@ -21,7 +22,7 @@ export default async function ActividadGrupoPage({
   const { grupo, rolActual } = resultado;
   const nombres = new Map(grupo.integrantes.map((integrante) => [
     integrante.idUsuario,
-    `${integrante.usuario.nombre} ${integrante.usuario.apellidos ?? ""}`.trim(),
+    nombreCorto(integrante.usuario.nombre, integrante.usuario.apellidos),
   ]));
 
   const feed = await obtenerFeedActividad(sesion.idUsuario, idGrupo).catch(() => null);

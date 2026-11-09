@@ -1,5 +1,6 @@
 import { formatearDuracion, formatearFechaHoraLima, formatearFechaLima } from "@/lib/dates";
-import { COLOR_ESTADO_TAREA, ETIQUETA_ESTADO_TAREA } from "@/lib/estado-tarea";
+import { COLOR_ESTADO_TAREA } from "@/lib/estado-tarea";
+import { nombreCorto } from "@/lib/nombres";
 import { describirCambioTarea, leerValorEstadoHistorial, type EntradaHistorialTarea } from "@/lib/tarea-historial";
 import {
   calcularTiemposTarea,
@@ -11,26 +12,22 @@ import {
 
 type Entrada = EntradaHistorialTarea & { idUsuario: number };
 
-function ChipTramo({ tramo }: { tramo: Tramo }) {
-  const pausado = tramo.estado === "en_revision";
-  const sinAsignar = tramo.idAsignado === null && tramo.estado !== "en_revision";
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-bg px-2 py-0.5 text-[11px] text-text-muted">
-      <span className="size-1.5 rounded-full" style={{ backgroundColor: COLOR_ESTADO_TAREA[tramo.estado] }} aria-hidden />
-      {sinAsignar ? "Sin asignar" : ETIQUETA_ESTADO_TAREA[tramo.estado]} {formatearDuracion(tramo.ms)}
-      {pausado ? <span className="font-medium">· pausado</span> : null}
-      {tramo.enCurso ? <span className="font-medium">· en curso</span> : null}
-    </span>
-  );
+const FRASE_TRAMO: Record<string, string> = {
+  pendiente: "pendiente",
+  en_progreso: "en progreso",
+  en_revision: "en revisión",
+};
+
+/** "3 min pendiente", "6 min en progreso": el tramo que termina con este evento. */
+function textoTramo(tramo: Tramo): string {
+  const frase = tramo.idAsignado === null && tramo.estado !== "en_revision"
+    ? "sin asignar"
+    : FRASE_TRAMO[tramo.estado] ?? tramo.estado;
+  return `${formatearDuracion(tramo.ms)} ${frase}`;
 }
 
-function Resumen({ etiqueta, valor, destacado = false }: { etiqueta: string; valor: string; destacado?: boolean }) {
-  return (
-    <div className="rounded-md border border-border bg-bg/60 px-3 py-2">
-      <dt className="text-[11px] text-text-muted">{etiqueta}</dt>
-      <dd className={`mt-0.5 text-sm font-semibold ${destacado ? "text-primary" : ""}`}>{valor}</dd>
-    </div>
-  );
+function plural(cantidad: number, singular: string, varios: string) {
+  return `${cantidad} ${cantidad === 1 ? singular : varios}`;
 }
 
 export function LineaTiempoTarea({
@@ -55,15 +52,27 @@ export function LineaTiempoTarea({
   const reprogramada = original && tarea.fechaLimite && original.getTime() !== tarea.fechaLimite.getTime();
   const personasConTrabajo = Object.entries(tiempos.trabajoPorUsuario);
 
+  const tarjetas = [
+    { etiqueta: "En progreso", ms: tiempos.enProgresoMs, color: COLOR_ESTADO_TAREA.en_progreso },
+    { etiqueta: "En revisión", ms: tiempos.enRevisionMs, color: COLOR_ESTADO_TAREA.en_revision },
+    { etiqueta: "Pendiente", ms: tiempos.pendienteMs, color: COLOR_ESTADO_TAREA.pendiente },
+    ...(tiempos.sinAsignarMs > 0
+      ? [{ etiqueta: "Sin asignar", ms: tiempos.sinAsignarMs, color: "var(--color-border-strong)" }]
+      : []),
+  ];
+  const detalles = [
+    reprogramada ? `fecha original ${formatearFechaLima(original)}` : null,
+    tiempos.devoluciones ? plural(tiempos.devoluciones, "devolución", "devoluciones") : null,
+    tiempos.reaperturas ? plural(tiempos.reaperturas, "reapertura", "reaperturas") : null,
+    tiempos.reprogramaciones ? plural(tiempos.reprogramaciones, "reprogramación", "reprogramaciones") : null,
+  ].filter(Boolean);
+
   function textoEntrada(entrada: Entrada): string {
     const base = describirCambioTarea(entrada, nombres);
     if (entrada === creada && asignacionInicial) {
       return `${base} y la asignó a ${nombres.get(asignacionInicial.idUsuario) ?? "un integrante"}`;
     }
-    if (entrada.accion === "vista") {
-      const vista = tiempos.vistas.find((v) => v.vistaEn?.getTime() === entrada.fecha.getTime() && v.idUsuario === entrada.idUsuario);
-      if (vista?.vistaEn) return `${base} (${formatearDuracion(vista.vistaEn.getTime() - vista.asignadaEn.getTime())} después de asignada)`;
-    }
+    if (entrada.accion === "vista") return "Vio la tarea";
     return base;
   }
 
@@ -71,77 +80,77 @@ export function LineaTiempoTarea({
     if (entrada.accion === "estado") {
       return COLOR_ESTADO_TAREA[leerValorEstadoHistorial(entrada.valorNuevo).estado ?? ""] ?? "var(--color-border-strong)";
     }
-    if (entrada.accion === "creada") return COLOR_ESTADO_TAREA.pendiente;
     return "var(--color-border-strong)";
   }
 
   return (
     <div className="flex flex-col gap-4">
-      <dl className="grid grid-cols-2 gap-2">
-        <Resumen etiqueta="En progreso" valor={formatearDuracion(tiempos.enProgresoMs)} destacado />
-        <Resumen etiqueta="Pendiente" valor={formatearDuracion(tiempos.pendienteMs)} />
-        <Resumen etiqueta="En revisión" valor={formatearDuracion(tiempos.enRevisionMs)} />
-        <Resumen etiqueta="Total" valor={formatearDuracion(tiempos.totalMs)} />
-        {tiempos.sinAsignarMs > 0 ? <Resumen etiqueta="Sin asignar" valor={formatearDuracion(tiempos.sinAsignarMs)} /> : null}
-      </dl>
-
-      {tiempos.devoluciones || tiempos.reaperturas || tiempos.reprogramaciones || entrega || reprogramada ? (
-        <ul className="flex flex-col gap-1 text-xs text-text-muted">
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 rounded-md border border-border bg-bg/60 px-3 py-2.5">
+          <div>
+            <p className="text-xs text-text-muted">Total</p>
+            <p className="text-xl font-semibold">{formatearDuracion(tiempos.totalMs)}</p>
+          </div>
           {entrega ? (
-            <li className={entrega.aTiempo ? "" : "font-medium text-danger"}>
+            <p className={`text-xs font-medium ${entrega.aTiempo ? "text-estado-completada" : "text-danger"}`}>
               {entrega.aTiempo
-                ? `Entregada a tiempo el ${formatearFechaHoraLima(entrega.entregadaEn)}`
+                ? "Entregada a tiempo"
                 : `Entregada con ${formatearDuracion(entrega.entregadaEn.getTime() - entrega.fechaLimite!.getTime())} de atraso`}
-            </li>
+            </p>
           ) : null}
-          {reprogramada ? <li>Fecha límite original: {formatearFechaLima(original)}</li> : null}
-          {tiempos.devoluciones ? <li>{tiempos.devoluciones} {tiempos.devoluciones === 1 ? "devolución" : "devoluciones"}</li> : null}
-          {tiempos.reaperturas ? <li>{tiempos.reaperturas} {tiempos.reaperturas === 1 ? "reapertura" : "reaperturas"}</li> : null}
-          {tiempos.reprogramaciones ? <li>{tiempos.reprogramaciones} {tiempos.reprogramaciones === 1 ? "reprogramación" : "reprogramaciones"}</li> : null}
+        </div>
+        <dl className="grid grid-cols-3 gap-2">
+          {tarjetas.map((tarjeta) => (
+            <div key={tarjeta.etiqueta} className="rounded-md border border-border bg-bg/60 px-2.5 py-2">
+              <dt className="flex items-center gap-1.5 text-[11px] text-text-muted">
+                <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: tarjeta.color }} aria-hidden />
+                <span className="truncate">{tarjeta.etiqueta}</span>
+              </dt>
+              <dd className="mt-0.5 text-sm font-semibold">{formatearDuracion(tarjeta.ms)}</dd>
+            </div>
+          ))}
+        </dl>
+        {detalles.length ? <p className="text-xs text-text-muted">{detalles.join(" · ")}</p> : null}
+      </div>
+
+      {personasConTrabajo.length > 1 ? (
+        <ul className="flex flex-col gap-0.5 text-xs text-text-muted">
+          {personasConTrabajo.map(([idUsuario, ms]) => (
+            <li key={idUsuario} className="flex justify-between gap-2">
+              <span>{nombres.get(Number(idUsuario)) ?? "Integrante no disponible"}</span>
+              <span className="text-text">{formatearDuracion(ms)}</span>
+            </li>
+          ))}
         </ul>
       ) : null}
 
-      {personasConTrabajo.length > 1 ? (
-        <div>
-          <h3 className="text-xs font-semibold">En progreso por persona</h3>
-          <ul className="mt-1 flex flex-col gap-0.5 text-xs text-text-muted">
-            {personasConTrabajo.map(([idUsuario, ms]) => (
-              <li key={idUsuario} className="flex justify-between gap-2">
-                <span>{nombres.get(Number(idUsuario)) ?? "Integrante no disponible"}</span>
-                <span className="font-medium text-text">{formatearDuracion(ms)}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      <ol className="relative flex flex-col gap-3 border-l border-border pl-4">
+      <ol className="flex flex-col border-l border-border">
         {ordenado.map((entrada) => {
           const tramo = tiempos.tramoCerradoPor[entrada.idHistorial];
           return (
-            <li key={entrada.idHistorial} className="relative text-sm">
+            <li key={entrada.idHistorial} className="relative pb-3 pl-4 text-sm last:pb-0">
               <span
-                className="absolute -left-[21px] top-1.5 size-2.5 rounded-full border-2 border-surface"
+                className="absolute -left-[5px] top-1.5 size-2.5 rounded-full border-2 border-surface"
                 style={{ backgroundColor: colorEntrada(entrada) }}
                 aria-hidden
               />
-              {tramo && tramo.ms > 0 ? <ChipTramo tramo={tramo} /> : null}
-              <p className="mt-1 break-words">{textoEntrada(entrada)}</p>
+              <p className="break-words">{textoEntrada(entrada)}</p>
               <p className="mt-0.5 text-xs text-text-muted">
-                {entrada.usuario.nombre} {entrada.usuario.apellidos ?? ""} ·{" "}
+                {nombreCorto(entrada.usuario.nombre, entrada.usuario.apellidos)} ·{" "}
                 <time dateTime={entrada.fecha.toISOString()}>{formatearFechaHoraLima(entrada.fecha)}</time>
+                {tramo && tramo.ms > 0 ? <> · {textoTramo(tramo)}</> : null}
               </p>
             </li>
           );
         })}
         {tiempos.tramoActual ? (
-          <li className="relative text-sm">
+          <li className="relative pl-4 text-xs text-text-muted">
             <span
-              className="absolute -left-[21px] top-1.5 size-2.5 rounded-full motion-safe:animate-pulse border-2 border-surface"
+              className="absolute -left-[5px] top-1 size-2.5 rounded-full border-2 border-surface"
               style={{ backgroundColor: COLOR_ESTADO_TAREA[tiempos.tramoActual.estado] }}
               aria-hidden
             />
-            <ChipTramo tramo={tiempos.tramoActual} />
+            {textoTramo(tiempos.tramoActual)} hasta ahora
           </li>
         ) : null}
       </ol>

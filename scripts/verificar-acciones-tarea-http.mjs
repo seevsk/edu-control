@@ -135,7 +135,7 @@ async function verificar() {
     const listado = "/grupos/1/tareas?vista=lista";
     const tablero = "/grupos/1/tareas";
     const detalle = "/grupos/1/tareas/3";
-    const espera = "Pendiente de aprobación por otro integrante.";
+    const espera = "Esperando revisión";
     await caso("tablero, lista y detalle muestran aprobación al revisor y espera al responsable", async () => {
       for (const ruta of [listado, tablero, detalle]) {
         const revisor = await html(ruta);

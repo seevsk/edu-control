@@ -4,7 +4,9 @@ import { requerirSesion } from "@/server/auth/session";
 import { obtenerGrupoDelUsuario } from "@/server/services/grupo";
 import { obtenerTareaDelGrupo } from "@/server/services/tarea";
 import { idRegistroSchema } from "@/lib/validation/tarea";
-import { formatearDuracion, formatearFechaHoraLima, formatearFechaLima } from "@/lib/dates";
+import { formatearDuracion, formatearFechaHoraLima } from "@/lib/dates";
+import { nombreCorto } from "@/lib/nombres";
+import { PesoTarea } from "@/components/peso-tarea";
 import { ETIQUETA_ESTADO_TAREA, COLOR_ESTADO_TAREA, estaAbierta } from "@/lib/estado-tarea";
 import { estaVencida } from "@/lib/tiempos-tarea";
 import { Avatar } from "@/components/avatar";
@@ -51,7 +53,7 @@ export default async function TareaDetallePage({
   );
   const nombres = new Map(grupo.integrantes.map((integrante) => [
     integrante.idUsuario,
-    `${integrante.usuario.nombre} ${integrante.usuario.apellidos ?? ""}`.trim(),
+    nombreCorto(integrante.usuario.nombre, integrante.usuario.apellidos),
   ]));
   const hoyISO = fechaEnZonaLimaISO(ahora);
   const limiteGrupoISO = grupo.fechaLimite ? fechaEnZonaLimaISO(grupo.fechaLimite) : undefined;
@@ -113,27 +115,24 @@ export default async function TareaDetallePage({
                 {tarea.asignado ? (
                   <>
                     <Avatar nombre={tarea.asignado.nombre} apellidos={tarea.asignado.apellidos} fotoUrl={tarea.asignado.fotoUrl} tamano="sm" />
-                    {tarea.asignado.nombre} {tarea.asignado.apellidos ?? ""}
+                    {nombreCorto(tarea.asignado.nombre, tarea.asignado.apellidos)}
                   </>
-                ) : <span className="text-danger">Sin asignar</span>}
+                ) : <span className="text-text-muted">Sin asignar</span>}
               </dd>
             </div>
-            <div><dt className="text-xs text-text-muted">Peso</dt><dd className="mt-1">{tarea.peso} de 3</dd></div>
+            <div><dt className="text-xs text-text-muted">Peso</dt><dd className="mt-2"><PesoTarea peso={tarea.peso} /></dd></div>
             <div>
               <dt className="text-xs text-text-muted">Fecha límite</dt>
               <dd className="mt-1">{tarea.fechaLimite ? <><span className={`font-medium ${vencida ? "text-danger" : ""}`}>{etiquetaRelativa(tarea.fechaLimite, ahora)}</span><span className="block text-xs text-text-muted">{formatearFechaHoraLima(tarea.fechaLimite)}</span></> : "Sin fecha límite"}</dd>
             </div>
-            <div><dt className="text-xs text-text-muted">Creada por</dt><dd className="mt-1">{tarea.creador.nombre} {tarea.creador.apellidos ?? ""}</dd></div>
+            <div><dt className="text-xs text-text-muted">Creada por</dt><dd className="mt-1">{nombreCorto(tarea.creador.nombre, tarea.creador.apellidos)}</dd></div>
           </dl>
           <div className="mt-5">
             <h2 className="text-sm font-semibold">Descripción</h2>
             <p className="mt-2 whitespace-pre-wrap break-words text-sm text-text-muted">{tarea.descripcion || "Sin descripción."}</p>
           </div>
           {puedeGestionar ? (
-            <div className="mt-5 rounded-md border border-border bg-bg/60 p-3">
-              <h2 className="mb-2 text-sm font-semibold">Siguiente acción</h2>
-              <AccionesTarea idGrupo={idGrupo} tarea={tarea} idUsuario={sesion.idUsuario} rol={rolActual} asignables={asignables} destino="detalle" />
-            </div>
+            <AccionesTarea idGrupo={idGrupo} tarea={tarea} idUsuario={sesion.idUsuario} rol={rolActual} asignables={asignables} destino="detalle" titulo="Siguiente acción" />
           ) : null}
         </section>
 
@@ -176,9 +175,6 @@ export default async function TareaDetallePage({
                 max={limiteGrupoISO}
                 className="rounded-md border border-border-strong px-3 py-1.5 text-sm"
               />
-              {grupo.fechaLimite ? (
-                <span className="text-xs text-text-muted">Hasta {formatearFechaLima(grupo.fechaLimite)}</span>
-              ) : null}
             </label>
             <SubmitButton className="mt-1 w-fit rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover sm:col-span-2">
               Guardar cambios
