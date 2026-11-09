@@ -254,8 +254,8 @@ Reglas de arquitectura:
 - Las tareas pertenecen siempre a un grupo. `id_asignado` debe ser un integrante `aceptada` que no sea observador (o `NULL` si está sin asignar).
 - `peso`: 1 a 3, lo define el grupo al crear la tarea.
 - **Restricciones adicionales (confirmadas por el usuario, 2026-11-02):** al crear una tarea, el responsable y la fecha límite son obligatorios. La fecha no puede estar en el pasado ni superar `grupo.fecha_limite`. Después de crearla puede quedar sin responsable por una reasignación o por el retiro de un integrante, pero necesita responsable antes de pasar a `en_progreso`. Una tarea `en_revision` o `completada` no se reasigna. Una tarea `en_progreso` solo la puede reasignar el líder y, al hacerlo, vuelve a `pendiente`; se registran tanto la reasignación como el cambio de estado en el historial. Las tareas `pendiente` sí pueden reasignarlas líder y miembros.
-- Un grupo no puede pasar a `finalizado` mientras tenga tareas que no estén `completada`.
-- Estados: `pendiente` → `en_progreso` → `en_revision` → `completada`.
+- Un grupo no puede pasar a `finalizado` mientras tenga tareas abiertas (`pendiente`, `en_progreso` o `en_revision`). Las `completada` y `descartada` están cerradas.
+- Estados: `pendiente` → `en_progreso` → `en_revision` → `completada`, más `descartada` (tarea que ya no se hará, como "Removed" en Azure o "Won't Do" en Jira). Nunca se borran tareas.
 
 | Transición | Quién |
 |---|---|
@@ -263,13 +263,20 @@ Reglas de arquitectura:
 | `en_progreso` → `en_revision` | El asignado. Significa "terminé". Se llena `fecha_terminada` |
 | `en_revision` → `completada` | Cualquier integrante aceptado (no observador) que no sea el asignado (confirmado) |
 | `en_revision` → `en_progreso` | Otro integrante, al devolverla. Debe escribir obligatoriamente un motivo y se borra `fecha_terminada` |
+| `completada` → `en_progreso` (reabrir) | Solo el líder, con motivo obligatorio. Se borra `fecha_terminada`. Si el responsable ya no puede recibir tareas, vuelve a `pendiente` sin asignar (confirmado, 2026-11-09) |
+| abierta → `descartada` | Solo el líder, con motivo obligatorio (confirmado, 2026-11-09) |
+| `descartada` → `pendiente` (restaurar) | Solo el líder. Si el responsable ya no puede recibir tareas, queda sin asignar |
 
-  Rechaza cualquier otra transición. Si el equipo pide más flexibilidad, se amplía esta tabla. La revisión del trabajo real ocurre fuera de la app (el revisor abre el documento del grupo); la app solo registra quién confirmó y cuándo.
-- **Cada cambio de `estado` o de `id_asignado` escribe una fila en `tarea_historial` dentro de la misma transacción que actualiza la tarea.** Lee el valor anterior **antes** de actualizar:
-  - `accion`: `creada` | `estado` | `reasignada`.
-  - `valor_anterior` y `valor_nuevo`: texto. En `reasignada` guarda el **id del usuario**, no el nombre. En `creada` ambos son `NULL`.
-  - Al devolver una tarea, `valor_nuevo` conserva `en_progreso` junto con el motivo en el mismo texto usando el formato interpretado por `src/lib/tarea-historial.ts`; así se muestra en el historial sin agregar columnas.
+  Rechaza cualquier otra transición. Si el equipo pide más flexibilidad, se amplía esta tabla. La revisión del trabajo real ocurre fuera de la app (el revisor abre el documento del grupo); la app solo registra quién confirmó y cuándo. Reabrir, descartar y restaurar solo se ofrecen en el detalle de la tarea, no en el tablero ni en la lista.
+- **Editar una tarea (confirmado, 2026-11-09):** el líder o quien la creó pueden cambiar título, descripción, peso y fecha límite mientras la tarea esté abierta. Una fecha nueva sigue las mismas reglas que al crear; si no cambia, se conserva aunque ya esté vencida. Para editar una tarea cerrada primero hay que reabrirla o restaurarla.
+- **Vencida** = fecha límite pasada y tarea abierta. Se calcula, no se guarda. Todos la ven marcada; el líder la resuelve reprogramando (editar la fecha), reasignando o descartando.
+- **Cada cambio de `estado`, de `id_asignado`, de `fecha_limite` o de `peso` escribe una fila en `tarea_historial` dentro de la misma transacción que actualiza la tarea.** Lee el valor anterior **antes** de actualizar:
+  - `accion`: `creada` | `estado` | `reasignada` | `vista` | `fecha_limite` | `peso`.
+  - `valor_anterior` y `valor_nuevo`: texto. En `reasignada` guarda el **id del usuario**, no el nombre. En `fecha_limite`, la fecha en ISO UTC. En `creada` y `vista` ambos son `NULL`.
+  - Al devolver, descartar o reabrir, `valor_nuevo` conserva el estado junto con el motivo en el mismo texto usando el formato interpretado por `src/lib/tarea-historial.ts`; así se muestra en el historial sin agregar columnas.
+  - `vista` (confirmado, 2026-11-09) = la primera vez que el responsable actual abre el detalle de la tarea; se registra una vez por asignación. Quien se asigna su propia tarea la tiene vista al asignarla. No aparece en el feed de actividad del grupo.
   - `id_usuario` sale de la sesión del servidor.
+- **Seguimiento de tiempos (confirmado, 2026-11-09, `src/lib/tiempos-tarea.ts`):** se calcula desde `tarea_historial`, nunca se guarda. Cada cambio de estado o de responsable cierra un tramo y abre otro, con reloj corrido (24/7, sin calendario laboral). Contadores: **Sin asignar** (tarea abierta sin responsable), **Pendiente** (desde que se asignó hasta que empezó), **En progreso** (trabajo del asignado; suma todos sus tramos, también tras una devolución o reapertura), **En revisión** (tiempo del revisor: el reloj del asignado queda pausado) y **Total** (desde que se creó hasta que se cerró, o hasta ahora). Si se reasigna, cada persona suma solo sus horas. El tramo abierto se mide hasta el momento actual. El detalle de la tarea muestra la línea de tiempo con la hora de cada paso (12 h, America/Lima) y la duración de cada tramo (`45 min`, `7 h 20 min`, `2 d 3 h`).
 - El historial nunca se edita ni se borra.
 - No hay evidencia adjunta por tarea. Como mucho, el `enlace_trabajo` del grupo.
 
@@ -278,8 +285,9 @@ Reglas de arquitectura:
 - **Avance del grupo** = suma del `peso` de tareas `completada` ÷ suma del `peso` de todas las tareas. Sin tareas, muestra "sin tareas" en lugar de 0 %.
 - **Carga de un integrante** = suma del `peso` que se le asignó ÷ suma del `peso` total. Sirve para detectar que el líder le cargó todo a dos personas.
 - **Cumplimiento de un integrante** = suma del `peso` completado ÷ suma del `peso` asignado.
-- **Puntualidad** = tareas entregadas a tiempo ÷ tareas entregadas con fecha límite. La entrega se mide con la **primera vez que la tarea pasó a `en_revision`** según `tarea_historial` (no con `fecha_terminada`, que se borra al devolverla), para no penalizar al asignado si el revisor tarda. Opcional: cuántas veces se devolvió cada tarea.
+- **Puntualidad** = tareas entregadas a tiempo ÷ tareas entregadas con fecha límite. La entrega se mide con la **primera vez que la tarea pasó a `en_revision` desde que se le asignó al responsable actual** según `tarea_historial` (no con `fecha_terminada`, que se borra al devolverla), para no penalizar al asignado si el revisor tarda. Se compara con la **fecha límite vigente cuando se le asignó** (confirmado, 2026-11-09): reprogramar después no borra el atraso. Opcional: cuántas veces se devolvió cada tarea.
 - Excluye a los observadores de todas las métricas.
+- Las tareas `descartada` quedan fuera del avance, la carga, el cumplimiento y la puntualidad (como "Removed" en Azure); su historial se conserva.
 - **No hay ranking ni puntaje único.** Muestra carga y cumplimiento lado a lado.
 - **Feed de actividad del grupo** = lectura de `tarea_historial`. No lleva tabla propia.
 - **Disponibilidad del grupo** (pestaña "Horarios", `src/lib/disponibilidad.ts`): ocupado de cada integrante aceptado no observador = `horario_curso` de sus cursos activos + sus `bloque_ocupado`, sobre la semana tipo. La vista abre en la semana calendario actual (lunes a domingo) y permite navegar a la semana anterior o siguiente. Las reuniones ya programadas de ese mismo grupo dentro de la semana visible se superponen al patrón: bloquean la franja para todo el grupo, se muestran en la pestaña y se excluyen de las sugerencias, sin convertirse en eventos recurrentes. Se muestra en franjas de 30 min entre 7 AM y 11 PM, con cuántos están libres y **quién falta por nombre**, nunca el motivo (tipo de bloque ni curso). Huecos en común = franjas consecutivas de 1 h o más con todos libres; si no hay, los de "falta una persona". Los observadores no ven esta pestaña.
@@ -301,6 +309,9 @@ Reglas de arquitectura:
 | Una tarea pasa a `en_revision` | `tarea_en_revision` | Integrantes aceptados que no sean observadores ni el asignado | Sí |
 | Devuelven una tarea a `en_progreso` | `tarea_devuelta` | El asignado | Sí |
 | Una tarea queda `completada` | `tarea_completada` | El asignado | No |
+| El líder reabre una tarea | `tarea_reabierta` | El asignado | No |
+| Cambia la fecha límite de una tarea | `tarea_reprogramada` | El asignado | No |
+| El líder descarta una tarea | `tarea_descartada` | El asignado | No |
 | Cambio a `en_progreso` | — | Nadie (solo queda en el historial) | No |
 | Programan una reunión | `reunion_programada` | Integrantes aceptados no observadores, menos quien la programó | Sí (confirmado por el usuario, 2026-11-02) |
 
@@ -340,8 +351,10 @@ Usa **Azure DevOps** como referencia visual: se siente profesional, densa en inf
 **Tareas**
 
 - Vista de **tablero** tipo Azure Boards con cuatro columnas (Pendiente, En progreso, En revisión, Completada) y vista de **lista/tabla** con columnas Título, Asignado a (avatar y nombre), Estado, Peso y Fecha límite.
+- Para que el tablero no se acumule (como Jira): la columna Completada muestra solo lo completado en los últimos 14 días, con un enlace a las anteriores en la lista. Las `descartada` no aparecen en el tablero ni en la lista por defecto; se ven filtrando por estado "Descartada".
+- Etiquetas calculadas en tarjetas y lista: "Vencida" (abierta con fecha pasada) y "Entregada con atraso" (completada después de su fecha vigente).
 - Barra de filtros con búsqueda por palabra y filtros desplegables (asignado, estado).
-- Estado con **punto de color + texto**, como en Azure DevOps: pendiente gris, en progreso azul, en revisión ámbar, completada verde.
+- Estado con **punto de color + texto**, como en Azure DevOps: pendiente gris, en progreso azul, en revisión ámbar, completada verde, descartada gris atenuado.
 
 **Avance:** barra de progreso o dona para el avance del grupo; carga y cumplimiento por integrante lado a lado, sin ranking.
 
@@ -434,7 +447,6 @@ Datos de ejemplo (`prisma/seed.ts`, **solo desarrollo**): varios usuarios de pru
 ## 13. Decisiones pendientes (pregunta antes de implementar)
 
 - **Dominio definitivo de producción:** la demo ya puede usar un dominio temporal verificado mediante `EMAIL_FROM`; antes de producción se debe elegir y verificar el dominio definitivo del equipo.
-- **Reapertura** de una tarea `completada` y transiciones de estado adicionales.
 - **Framework de pruebas**, librería de formularios, librería de componentes e íconos, y React Compiler.
 - **Privacidad:** con usuarios reales aplica la Ley 29733 de Protección de Datos Personales (Perú). Antes de abrir la app hacen falta política de privacidad, términos y consentimiento; lo decide el equipo, no lo improvises.
 
@@ -444,7 +456,7 @@ Datos de ejemplo (`prisma/seed.ts`, **solo desarrollo**): varios usuarios de pru
 - No pidas más scopes de Google que `openid`, `email` y `profile`, ni guardes tokens de Google.
 - No agregues contraseñas, registro propio ni recuperación de cuenta.
 - No crees tareas personales ni subida de archivos.
-- No borres filas de `usuario`, `grupo_integrante` ni `tarea_historial`.
+- No borres filas de `usuario`, `grupo_integrante`, `tarea` ni `tarea_historial`. Una tarea que ya no se hará se descarta.
 - No confíes en un id de usuario que venga del cliente; no dejes rutas de grupo sin verificar membresía.
 - No expongas el `detalle` de un bloque ocupado a nadie más que su dueño, ni la disponibilidad a quien no sea compañero (ver 8.2).
 - No guardes cifras derivadas (avance, carga, cumplimiento, tiempo libre) en la base de datos.

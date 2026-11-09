@@ -45,6 +45,27 @@ export const plantillasNotificacion = {
       asunto: `Tarea completada: ${titulo}`,
     };
   },
+  tareaReabierta(titulo: string, idGrupo: number, idTarea: number, motivo: string) {
+    return {
+      mensaje: `Reabrieron "${titulo}". Motivo: ${motivo}`,
+      enlace: `/grupos/${idGrupo}/tareas/${idTarea}`,
+      asunto: `Reabrieron una tarea: ${titulo}`,
+    };
+  },
+  tareaReprogramada(titulo: string, idGrupo: number, idTarea: number, nuevaFecha: string) {
+    return {
+      mensaje: `La fecha límite de "${titulo}" cambió al ${nuevaFecha}.`,
+      enlace: `/grupos/${idGrupo}/tareas/${idTarea}`,
+      asunto: `Nueva fecha límite: ${titulo}`,
+    };
+  },
+  tareaDescartada(titulo: string, idGrupo: number, idTarea: number, motivo: string) {
+    return {
+      mensaje: `Descartaron "${titulo}". Motivo: ${motivo}`,
+      enlace: `/grupos/${idGrupo}/tareas/${idTarea}`,
+      asunto: `Tarea descartada: ${titulo}`,
+    };
+  },
   reunionProgramada(titulo: string, nombreGrupo: string, idGrupo: number, cuando: string) {
     return {
       mensaje: `Nueva reunión en "${nombreGrupo}": "${titulo}", ${cuando}.`,

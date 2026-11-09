@@ -36,16 +36,35 @@ export function formatearFechaLima(fecha: Date): string {
   }).format(fecha);
 }
 
+/** "03/11/2026 3:00 PM" (America/Lima, 12 h como pide AGENTS.md 9). */
 export function formatearFechaHoraLima(fecha: Date): string {
-  return new Intl.DateTimeFormat("es-PE", {
+  const partes = new Intl.DateTimeFormat("en-US", {
     timeZone: ZONA_LIMA,
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
+    hour: "numeric",
     minute: "2-digit",
-    hourCycle: "h23",
-  }).format(fecha);
+    hourCycle: "h12",
+  }).formatToParts(fecha);
+  const valor = (tipo: Intl.DateTimeFormatPartTypes) => partes.find((parte) => parte.type === tipo)?.value ?? "";
+  return `${formatearFechaLima(fecha)} ${valor("hour")}:${valor("minute")} ${valor("dayPeriod").toUpperCase()}`;
+}
+
+const MINUTO_MS = 60_000;
+const HORA_MS = 60 * MINUTO_MS;
+const DIA_MS = 24 * HORA_MS;
+
+/** "45 min", "7 h 20 min", "2 d 3 h". Desde 1 dia se omiten los minutos. */
+export function formatearDuracion(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / MINUTO_MS)) * MINUTO_MS;
+  if (total < MINUTO_MS) return "menos de 1 min";
+  if (total < HORA_MS) return `${total / MINUTO_MS} min`;
+  if (total < DIA_MS) {
+    const horas = Math.floor(total / HORA_MS);
+    const minutos = (total % HORA_MS) / MINUTO_MS;
+    return minutos ? `${horas} h ${minutos} min` : `${horas} h`;
+  }
+  const dias = Math.floor(total / DIA_MS);
+  const horas = Math.floor((total % DIA_MS) / HORA_MS);
+  return horas ? `${dias} d ${horas} h` : `${dias} d`;
 }
 
 export const DIAS_SEMANA = [

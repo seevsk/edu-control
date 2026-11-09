@@ -49,12 +49,16 @@ enum EstadoTarea {
   en_progreso
   en_revision
   completada
+  descartada
 }
 
 enum AccionHistorial {
   creada
   estado
   reasignada
+  vista
+  fecha_limite
+  peso
 }
 
 enum TipoNotificacion {
@@ -64,6 +68,9 @@ enum TipoNotificacion {
   tarea_en_revision
   tarea_devuelta
   tarea_completada
+  tarea_reabierta
+  tarea_reprogramada
+  tarea_descartada
   reunion_programada
 }
 

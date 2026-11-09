@@ -52,7 +52,8 @@ export async function obtenerFeedActividad(idUsuario: number, idGrupo: number, l
   await requerirIntegranteActivo(idUsuario, idGrupo);
 
   return prisma.tareaHistorial.findMany({
-    where: { tarea: { idGrupo } },
+    // "vista" es un dato de seguimiento de la tarea, no una actividad del grupo.
+    where: { tarea: { idGrupo }, accion: { not: "vista" } },
     include: { usuario: true, tarea: true },
     orderBy: [{ fecha: "desc" }, { idHistorial: "desc" }],
     take: limite,

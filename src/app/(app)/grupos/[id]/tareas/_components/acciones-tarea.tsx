@@ -1,7 +1,25 @@
-import { accionesDisponiblesTarea, type ESTADOS_TAREA_ORDEN } from "@/lib/estado-tarea";
+import { accionesDisponiblesTarea, type AccionConMotivo, type EstadoTarea } from "@/lib/estado-tarea";
 import { SubmitButton } from "@/components/submit-button";
 import { cambiarEstadoTareaAction, reasignarTareaAction } from "../actions";
 import type { DestinoTarea, FiltrosTarea } from "@/lib/validation/tarea";
+
+const TEXTOS_MOTIVO: Record<AccionConMotivo, { placeholder: string; confirmar: string; enviando: string }> = {
+  devolver: {
+    placeholder: "Explica qué debe corregirse antes de volver a revisión",
+    confirmar: "Confirmar devolución",
+    enviando: "Devolviendo...",
+  },
+  descartar: {
+    placeholder: "Explica por qué ya no se hará esta tarea",
+    confirmar: "Confirmar descarte",
+    enviando: "Descartando...",
+  },
+  reabrir: {
+    placeholder: "Explica qué falta o qué debe corregirse",
+    confirmar: "Confirmar reapertura",
+    enviando: "Reabriendo...",
+  },
+};
 
 export function AccionesTarea({
   idGrupo,
@@ -13,7 +31,7 @@ export function AccionesTarea({
   filtros = {},
 }: {
   idGrupo: number;
-  tarea: { idTarea: number; estado: (typeof ESTADOS_TAREA_ORDEN)[number]; idAsignado: number | null };
+  tarea: { idTarea: number; estado: EstadoTarea; idAsignado: number | null };
   idUsuario: number;
   rol: "lider" | "miembro" | "observador";
   asignables: { idUsuario: number; usuario: { nombre: string; apellidos: string | null } }[];
@@ -21,47 +39,51 @@ export function AccionesTarea({
   filtros?: FiltrosTarea;
 }) {
   if (rol === "observador") return null;
-  const acciones = accionesDisponiblesTarea({ ...tarea, idUsuario, rol });
+  const acciones = accionesDisponiblesTarea({ ...tarea, idUsuario, rol })
+    .filter((accion) => destino === "detalle" || !accion.gestion);
   const esperaRevision = tarea.estado === "en_revision" && tarea.idAsignado === idUsuario;
   const puedeReasignar = tarea.estado === "pendiente" || (tarea.estado === "en_progreso" && rol === "lider");
   return (
     <div className="flex flex-wrap items-center gap-2 pt-1">
       {acciones.map((accion) => {
-        const esDevolucion = tarea.estado === "en_revision" && accion.estado === "en_progreso";
-        if (esDevolucion) {
+        const accionCambio = cambiarEstadoTareaAction.bind(null, idGrupo, tarea.idTarea, accion.estado, destino, filtros);
+        if (accion.motivo) {
+          const textos = TEXTOS_MOTIVO[accion.motivo];
+          const destructiva = accion.motivo === "descartar";
           return (
-            <details key={accion.estado} className="w-full rounded-md border border-estado-revision/40 bg-cat-laboral-bg p-2">
-              <summary className="cursor-pointer text-xs font-medium text-cat-laboral-fg">{accion.etiqueta}</summary>
-              <form
-                action={cambiarEstadoTareaAction.bind(null, idGrupo, tarea.idTarea, accion.estado, destino, filtros)}
-                className="mt-2 flex flex-col gap-2"
-              >
+            <details
+              key={accion.motivo}
+              className={`w-full rounded-md border p-2 ${destructiva ? "border-danger/30 bg-danger/5" : "border-estado-revision/40 bg-cat-laboral-bg"}`}
+            >
+              <summary className={`cursor-pointer text-xs font-medium ${destructiva ? "text-danger" : "text-cat-laboral-fg"}`}>
+                {accion.etiqueta}
+              </summary>
+              <form action={accionCambio} className="mt-2 flex flex-col gap-2">
                 <label className="flex flex-col gap-1 text-xs">
-                  Motivo de la devolución
+                  Motivo
                   <textarea
-                    name="motivoDevolucion"
+                    name="motivo"
                     required
                     maxLength={500}
                     rows={3}
-                    placeholder="Explica qué debe corregirse antes de volver a revisión"
+                    placeholder={textos.placeholder}
                     className="w-full rounded-md border border-border-strong bg-surface px-2.5 py-2 text-sm text-text"
                   />
                 </label>
                 <SubmitButton
-                  pendingText="Devolviendo..."
-                  className="w-fit rounded-md border border-estado-revision px-3 py-1.5 text-xs font-medium text-cat-laboral-fg hover:bg-surface"
+                  pendingText={textos.enviando}
+                  className={`w-fit rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-surface ${
+                    destructiva ? "border-danger text-danger" : "border-estado-revision text-cat-laboral-fg"
+                  }`}
                 >
-                  Confirmar devolución
+                  {textos.confirmar}
                 </SubmitButton>
               </form>
             </details>
           );
         }
         return (
-          <form
-            key={accion.estado}
-            action={cambiarEstadoTareaAction.bind(null, idGrupo, tarea.idTarea, accion.estado, destino, filtros)}
-          >
+          <form key={`${accion.estado}-${accion.etiqueta}`} action={accionCambio}>
             <SubmitButton
               pendingText={accion.estado === "completada" ? "Completando..." : "Actualizando..."}
               className={`rounded-md px-3 py-1.5 text-xs font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${

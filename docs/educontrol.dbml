@@ -207,7 +207,7 @@ COMMENT ON COLUMN "grupo_integrante"."correo_actividad" IS 'false = no recibir c
 
 COMMENT ON COLUMN "tarea"."id_asignado" IS 'Integrante aceptado (no observador). NULL = sin asignar';
 
-COMMENT ON COLUMN "tarea"."estado" IS 'pendiente | en_progreso | en_revision | completada';
+COMMENT ON COLUMN "tarea"."estado" IS 'pendiente | en_progreso | en_revision | completada | descartada. descartada = no se hará (la cierra el líder con motivo); queda fuera de las métricas';
 
 COMMENT ON COLUMN "tarea"."peso" IS '1 a 3, lo define el grupo al crear la tarea';
 
@@ -215,15 +215,15 @@ COMMENT ON COLUMN "tarea"."fecha_terminada" IS 'Cuando el asignado la marcó en_
 
 COMMENT ON COLUMN "tarea_historial"."id_usuario" IS 'Quién hizo el cambio. Sale de la sesión del servidor, nunca del navegador';
 
-COMMENT ON COLUMN "tarea_historial"."accion" IS 'creada | estado | reasignada';
+COMMENT ON COLUMN "tarea_historial"."accion" IS 'creada | estado | reasignada | vista | fecha_limite | peso. vista = primera vez que el responsable abre la tarea en cada asignación';
 
-COMMENT ON COLUMN "tarea_historial"."valor_anterior" IS 'Estado anterior o id del asignado anterior';
+COMMENT ON COLUMN "tarea_historial"."valor_anterior" IS 'Estado anterior, id del asignado anterior, fecha límite anterior (ISO UTC) o peso anterior. NULL en creada y vista';
 
-COMMENT ON COLUMN "tarea_historial"."valor_nuevo" IS 'Estado nuevo o id del asignado nuevo';
+COMMENT ON COLUMN "tarea_historial"."valor_nuevo" IS 'Estado nuevo (con motivo si es devolución, descarte o reapertura), id del asignado nuevo, fecha límite nueva (ISO UTC) o peso nuevo';
 
 COMMENT ON COLUMN "notificacion"."id_usuario" IS 'Destinatario. Una fila por destinatario, no por evento';
 
-COMMENT ON COLUMN "notificacion"."tipo" IS 'invitacion_grupo | invitacion_respondida | tarea_asignada | tarea_en_revision | tarea_devuelta | tarea_completada | reunion_programada';
+COMMENT ON COLUMN "notificacion"."tipo" IS 'invitacion_grupo | invitacion_respondida | tarea_asignada | tarea_en_revision | tarea_devuelta | tarea_completada | tarea_reabierta | tarea_reprogramada | tarea_descartada | reunion_programada';
 
 COMMENT ON TABLE "reunion" IS 'Reunion de un grupo, de una sola vez. La crean lider o miembros; inicio/fin en UTC';
 
