@@ -52,12 +52,13 @@ async function verificar() {
       casos++;
       console.log(`OK ${nombreCaso}`);
     }
-    await caso("las acciones visibles coinciden con los permisos del servidor en 144 combinaciones", async () => {
+    const todosLosEstados = [...ESTADOS_TAREA_ORDEN, "descartada"] as const;
+    await caso("las acciones visibles coinciden con los permisos del servidor en 225 combinaciones", async () => {
       for (const rol of ["lider", "miembro", "observador"] as const) {
         for (const idAsignado of [null, 1, 2]) {
-          for (const estado of ESTADOS_TAREA_ORDEN) {
+          for (const estado of todosLosEstados) {
             const acciones = accionesDisponiblesTarea({ estado, idAsignado, idUsuario: 1, rol });
-            for (const nuevoEstado of ESTADOS_TAREA_ORDEN) {
+            for (const nuevoEstado of todosLosEstados) {
               let permitido = true;
               try {
                 tareaService.verificarTransicion({
@@ -318,6 +319,79 @@ async function verificar() {
       const historialAntes = await db!.tareaHistorial.count();
       await assert.rejects(tareaService.cambiarEstadoTarea(luis, idGrupo, revision.idTarea, "completada"), ErrorDeNegocio);
       assert.equal(await db!.tareaHistorial.count(), historialAntes);
+    });
+    await caso("solo el líder descarta, restaura y reabre con motivo; lo descartado sale del avance", async () => {
+      const { obtenerMetricasGrupo } = await import("../src/server/services/metricas");
+      const ciclo = await tareaService.crearTarea(lider, idGrupo, { titulo: "Ciclo completo", peso: 2, idAsignado: String(ana), fechaLimite: fechaLimitePrueba });
+      await assert.rejects(tareaService.cambiarEstadoTarea(ana, idGrupo, ciclo.idTarea, "descartada", "No aplica"), ErrorDeNegocio);
+      await assert.rejects(tareaService.cambiarEstadoTarea(lider, idGrupo, ciclo.idTarea, "descartada"), ErrorDeNegocio);
+      await tareaService.cambiarEstadoTarea(lider, idGrupo, ciclo.idTarea, "descartada", "Cambió el alcance");
+      assert.equal((await obtenerMetricasGrupo(lider, idGrupo)).avance, 1);
+      assert.equal(await db!.notificacion.count({ where: { tipo: "tarea_descartada", idUsuario: ana } }), 1);
+      assert.equal((await tareaService.listarTareasDelGrupo(lider, idGrupo, { q: "Ciclo completo" })).length, 0);
+      assert.equal((await tareaService.listarTareasDelGrupo(lider, idGrupo, { q: "Ciclo completo", estado: "descartada" })).length, 1);
+      await assert.rejects(tareaService.reasignarTarea(lider, idGrupo, ciclo.idTarea, String(luis)), ErrorDeNegocio);
+      await assert.rejects(
+        tareaService.editarTarea(lider, idGrupo, ciclo.idTarea, { titulo: "x", peso: 1, fechaLimite: fechaLimitePrueba }),
+        ErrorDeNegocio,
+      );
+      await assert.rejects(tareaService.cambiarEstadoTarea(ana, idGrupo, ciclo.idTarea, "pendiente"), ErrorDeNegocio);
+      await tareaService.cambiarEstadoTarea(lider, idGrupo, ciclo.idTarea, "pendiente");
+      await tareaService.cambiarEstadoTarea(ana, idGrupo, ciclo.idTarea, "en_progreso");
+      await tareaService.cambiarEstadoTarea(ana, idGrupo, ciclo.idTarea, "en_revision");
+      await tareaService.cambiarEstadoTarea(luis, idGrupo, ciclo.idTarea, "completada");
+      await assert.rejects(tareaService.cambiarEstadoTarea(luis, idGrupo, ciclo.idTarea, "en_progreso", "Falta algo"), ErrorDeNegocio);
+      await assert.rejects(tareaService.cambiarEstadoTarea(lider, idGrupo, ciclo.idTarea, "en_progreso"), ErrorDeNegocio);
+      await tareaService.cambiarEstadoTarea(lider, idGrupo, ciclo.idTarea, "en_progreso", "Faltó la bibliografía");
+      const reabierta = await db!.tarea.findUniqueOrThrow({ where: { idTarea: ciclo.idTarea } });
+      assert.equal(reabierta.estado, "en_progreso");
+      assert.equal(reabierta.fechaTerminada, null);
+      assert.equal(await db!.notificacion.count({ where: { tipo: "tarea_reabierta", idUsuario: ana } }), 1);
+      await tareaService.cambiarEstadoTarea(ana, idGrupo, ciclo.idTarea, "en_revision");
+      await tareaService.cambiarEstadoTarea(luis, idGrupo, ciclo.idTarea, "completada");
+      const estados = await db!.tareaHistorial.findMany({ where: { idTarea: ciclo.idTarea, accion: "estado" }, orderBy: { idHistorial: "asc" } });
+      assert.deepEqual(estados.map((cambio) => [cambio.valorAnterior, cambio.valorNuevo]), [
+        ["pendiente", "descartada\n\nMotivo de descarte: Cambió el alcance"], ["descartada", "pendiente"],
+        ["pendiente", "en_progreso"], ["en_progreso", "en_revision"], ["en_revision", "completada"],
+        ["completada", "en_progreso\n\nMotivo de reapertura: Faltó la bibliografía"],
+        ["en_progreso", "en_revision"], ["en_revision", "completada"],
+      ]);
+    });
+    await caso("editar registra fecha límite y peso; la vista se guarda una vez por asignación", async () => {
+      const editable = await tareaService.crearTarea(lider, idGrupo, { titulo: "Editable", peso: 1, idAsignado: String(ana), fechaLimite: fechaLimitePrueba });
+      const cambios = { titulo: "Editada", peso: 3, fechaLimite: "2099-12-15" };
+      await assert.rejects(tareaService.editarTarea(luis, idGrupo, editable.idTarea, cambios), ErrorDeNegocio);
+      await assert.rejects(tareaService.editarTarea(observador, idGrupo, editable.idTarea, cambios), ErrorDeNegocio);
+      await assert.rejects(
+        tareaService.editarTarea(lider, idGrupo, editable.idTarea, { ...cambios, fechaLimite: "2020-01-01" }),
+        ErrorDeNegocio,
+      );
+      await tareaService.editarTarea(lider, idGrupo, editable.idTarea, cambios);
+      const cambiosHistorial = await db!.tareaHistorial.findMany({
+        where: { idTarea: editable.idTarea, accion: { in: ["fecha_limite", "peso"] } },
+        orderBy: { idHistorial: "asc" },
+      });
+      assert.deepEqual(cambiosHistorial.map((cambio) => [cambio.accion, cambio.valorAnterior, cambio.valorNuevo]), [
+        ["fecha_limite", new Date("2099-12-30T23:59:00-05:00").toISOString(), new Date("2099-12-15T23:59:00-05:00").toISOString()],
+        ["peso", "1", "3"],
+      ]);
+      assert.equal(await db!.notificacion.count({ where: { tipo: "tarea_reprogramada", idUsuario: ana } }), 1);
+      const historialAntes = await db!.tareaHistorial.count({ where: { idTarea: editable.idTarea } });
+      await tareaService.editarTarea(lider, idGrupo, editable.idTarea, { ...cambios, titulo: "Solo título" });
+      assert.equal(await db!.tareaHistorial.count({ where: { idTarea: editable.idTarea } }), historialAntes);
+
+      const vistas = () => db!.tareaHistorial.count({ where: { idTarea: editable.idTarea, accion: "vista" } });
+      await tareaService.registrarVistaTarea(luis, idGrupo, editable.idTarea);
+      assert.equal(await vistas(), 0);
+      await tareaService.registrarVistaTarea(ana, idGrupo, editable.idTarea);
+      await tareaService.registrarVistaTarea(ana, idGrupo, editable.idTarea);
+      assert.equal(await vistas(), 1);
+      await tareaService.reasignarTarea(lider, idGrupo, editable.idTarea, String(luis));
+      await tareaService.registrarVistaTarea(luis, idGrupo, editable.idTarea);
+      assert.equal(await vistas(), 2);
+      await tareaService.reasignarTarea(lider, idGrupo, editable.idTarea, String(lider));
+      assert.equal(await vistas(), 3);
+      await tareaService.cambiarEstadoTarea(lider, idGrupo, editable.idTarea, "descartada", "Ya no es necesaria");
     });
     await caso("retirar mientras se asignan tareas nunca deja tareas abiertas del retirado", async () => {
       const grupo = await crearGrupo();

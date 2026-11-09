@@ -2,6 +2,7 @@ import { prisma } from "@/server/db/client";
 import { crearNotificacion } from "@/server/notifications/crear-notificacion";
 import { plantillasNotificacion } from "@/server/notifications/templates";
 import { ErrorDeNegocio } from "@/lib/errores";
+import { ESTADOS_TAREA_ABIERTOS } from "@/lib/estado-tarea";
 import type { Prisma } from "../../../generated/prisma/client";
 import { ejecutarCambioDeGrupo } from "./cambio-grupo";
 import type { crearGrupoSchema, actualizarGrupoSchema } from "@/lib/validation/grupo";
@@ -103,11 +104,11 @@ export async function actualizarGrupo(
     await requerirLiderDelGrupo(idUsuario, idGrupo, tx);
     if (datos.estado === "finalizado") {
       const tareasAbiertas = await tx.tarea.count({
-        where: { idGrupo, estado: { not: "completada" } },
+        where: { idGrupo, estado: { in: [...ESTADOS_TAREA_ABIERTOS] } },
       });
       if (tareasAbiertas > 0) {
         throw new ErrorDeNegocio(
-          `Completa las ${tareasAbiertas} ${tareasAbiertas === 1 ? "tarea pendiente" : "tareas pendientes"} antes de finalizar el grupo`,
+          `Completa o descarta ${tareasAbiertas === 1 ? "la tarea abierta" : `las ${tareasAbiertas} tareas abiertas`} antes de finalizar el grupo`,
         );
       }
     }
@@ -284,7 +285,7 @@ export async function retirarIntegrante(idActor: number, idGrupo: number, idUsua
     if (objetivo.rol === "lider") throw new ErrorDeNegocio("El lider no se puede retirar a si mismo");
 
     const tareasAbiertas = await tx.tarea.findMany({
-      where: { idGrupo, idAsignado: idUsuarioObjetivo, estado: { not: "completada" } },
+      where: { idGrupo, idAsignado: idUsuarioObjetivo, estado: { in: [...ESTADOS_TAREA_ABIERTOS] } },
       select: { idTarea: true, idAsignado: true },
     });
 

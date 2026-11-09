@@ -7,23 +7,29 @@ function esFechaISOReal(valor: string) {
   return fecha.getUTCFullYear() === anio && fecha.getUTCMonth() === mes - 1 && fecha.getUTCDate() === dia;
 }
 
-export const crearTareaSchema = z.object({
+const camposEditablesTarea = {
   titulo: z.string().trim().min(1, "El título es obligatorio").max(160),
   descripcion: z.string().trim().max(1000).optional().or(z.literal("")),
   peso: z.coerce.number().int().min(1, "El peso va de 1 a 3").max(3, "El peso va de 1 a 3"),
-  idAsignado: z.string()
-    .min(1, "Selecciona un responsable")
-    .regex(/^[1-9]\d*$/, "Selecciona un responsable válido")
-    .refine((valor) => Number(valor) <= 2147483647, "Selecciona un responsable válido"),
   fechaLimite: z
     .string()
     .min(1, "La fecha límite es obligatoria")
     .refine(esFechaISOReal, "La fecha límite no es válida"),
+};
+
+export const crearTareaSchema = z.object({
+  ...camposEditablesTarea,
+  idAsignado: z.string()
+    .min(1, "Selecciona un responsable")
+    .regex(/^[1-9]\d*$/, "Selecciona un responsable válido")
+    .refine((valor) => Number(valor) <= 2147483647, "Selecciona un responsable válido"),
 });
 
-export const motivoDevolucionSchema = z.string()
+export const editarTareaSchema = z.object(camposEditablesTarea);
+
+export const motivoCambioEstadoSchema = z.string()
   .trim()
-  .min(1, "Escribe el motivo de la devolución")
+  .min(1, "Escribe el motivo")
   .max(500, "El motivo admite hasta 500 caracteres");
 
 export const reasignarTareaSchema = z.object({
@@ -32,7 +38,7 @@ export const reasignarTareaSchema = z.object({
     .optional().or(z.literal("")),
 });
 
-export const ESTADOS_TAREA = ["pendiente", "en_progreso", "en_revision", "completada"] as const;
+export const ESTADOS_TAREA = ["pendiente", "en_progreso", "en_revision", "completada", "descartada"] as const;
 
 export const idRegistroSchema = z.coerce.number().int().positive().max(2147483647);
 

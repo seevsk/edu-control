@@ -156,6 +156,9 @@ async function main() {
   });
 
   const ahora = new Date();
+  // Fechas escalonadas en el pasado para que el seguimiento de tiempos de la demo tenga datos reales.
+  const haceHoras = (horas: number) => new Date(ahora.getTime() - horas * 60 * 60 * 1000);
+  const enDias = (dias: number) => new Date(ahora.getTime() + dias * 24 * 60 * 60 * 1000);
 
   const tareaPendiente = await prisma.tarea.create({
     data: {
@@ -165,7 +168,9 @@ async function main() {
       titulo: "Redactar historias de usuario restantes",
       peso: 1,
       estado: "pendiente",
-      historial: { create: [{ idUsuario: ana.idUsuario, accion: "creada" }] },
+      fechaLimite: enDias(5),
+      fechaCreacion: haceHoras(20),
+      historial: { create: [{ idUsuario: ana.idUsuario, accion: "creada", fecha: haceHoras(20) }] },
     },
   });
 
@@ -177,10 +182,21 @@ async function main() {
       titulo: "Modelar el esquema de base de datos",
       peso: 2,
       estado: "en_progreso",
+      fechaLimite: enDias(3),
+      fechaCreacion: haceHoras(52),
       historial: {
         create: [
-          { idUsuario: ana.idUsuario, accion: "creada" },
-          { idUsuario: bruno.idUsuario, accion: "estado", valorAnterior: "pendiente", valorNuevo: "en_progreso" },
+          { idUsuario: ana.idUsuario, accion: "creada", fecha: haceHoras(52) },
+          { idUsuario: bruno.idUsuario, accion: "vista", fecha: haceHoras(49) },
+          { idUsuario: bruno.idUsuario, accion: "estado", valorAnterior: "pendiente", valorNuevo: "en_progreso", fecha: haceHoras(30) },
+          { idUsuario: bruno.idUsuario, accion: "estado", valorAnterior: "en_progreso", valorNuevo: "en_revision", fecha: haceHoras(22) },
+          {
+            idUsuario: ana.idUsuario,
+            accion: "estado",
+            valorAnterior: "en_revision",
+            valorNuevo: "en_progreso\n\nMotivo de devolución: Faltan las relaciones entre grupo y tarea",
+            fecha: haceHoras(6),
+          },
         ],
       },
     },
@@ -194,12 +210,22 @@ async function main() {
       titulo: "Armar el mockup del tablero de tareas",
       peso: 2,
       estado: "en_revision",
-      fechaTerminada: ahora,
+      fechaLimite: enDias(4),
+      fechaTerminada: haceHoras(3),
+      fechaCreacion: haceHoras(70),
       historial: {
         create: [
-          { idUsuario: ana.idUsuario, accion: "creada" },
-          { idUsuario: ana.idUsuario, accion: "estado", valorAnterior: "pendiente", valorNuevo: "en_progreso" },
-          { idUsuario: ana.idUsuario, accion: "estado", valorAnterior: "en_progreso", valorNuevo: "en_revision" },
+          { idUsuario: ana.idUsuario, accion: "creada", fecha: haceHoras(70) },
+          { idUsuario: ana.idUsuario, accion: "vista", fecha: haceHoras(70) },
+          {
+            idUsuario: ana.idUsuario,
+            accion: "fecha_limite",
+            valorAnterior: enDias(1).toISOString(),
+            valorNuevo: enDias(4).toISOString(),
+            fecha: haceHoras(40),
+          },
+          { idUsuario: ana.idUsuario, accion: "estado", valorAnterior: "pendiente", valorNuevo: "en_progreso", fecha: haceHoras(26) },
+          { idUsuario: ana.idUsuario, accion: "estado", valorAnterior: "en_progreso", valorNuevo: "en_revision", fecha: haceHoras(3) },
         ],
       },
     },
@@ -213,13 +239,42 @@ async function main() {
       titulo: "Levantar Postgres local con Docker",
       peso: 1,
       estado: "completada",
-      fechaTerminada: new Date(ahora.getTime() - 2 * 24 * 60 * 60 * 1000),
+      fechaLimite: haceHoras(72),
+      fechaTerminada: haceHoras(60),
+      fechaCreacion: haceHoras(96),
       historial: {
         create: [
-          { idUsuario: ana.idUsuario, accion: "creada" },
-          { idUsuario: ana.idUsuario, accion: "estado", valorAnterior: "pendiente", valorNuevo: "en_progreso" },
-          { idUsuario: ana.idUsuario, accion: "estado", valorAnterior: "en_progreso", valorNuevo: "en_revision" },
-          { idUsuario: bruno.idUsuario, accion: "estado", valorAnterior: "en_revision", valorNuevo: "completada" },
+          { idUsuario: ana.idUsuario, accion: "creada", fecha: haceHoras(96) },
+          { idUsuario: ana.idUsuario, accion: "vista", fecha: haceHoras(96) },
+          { idUsuario: ana.idUsuario, accion: "estado", valorAnterior: "pendiente", valorNuevo: "en_progreso", fecha: haceHoras(90) },
+          { idUsuario: ana.idUsuario, accion: "estado", valorAnterior: "en_progreso", valorNuevo: "en_revision", fecha: haceHoras(60) },
+          { idUsuario: bruno.idUsuario, accion: "estado", valorAnterior: "en_revision", valorNuevo: "completada", fecha: haceHoras(54) },
+        ],
+      },
+    },
+  });
+
+  await prisma.tarea.create({
+    data: {
+      idGrupo: grupo.idGrupo,
+      idCreador: ana.idUsuario,
+      idAsignado: bruno.idUsuario,
+      titulo: "Integrar el login con Moodle",
+      peso: 2,
+      estado: "descartada",
+      fechaLimite: haceHoras(24),
+      fechaCreacion: haceHoras(120),
+      historial: {
+        create: [
+          { idUsuario: ana.idUsuario, accion: "creada", fecha: haceHoras(120) },
+          { idUsuario: bruno.idUsuario, accion: "vista", fecha: haceHoras(110) },
+          {
+            idUsuario: ana.idUsuario,
+            accion: "estado",
+            valorAnterior: "pendiente",
+            valorNuevo: "descartada\n\nMotivo de descarte: Moodle quedó fuera del alcance del MVP",
+            fecha: haceHoras(12),
+          },
         ],
       },
     },
@@ -253,7 +308,7 @@ async function main() {
 
   console.log("Seed listo:");
   console.log(`- usuarios: ana(${ana.idUsuario}) bruno(${bruno.idUsuario}) carla(${carla.idUsuario})`);
-  console.log(`- grupo: ${grupo.idGrupo} con tareas ${tareaPendiente.idTarea}/${tareaEnProgreso.idTarea}/${tareaEnRevision.idTarea} + 1 completada`);
+  console.log(`- grupo: ${grupo.idGrupo} con tareas ${tareaPendiente.idTarea}/${tareaEnProgreso.idTarea}/${tareaEnRevision.idTarea} + 1 completada con atraso + 1 descartada`);
 }
 
 main()

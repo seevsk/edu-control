@@ -21,7 +21,7 @@ export async function obtenerCalendarioEntre(idUsuario: number, desdeISO: string
       orderBy: { fechaCierre: "asc" },
     }),
     prisma.tarea.findMany({
-      where: { idAsignado: idUsuario, fechaLimite: { gte: desde, lt: hasta } },
+      where: { idAsignado: idUsuario, estado: { not: "descartada" }, fechaLimite: { gte: desde, lt: hasta } },
       include: { grupo: true },
       orderBy: { fechaLimite: "asc" },
     }),

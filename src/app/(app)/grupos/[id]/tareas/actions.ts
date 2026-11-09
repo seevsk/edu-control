@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requerirSesion } from "@/server/auth/session";
 import {
   crearTareaSchema,
+  editarTareaSchema,
   reasignarTareaSchema,
   contextoTareaSchema,
   cambiarEstadoTareaSchema,
@@ -15,6 +16,7 @@ import {
 } from "@/lib/validation/tarea";
 import * as tareaService from "@/server/services/tarea";
 import { mensajeParaUsuario } from "@/lib/errores";
+import type { EstadoTarea } from "@/lib/estado-tarea";
 
 function leerFormData(formData: FormData) {
   return Object.fromEntries(formData.entries());
@@ -98,7 +100,7 @@ export async function reasignarTareaAction(
 export async function cambiarEstadoTareaAction(
   idGrupo: number,
   idTarea: number,
-  nuevoEstado: "pendiente" | "en_progreso" | "en_revision" | "completada",
+  nuevoEstado: EstadoTarea,
   destino: DestinoTarea,
   filtros: FiltrosTarea,
   formData: FormData,
@@ -120,7 +122,7 @@ export async function cambiarEstadoTareaAction(
       contexto.data.idGrupo,
       contexto.data.idTarea,
       contexto.data.nuevoEstado,
-      String(formData.get("motivoDevolucion") ?? ""),
+      String(formData.get("motivo") ?? ""),
     );
   } catch (error) {
     redirigirErrorTarea(ruta, mensajeParaUsuario(error, "No se pudo cambiar el estado"));
@@ -128,4 +130,35 @@ export async function cambiarEstadoTareaAction(
 
   revalidarTarea(idGrupo, idTarea);
   redirect(ruta);
+}
+
+export async function editarTareaAction(idGrupo: number, idTarea: number, formData: FormData) {
+  const sesion = await requerirSesion();
+  const contexto = contextoTareaSchema.safeParse({ idGrupo, idTarea, destino: "detalle" });
+  if (!contexto.success) redirect("/grupos");
+  const ruta = rutaTarea(contexto.data.idGrupo, contexto.data.idTarea, "detalle");
+  const parseo = editarTareaSchema.safeParse(leerFormData(formData));
+  if (!parseo.success) redirigirErrorTarea(`${ruta}?editar=1`, parseo.error.issues[0].message);
+
+  try {
+    await tareaService.editarTarea(sesion.idUsuario, contexto.data.idGrupo, contexto.data.idTarea, parseo.data);
+  } catch (error) {
+    redirigirErrorTarea(`${ruta}?editar=1`, mensajeParaUsuario(error, "No se pudo guardar la tarea"));
+  }
+
+  revalidarTarea(idGrupo, idTarea);
+  redirect(`${ruta}?toast=${encodeURIComponent("Tarea actualizada")}`);
+}
+
+/** Se llama al abrir el detalle; nunca muestra errores porque es solo un registro de seguimiento. */
+export async function registrarVistaTareaAction(idGrupo: number, idTarea: number) {
+  const sesion = await requerirSesion();
+  const contexto = contextoTareaSchema.safeParse({ idGrupo, idTarea, destino: "detalle" });
+  if (!contexto.success) return;
+  try {
+    await tareaService.registrarVistaTarea(sesion.idUsuario, contexto.data.idGrupo, contexto.data.idTarea);
+  } catch {
+    return;
+  }
+  revalidatePath(`/grupos/${idGrupo}/tareas/${idTarea}`);
 }

@@ -10,6 +10,7 @@ import { ChipModalidad } from "@/components/chip-modalidad";
 import { formatearFechaLima } from "@/lib/dates";
 import { diasHasta, etiquetaRelativa } from "@/lib/calendario";
 import { calcularAvanceGrupo } from "@/lib/metricas";
+import { estaAbierta } from "@/lib/estado-tarea";
 import { IconAgregar, IconBuscar, IconCalendario, IconGrupos } from "@/components/icons";
 import { Modal } from "@/components/modal";
 
@@ -50,7 +51,7 @@ export default async function GruposPage({
   });
   const ahora = new Date();
   const tareasAbiertas = activos.reduce(
-    (total, grupo) => total + grupo.tareas.filter((tarea) => tarea.estado !== "completada").length,
+    (total, grupo) => total + grupo.tareas.filter((tarea) => estaAbierta(tarea.estado)).length,
     0,
   );
 

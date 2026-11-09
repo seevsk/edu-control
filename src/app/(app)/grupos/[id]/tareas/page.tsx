@@ -6,6 +6,10 @@ import { listarTareasDelGrupo, obtenerResumenTareasGrupo } from "@/server/servic
 import { formatearFechaLima } from "@/lib/dates";
 import { diasHasta, etiquetaRelativa, fechaEnZonaLimaISO } from "@/lib/calendario";
 import { ESTADOS_TAREA_ORDEN, ETIQUETA_ESTADO_TAREA, COLOR_ESTADO_TAREA } from "@/lib/estado-tarea";
+import { estaVencida, evaluarEntrega, fechaEstadoActual } from "@/lib/tiempos-tarea";
+
+/** Como en Jira: el tablero solo muestra lo completado recientemente; el resto queda en la lista. */
+const DIAS_COMPLETADAS_EN_TABLERO = 14;
 import { Avatar } from "@/components/avatar";
 import { SubmitButton } from "@/components/submit-button";
 import { Modal } from "@/components/modal";
@@ -41,7 +45,8 @@ export default async function TareasGrupoPage({
   const { grupo, rolActual } = resultado;
 
   const puedeGestionar = rolActual !== "observador" && grupo.estado === "activo";
-  const esVistaLista = vista === "lista";
+  // El tablero no tiene columna de descartadas: ese filtro siempre se muestra como lista.
+  const esVistaLista = vista === "lista" || estado === "descartada";
 
   const [tareas, resumen] = filtros.success
     ? await Promise.all([
@@ -85,14 +90,26 @@ export default async function TareasGrupoPage({
     return `?${parametrosDestino.toString()}`;
   }
 
-  function PresentacionFecha({ fecha, completada = false }: { fecha: Date | null; completada?: boolean }) {
+  const limiteCompletadas = ahora.getTime() - DIAS_COMPLETADAS_EN_TABLERO * 86_400_000;
+  const completadasAntiguas = tareas.filter((tarea) => {
+    if (tarea.estado !== "completada") return false;
+    const completadaEn = fechaEstadoActual(tarea.historial);
+    return completadaEn !== null && completadaEn.getTime() < limiteCompletadas;
+  });
+
+  function PresentacionFecha({ tarea }: { tarea: (typeof tareas)[number] }) {
+    const fecha = tarea.fechaLimite;
     if (!fecha) return <span className="text-text-muted">Sin fecha límite</span>;
-    const dias = diasHasta(fecha, ahora);
-    const urgente = !completada && dias <= 2;
+    const cerrada = tarea.estado === "completada" || tarea.estado === "descartada";
+    const vencida = estaVencida(tarea, ahora);
+    const urgente = !cerrada && diasHasta(fecha, ahora) <= 2;
+    const conAtraso = tarea.estado === "completada" && evaluarEntrega(tarea, tarea.historial)?.aTiempo === false;
     return (
-      <span className={`inline-flex items-center gap-1.5 ${urgente ? "font-medium text-danger" : "text-text-muted"}`}>
+      <span className={`inline-flex flex-wrap items-center gap-1.5 ${urgente ? "font-medium text-danger" : "text-text-muted"}`}>
         <IconCalendario className="size-3.5 shrink-0" aria-hidden />
-        <span title={formatearFechaLima(fecha)}>{completada ? formatearFechaLima(fecha) : etiquetaRelativa(fecha, ahora)}</span>
+        <span title={formatearFechaLima(fecha)}>{cerrada ? formatearFechaLima(fecha) : etiquetaRelativa(fecha, ahora)}</span>
+        {vencida ? <span className="rounded-full bg-danger/10 px-1.5 py-0.5 text-[11px] font-medium text-danger">Vencida</span> : null}
+        {conAtraso ? <span className="rounded-full bg-danger/10 px-1.5 py-0.5 text-[11px] font-medium text-danger">Entregada con atraso</span> : null}
       </span>
     );
   }
@@ -132,7 +149,7 @@ export default async function TareasGrupoPage({
             ))}
           </span>
         </div>
-        <p className="text-xs"><PresentacionFecha fecha={tarea.fechaLimite} completada={tarea.estado === "completada"} /></p>
+        <p className="text-xs"><PresentacionFecha tarea={tarea} /></p>
 
         {puedeGestionar ? (
           <AccionesTarea
@@ -215,6 +232,7 @@ export default async function TareasGrupoPage({
             <select name="estado" defaultValue={estado ?? ""} className="rounded-md border border-border-strong bg-surface px-2 py-1.5 text-sm">
               <option value="">Todos</option>
               {ESTADOS_TAREA_ORDEN.map((e) => <option key={e} value={e}>{ETIQUETA_ESTADO_TAREA[e]}</option>)}
+              <option value="descartada">{ETIQUETA_ESTADO_TAREA.descartada}</option>
             </select>
           </label>
           <label className="flex flex-col gap-1 text-xs">Responsable
@@ -248,6 +266,14 @@ export default async function TareasGrupoPage({
         <p className="text-xs text-text-muted">
           {resumen.sinAsignar > 0 ? `${resumen.sinAsignar} ${resumen.sinAsignar === 1 ? "tarea abierta sin responsable" : "tareas abiertas sin responsable"}. ` : ""}
           El peso representa el impacto de cada tarea en el avance del grupo.
+          {resumen.descartadas > 0 && estado !== "descartada" ? (
+            <>
+              {" "}
+              <Link href={hrefConFiltros({ estado: "descartada", foco: undefined, vista: "lista" })} className="text-primary hover:underline">
+                Ver descartadas ({resumen.descartadas})
+              </Link>
+            </>
+          ) : null}
         </p>
         <div className="flex overflow-hidden rounded-md border border-border-strong bg-surface text-sm">
           <Link
@@ -315,7 +341,7 @@ export default async function TareasGrupoPage({
                   </td>
                   <td className="px-3 py-2">{tarea.peso}</td>
                   <td className="px-3 py-2">
-                    <PresentacionFecha fecha={tarea.fechaLimite} completada={tarea.estado === "completada"} />
+                    <PresentacionFecha tarea={tarea} />
                   </td>
                   {puedeGestionar ? (
                     <td className="min-w-64 px-3 py-2">
@@ -337,7 +363,8 @@ export default async function TareasGrupoPage({
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {ESTADOS_TAREA_ORDEN.map((columnaEstado) => {
-            const tareasColumna = tareas.filter((tarea) => tarea.estado === columnaEstado);
+            const ocultas = columnaEstado === "completada" && estado !== "completada" ? completadasAntiguas : [];
+            const tareasColumna = tareas.filter((tarea) => tarea.estado === columnaEstado && !ocultas.includes(tarea));
             return (
             <section key={columnaEstado} className="flex min-h-64 flex-col gap-3 rounded-md border border-border bg-bg/60 p-2.5">
               <h2 className="flex items-center gap-2 px-1 text-sm font-semibold">
@@ -353,6 +380,14 @@ export default async function TareasGrupoPage({
                 {tareasColumna.map((tarea) => <TarjetaTarea key={tarea.idTarea} tarea={tarea} />)}
               </ul>
               {tareasColumna.length === 0 ? <p className="m-auto px-3 text-center text-xs text-text-muted">No hay tareas en este estado.</p> : null}
+              {ocultas.length > 0 ? (
+                <Link
+                  href={hrefConFiltros({ estado: "completada", foco: undefined, vista: "lista" })}
+                  className="px-1 text-xs text-primary hover:underline"
+                >
+                  Ver anteriores ({ocultas.length})
+                </Link>
+              ) : null}
             </section>
           );})}
         </div>
