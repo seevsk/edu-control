@@ -1,263 +1,327 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ChevronDown, Plus, X } from "lucide-react";
 import { requerirSesion } from "@/server/auth/session";
 import { obtenerGrupoDelUsuario } from "@/server/services/grupo";
-import { obtenerMetricasGrupo } from "@/server/services/metricas";
-import { yaImportoCurso } from "@/server/services/curso";
-import { formatearFechaLima } from "@/lib/dates";
-import { importarCursoAction } from "../../cursos/actions";
-import { actualizarPreferenciaCorreoActividadAction } from "../actions";
-import { SubmitButton } from "@/components/submit-button";
+import { listarTareasDelGrupo, obtenerTareaDelGrupo } from "@/server/services/tarea";
+import { calcularAvanceGrupo } from "@/lib/metricas";
+import { ESTADOS_TAREA_ORDEN, type EstadoTarea } from "@/lib/estado-tarea";
+import { nombreCorto } from "@/lib/nombres";
+import { fechaEnZonaLimaISO } from "@/lib/calendario";
+import { filtrosTareaSchema, idRegistroSchema } from "@/lib/validation/tarea";
+import { PaginaCompleta } from "@/components/ui-app/page-header";
+import { PanelLateral } from "@/components/ui-app/panel-lateral";
+import { ViewSwitcher } from "@/components/ui-app/view-switcher";
+import { StatusGroup, TaskRow } from "@/components/ui-app/task-row";
+import { StatusIcon } from "@/components/ui-app/status-icon";
+import { UserAvatar } from "@/components/ui-app/user-avatar";
 import { Toast } from "@/components/toast";
-import { IconAgregar, IconReuniones } from "@/components/icons";
-import { TabsGrupo } from "./_components/tabs-grupo";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { SubmitButton } from "@/components/submit-button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { EncabezadoGrupo } from "./_components/encabezado-grupo";
+import { DetalleTarea } from "./_components/detalle-tarea";
+import { TableroTareas } from "./_components/tablero-tareas";
+import { crearTareaAction } from "./tareas/actions";
 
-export default async function GrupoDetallePage({
+/** Orden de la lista: lo que se esta moviendo primero, lo cerrado al final. */
+const ORDEN_LISTA: EstadoTarea[] = ["en_progreso", "en_revision", "pendiente", "completada"];
+const CAMPO = "flex flex-col gap-1.5 text-[13px] font-medium";
+const SELECT = "h-9 rounded-md border border-input bg-transparent px-3 text-sm";
+
+function texto(valor: string | string[] | undefined) {
+  return typeof valor === "string" ? valor : undefined;
+}
+
+export default async function GrupoTareasPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; nuevo?: string; toast?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { id } = await params;
-  const idGrupo = Number(id);
-  if (!Number.isInteger(idGrupo)) notFound();
-
+  const grupoId = idRegistroSchema.safeParse(id);
+  if (!grupoId.success) notFound();
+  const idGrupo = grupoId.data;
   const sesion = await requerirSesion();
-  const { error, nuevo, toast } = await searchParams;
-  const resultado = await obtenerGrupoDelUsuario(sesion.idUsuario, idGrupo).catch(() => null);
-  if (!resultado) notFound();
 
-  const { grupo, rolActual } = resultado;
-  const integranteActual = grupo.integrantes.find((integrante) => integrante.idUsuario === sesion.idUsuario)!;
-  const esLider = rolActual === "lider";
-  const puedeParticipar = rolActual !== "observador" && grupo.estado === "activo";
-  const { avance, porIntegrante } = await obtenerMetricasGrupo(sesion.idUsuario, idGrupo);
+  const parametros = await searchParams;
+  const filtros = filtrosTareaSchema.safeParse({ estado: texto(parametros.estado), asignado: texto(parametros.asignado) });
+  const estado = filtros.success ? filtros.data.estado || undefined : undefined;
+  const asignado = filtros.success ? filtros.data.asignado || undefined : undefined;
+  const vista = texto(parametros.vista) === "tablero" ? "tablero" : "lista";
+  const idTareaAbierta = idRegistroSchema.safeParse(texto(parametros.tarea));
+  const abrirNueva = texto(parametros.nueva) === "1";
+  const error = texto(parametros.error);
+  const toast = texto(parametros.toast);
 
-  const curso = grupo.evaluacion?.curso ?? null;
-  const puedeImportarCurso =
-    curso !== null &&
-    curso.idUsuario !== sesion.idUsuario &&
-    !(await yaImportoCurso(sesion.idUsuario, curso.idCurso));
+  const datos = await obtenerGrupoDelUsuario(sesion.idUsuario, idGrupo).catch(() => null);
+  if (!datos) notFound();
+  const { grupo, rolActual } = datos;
+  const puedeGestionar = rolActual !== "observador" && grupo.estado === "activo";
+
+  const [todas, descartadas, tareaAbierta] = await Promise.all([
+    listarTareasDelGrupo(sesion.idUsuario, idGrupo),
+    estado === "descartada" ? listarTareasDelGrupo(sesion.idUsuario, idGrupo, { estado: "descartada" }) : Promise.resolve([]),
+    idTareaAbierta.success ? obtenerTareaDelGrupo(sesion.idUsuario, idGrupo, idTareaAbierta.data).catch(() => null) : Promise.resolve(null),
+  ]);
+  const visibles = (estado === "descartada" ? descartadas : todas).filter(
+    (tarea) => (!estado || tarea.estado === estado) && (!asignado || tarea.idAsignado === asignado),
+  );
+
+  const ahora = new Date();
+  const completadas = todas.filter((tarea) => tarea.estado === "completada").length;
+  const avance = calcularAvanceGrupo(todas);
+  const asignables = grupo.integrantes.filter((integrante) => integrante.estadoInvitacion === "aceptada" && integrante.rol !== "observador");
+
+  function href(cambios: Record<string, string | undefined>) {
+    const destino = new URLSearchParams();
+    const base: Record<string, string | undefined> = {
+      vista: vista === "tablero" ? "tablero" : undefined,
+      estado,
+      asignado: asignado ? String(asignado) : undefined,
+      ...cambios,
+    };
+    for (const [clave, valor] of Object.entries(base)) if (valor) destino.set(clave, valor);
+    const consulta = destino.toString();
+    return `/grupos/${idGrupo}${consulta ? `?${consulta}` : ""}`;
+  }
+  const hrefCerrar = href({});
+  const hrefTarea = (idTarea: number) => href({ tarea: String(idTarea) });
+
+  const filas = visibles.map((tarea) => ({
+    idTarea: tarea.idTarea,
+    titulo: tarea.titulo,
+    estado: tarea.estado,
+    fechaLimite: tarea.fechaLimite,
+    asignado: tarea.asignado ? { idUsuario: tarea.asignado.idUsuario, nombre: tarea.asignado.nombre, apellidos: tarea.asignado.apellidos, fotoUrl: tarea.asignado.fotoUrl } : null,
+    nota: tarea.estado === "en_revision" && puedeGestionar && tarea.idAsignado !== sesion.idUsuario ? "Te toca revisar" : undefined,
+  }));
+  const responsableFiltrado = asignables.find((integrante) => integrante.idUsuario === asignado);
 
   return (
-    <div className="animate-page-in mx-auto flex max-w-5xl flex-col gap-6">
+    <PaginaCompleta>
       <Toast mensaje={toast} />
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <Link href="/grupos" className="text-sm text-primary hover:underline">
-            Grupos
-          </Link>
-          <div className="mt-1 flex items-center gap-2">
-            <h1 className="text-xl font-semibold">{grupo.nombre}</h1>
-            <span
-              className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                grupo.estado === "activo"
-                  ? "bg-estado-completada/15 text-estado-completada"
-                  : "bg-bg text-text-muted"
-              }`}
-            >
-              {grupo.estado === "activo" ? "Activo" : "Finalizado"}
-            </span>
-          </div>
-          {grupo.descripcion ? <p className="mt-1 text-sm text-text-muted">{grupo.descripcion}</p> : null}
-        </div>
-
-        {puedeParticipar ? (
-          <div className="flex flex-wrap items-center gap-2">
-            {esLider ? (
-              <Link
-                href={`/grupos/${idGrupo}/integrantes#invitar`}
-                className="rounded-md border border-border-strong bg-surface px-3 py-1.5 text-sm font-medium hover:bg-bg"
-              >
-                Invitar integrante
+      <EncabezadoGrupo
+        datos={datos}
+        idUsuario={sesion.idUsuario}
+        activa="tareas"
+        accionPrincipal={
+          puedeGestionar ? (
+            <Button size="sm" asChild>
+              <Link href={href({ nueva: "1" })} scroll={false}>
+                <Plus aria-hidden />
+                Nueva tarea
               </Link>
-            ) : null}
-            <Link
-              href={`/reuniones/nueva?grupo=${idGrupo}`}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border-strong bg-surface px-3 py-1.5 text-sm font-medium hover:bg-bg"
+            </Button>
+          ) : null
+        }
+      />
+
+      <div className="flex flex-wrap items-center gap-2 border-b px-4 py-2.5 sm:px-6">
+        <ViewSwitcher vista={vista} hrefLista={href({ vista: undefined })} hrefTablero={href({ vista: "tablero" })} />
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className={estado ? "h-7" : "h-7 border-dashed text-muted-foreground"}>
+              {estado ? <StatusIcon estado={estado} conTexto /> : "+ Estado"}
+              <ChevronDown aria-hidden />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            {[...ESTADOS_TAREA_ORDEN, "descartada" as const].map((opcion) => (
+              <DropdownMenuItem key={opcion} asChild>
+                <Link href={href({ estado: opcion })} scroll={false}>
+                  <StatusIcon estado={opcion} conTexto />
+                </Link>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        {estado ? (
+          <Link href={href({ estado: undefined })} scroll={false} aria-label="Quitar filtro de estado" className="-ml-1 rounded p-0.5 text-subtle-foreground hover:text-foreground">
+            <X className="size-3.5" aria-hidden />
+          </Link>
+        ) : null}
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className={asignado ? "h-7" : "h-7 border-dashed text-muted-foreground"}>
+              {responsableFiltrado ? (
+                <>
+                  <UserAvatar usuario={responsableFiltrado.usuario} tamano="xs" />
+                  {nombreCorto(responsableFiltrado.usuario.nombre, responsableFiltrado.usuario.apellidos)}
+                </>
+              ) : "+ Asignado"}
+              <ChevronDown aria-hidden />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            {asignables.map((integrante) => (
+              <DropdownMenuItem key={integrante.idUsuario} asChild>
+                <Link href={href({ asignado: String(integrante.idUsuario) })} scroll={false}>
+                  <UserAvatar usuario={integrante.usuario} tamano="xs" />
+                  {nombreCorto(integrante.usuario.nombre, integrante.usuario.apellidos)}
+                </Link>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        {asignado ? (
+          <Link href={href({ asignado: undefined })} scroll={false} aria-label="Quitar filtro de responsable" className="-ml-1 rounded p-0.5 text-subtle-foreground hover:text-foreground">
+            <X className="size-3.5" aria-hidden />
+          </Link>
+        ) : null}
+
+        {todas.length > 0 ? (
+          <div className="ml-auto flex items-center gap-2.5 text-[13px] text-muted-foreground">
+            <span className="tabular-nums">{completadas} de {todas.length} completadas</span>
+            <div
+              className="h-1 w-28 overflow-hidden rounded-full bg-secondary"
+              role="progressbar"
+              aria-label="Avance del grupo según el peso de las tareas"
+              aria-valuenow={Math.round((avance ?? 0) * 100)}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              title={`Avance por peso: ${Math.round((avance ?? 0) * 100)} %`}
             >
-              <IconReuniones className="size-4" aria-hidden />
-              Programar reunión
-            </Link>
-            <Link
-              href={`/grupos/${idGrupo}/tareas?nueva=1`}
-              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary-hover"
-            >
-              <IconAgregar className="size-4" aria-hidden />
-              Nueva tarea
-            </Link>
+              <div className="h-full rounded-full bg-estado-completada" style={{ width: `${Math.round((avance ?? 0) * 100)}%` }} />
+            </div>
           </div>
         ) : null}
       </div>
 
-      <TabsGrupo idGrupo={idGrupo} activa="resumen" mostrarConfiguracion={esLider} />
+      {error && !abrirNueva && !tareaAbierta ? (
+        <p role="alert" className="mx-4 mt-3 rounded-md bg-destructive/10 px-3 py-2 text-[13px] text-destructive sm:mx-6">{error}</p>
+      ) : null}
 
-      {nuevo === "1" ? (
-        <section className="rounded-md border border-primary/30 bg-primary-soft px-4 py-3 text-sm">
-          <p className="font-medium">Tu grupo ya está listo.</p>
-          <p className="mt-1 text-text-muted">
-            El siguiente paso es invitar a tus compañeros y crear las tareas del trabajo.
+      {vista === "tablero" && estado !== "descartada" ? (
+        <TableroTareas
+          idGrupo={idGrupo}
+          filas={filas}
+          ahora={ahora}
+          rol={rolActual}
+          idUsuario={sesion.idUsuario}
+          activo={grupo.estado === "activo"}
+          hrefTarea={Object.fromEntries(filas.map((fila) => [fila.idTarea, hrefTarea(fila.idTarea)]))}
+          hrefNueva={puedeGestionar ? href({ nueva: "1" }) : undefined}
+          hrefAnteriores={href({ vista: undefined, estado: "completada" })}
+          completadasEn={Object.fromEntries(
+            visibles.filter((tarea) => tarea.estado === "completada").map((tarea) => [
+              tarea.idTarea,
+              tarea.historial.reduce((ultima, cambio) => (cambio.accion === "estado" && cambio.fecha > ultima ? cambio.fecha : ultima), new Date(0)).toISOString(),
+            ]),
+          )}
+        />
+      ) : todas.length === 0 && !estado ? (
+        <div className="px-4 py-16 text-center sm:px-6">
+          <p className="text-[13px] text-muted-foreground">
+            Aquí aparecerán las tareas del grupo, ordenadas por estado, con su responsable y fecha límite.
           </p>
-        </section>
-      ) : null}
-
-      {grupo.estado === "finalizado" ? (
-        <p role="status" className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-sm">
-          Este grupo está finalizado y es de solo lectura. Puedes consultar sus tareas, integrantes e historial.
-        </p>
-      ) : null}
-
-      {error ? (
-        <p role="alert" className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
-          {error}
-        </p>
-      ) : null}
-
-      <section className="grid gap-3 md:grid-cols-3" aria-label="Datos principales del grupo">
-        <div className="rounded-md border border-border bg-surface p-4">
-          <p className="text-xs font-medium text-text-muted">Fecha límite</p>
-          <p className="mt-1 text-sm font-medium">
-            {grupo.fechaLimite ? formatearFechaLima(grupo.fechaLimite) : "Sin fecha definida"}
-          </p>
-        </div>
-        <div className="rounded-md border border-border bg-surface p-4">
-          <p className="text-xs font-medium text-text-muted">Curso relacionado</p>
-          <p className="mt-1 text-sm font-medium">{curso?.nombre ?? "Sin curso relacionado"}</p>
-          {puedeImportarCurso ? (
-            <form action={importarCursoAction.bind(null, idGrupo, `/grupos/${idGrupo}`)} className="mt-2">
-              <SubmitButton className="text-xs font-medium text-primary hover:underline" pendingText="Añadiendo...">
-                Añadir a mis cursos
-              </SubmitButton>
-            </form>
+          {puedeGestionar ? (
+            <Button size="sm" className="mt-4" asChild>
+              <Link href={href({ nueva: "1" })} scroll={false}><Plus aria-hidden />Crear la primera tarea</Link>
+            </Button>
           ) : null}
         </div>
-        <div className="rounded-md border border-border bg-surface p-4">
-          <p className="text-xs font-medium text-text-muted">Documento del grupo</p>
-          {grupo.enlaceTrabajo ? (
-            <a
-              href={grupo.enlaceTrabajo}
-              target="_blank"
-              rel="noreferrer noopener"
-              className="mt-1 inline-block text-sm font-medium text-primary hover:underline"
-            >
-              Abrir documento ↗
-            </a>
-          ) : (
-            <p className="mt-1 text-sm text-text-muted">Sin enlace registrado</p>
-          )}
+      ) : estado ? (
+        <StatusGroup estado={estado} cantidad={filas.length} vacio="No hay tareas con estos filtros.">
+          {filas.map((fila) => <TaskRow key={fila.idTarea} tarea={fila} href={hrefTarea(fila.idTarea)} ahora={ahora} />)}
+        </StatusGroup>
+      ) : (
+        <div>
+          {ORDEN_LISTA.map((grupoEstado) => {
+            const delEstado = filas.filter((fila) => fila.estado === grupoEstado);
+            return (
+              <StatusGroup
+                key={grupoEstado}
+                estado={grupoEstado}
+                cantidad={delEstado.length}
+                hrefNueva={grupoEstado === "pendiente" && puedeGestionar ? href({ nueva: "1" }) : undefined}
+              >
+                {delEstado.map((fila) => <TaskRow key={fila.idTarea} tarea={fila} href={hrefTarea(fila.idTarea)} ahora={ahora} />)}
+              </StatusGroup>
+            );
+          })}
         </div>
-      </section>
+      )}
 
-      {rolActual !== "observador" ? (
-        <section id="notificaciones" aria-labelledby="titulo-notificaciones" className="scroll-mt-4 rounded-md border border-border bg-surface p-4">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="max-w-2xl">
-              <h2 id="titulo-notificaciones" className="text-sm font-medium">Tus notificaciones de este grupo</h2>
-              <p className="mt-1 text-xs leading-relaxed text-text-muted">
-                La campana dentro de EduControl siempre permanece activa. Esta preferencia solo controla los correos de actividad,
-                como cuando una tarea pasa a revisión. Las invitaciones, asignaciones y devoluciones importantes siguen llegando.
-              </p>
-            </div>
-
-            {grupo.estado === "activo" ? (
-              <form action={actualizarPreferenciaCorreoActividadAction.bind(null, idGrupo)} className="flex flex-col items-start gap-2">
-                <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
-                  <input
-                    type="checkbox"
-                    name="correoActividad"
-                    defaultChecked={integranteActual.correoActividad}
-                    className="size-4 accent-primary"
-                  />
-                  Recibir correos de actividad
-                </label>
-                <SubmitButton
-                  pendingText="Guardando..."
-                  className="rounded-md border border-border-strong bg-surface px-3 py-1.5 text-sm font-medium hover:bg-bg"
-                >
-                  Guardar preferencia
-                </SubmitButton>
-              </form>
-            ) : (
-              <p className="text-xs text-text-muted">
-                Preferencia {integranteActual.correoActividad ? "activada" : "desactivada"}. El grupo finalizado es de solo lectura.
-              </p>
-            )}
-          </div>
-        </section>
+      {tareaAbierta ? (
+        <PanelLateral titulo={tareaAbierta.titulo} cerrarEn={hrefCerrar}>
+          <DetalleTarea
+            datos={datos}
+            tarea={tareaAbierta}
+            idUsuario={sesion.idUsuario}
+            ahora={ahora}
+            hrefBase={hrefTarea(tareaAbierta.idTarea)}
+            editar={texto(parametros.editar) === "1"}
+            error={error}
+          />
+        </PanelLateral>
       ) : null}
 
-      <section className="rounded-md border border-border bg-surface p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-medium">Avance del grupo</h2>
-            <p className="mt-0.5 text-xs text-text-muted">Basado en el peso de las tareas completadas.</p>
-          </div>
-          <details className="text-xs text-text-muted">
-            <summary className="cursor-pointer text-primary hover:underline">Cómo se calcula</summary>
-            <div className="mt-2 max-w-md space-y-1 rounded-md border border-border bg-bg p-3 leading-relaxed">
-              <p><strong className="text-text">Carga:</strong> proporción del peso total asignado a cada integrante.</p>
-              <p><strong className="text-text">Cumplimiento:</strong> peso completado frente al peso que recibió.</p>
-              <p><strong className="text-text">Puntualidad:</strong> tareas enviadas a revisión antes de su fecha límite.</p>
-            </div>
-          </details>
-        </div>
-
-        {avance === null ? (
-          <div className="mt-4 rounded-md border border-dashed border-border-strong px-4 py-5 text-center">
-            <p className="text-sm text-text-muted">Aún no hay tareas para calcular el avance.</p>
-            {puedeParticipar ? (
-              <Link href={`/grupos/${idGrupo}/tareas?nueva=1`} className="mt-2 inline-block text-sm font-medium text-primary hover:underline">
-                Crear la primera tarea
-              </Link>
-            ) : null}
-          </div>
-        ) : (
-          <div className="mt-3 flex items-center gap-3">
-            <div className="h-2 flex-1 overflow-hidden rounded-full bg-bg">
-              <div className="h-full rounded-full bg-estado-completada" style={{ width: `${Math.round(avance * 100)}%` }} />
-            </div>
-            <span className="text-sm font-medium">{Math.round(avance * 100)}%</span>
-          </div>
-        )}
-
-        {porIntegrante.length > 0 ? (
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-border text-xs text-text-muted">
-                <tr>
-                  <th className="py-2 pr-3 font-medium">Integrante</th>
-                  <th className="py-2 pr-3 font-medium">Carga</th>
-                  <th className="py-2 pr-3 font-medium">Cumplimiento</th>
-                  <th className="py-2 font-medium">Puntualidad</th>
-                </tr>
-              </thead>
-              <tbody>
-                {porIntegrante.map((metrica) => (
-                  <tr key={metrica.idUsuario} className="border-b border-border last:border-0">
-                    <td className="py-2 pr-3 font-medium">{metrica.nombre}</td>
-                    <td className="py-2 pr-3">{Math.round(metrica.carga * 100)}%</td>
-                    <td className="py-2 pr-3">
-                      {metrica.cumplimiento === null ? (
-                        <span className="text-text-muted">Sin tareas asignadas</span>
-                      ) : (
-                        `${Math.round(metrica.cumplimiento * 100)}%`
-                      )}
-                    </td>
-                    <td className="py-2">
-                      {metrica.puntualidad === null ? (
-                        <span className="text-text-muted">Sin datos</span>
-                      ) : (
-                        `${Math.round(metrica.puntualidad * 100)}%`
-                      )}
-                    </td>
-                  </tr>
+      {abrirNueva && puedeGestionar ? (
+        <PanelLateral titulo="Nueva tarea" cerrarEn={hrefCerrar}>
+          {error ? <p role="alert" className="mb-4 rounded-md bg-destructive/10 px-3 py-2 text-[13px] text-destructive">{error}</p> : null}
+          <form action={crearTareaAction.bind(null, idGrupo)} className="flex flex-col gap-4">
+            <label className={CAMPO}>
+              Título
+              <Input name="titulo" required maxLength={160} autoFocus />
+            </label>
+            <label className={CAMPO}>
+              Descripción
+              <Textarea name="descripcion" maxLength={1000} rows={3} />
+            </label>
+            <label className={CAMPO}>
+              Responsable
+              <select name="idAsignado" defaultValue="" required className={SELECT}>
+                <option value="" disabled>Elige a quién le toca</option>
+                {asignables.map((integrante) => (
+                  <option key={integrante.idUsuario} value={integrante.idUsuario}>
+                    {nombreCorto(integrante.usuario.nombre, integrante.usuario.apellidos)}
+                  </option>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        ) : null}
-      </section>
-    </div>
+              </select>
+            </label>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className={CAMPO}>
+                Peso
+                <select name="peso" defaultValue="1" className={SELECT}>
+                  <option value="1">1 · liviana</option>
+                  <option value="2">2 · media</option>
+                  <option value="3">3 · pesada</option>
+                </select>
+              </label>
+              <label className={CAMPO}>
+                Fecha límite
+                <Input
+                  type="date"
+                  name="fechaLimite"
+                  required
+                  min={fechaEnZonaLimaISO(ahora)}
+                  max={grupo.fechaLimite ? fechaEnZonaLimaISO(grupo.fechaLimite) : undefined}
+                />
+              </label>
+            </div>
+            <div className="flex items-center gap-2">
+              <SubmitButton className="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+                Crear tarea
+              </SubmitButton>
+              <Button variant="ghost" asChild>
+                <Link href={hrefCerrar} scroll={false}>Cancelar</Link>
+              </Button>
+            </div>
+          </form>
+        </PanelLateral>
+      ) : null}
+    </PaginaCompleta>
   );
 }

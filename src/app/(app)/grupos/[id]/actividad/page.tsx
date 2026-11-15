@@ -1,9 +1,8 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requerirSesion } from "@/server/auth/session";
 import { obtenerFeedActividad } from "@/server/services/metricas";
 import { obtenerGrupoDelUsuario } from "@/server/services/grupo";
-import { TabsGrupo } from "../_components/tabs-grupo";
+import { MarcoGrupo } from "../_components/marco-grupo";
 import { HistorialTareas } from "../_components/historial-tareas";
 import { nombreCorto } from "@/lib/nombres";
 
@@ -19,7 +18,7 @@ export default async function ActividadGrupoPage({
   const sesion = await requerirSesion();
   const resultado = await obtenerGrupoDelUsuario(sesion.idUsuario, idGrupo).catch(() => null);
   if (!resultado) notFound();
-  const { grupo, rolActual } = resultado;
+  const { grupo } = resultado;
   const nombres = new Map(grupo.integrantes.map((integrante) => [
     integrante.idUsuario,
     nombreCorto(integrante.usuario.nombre, integrante.usuario.apellidos),
@@ -29,17 +28,8 @@ export default async function ActividadGrupoPage({
   if (!feed) notFound();
 
   return (
-    <div className="animate-page-in mx-auto flex max-w-5xl flex-col gap-6">
-      <div>
-        <Link href="/grupos" className="text-sm text-primary hover:underline">
-          Grupos
-        </Link>
-        <h1 className="mt-1 text-xl font-semibold">{grupo.nombre}</h1>
-      </div>
-
-      <TabsGrupo idGrupo={idGrupo} activa="actividad" mostrarConfiguracion={rolActual === "lider"} />
-
+    <MarcoGrupo datos={resultado} idUsuario={sesion.idUsuario} activa="actividad">
       <HistorialTareas entradas={feed} nombres={nombres} idGrupo={idGrupo} />
-    </div>
+    </MarcoGrupo>
   );
 }

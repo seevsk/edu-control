@@ -27,7 +27,7 @@ import { Avatar } from "@/components/avatar";
 import { IconCalendario, IconChevronDerecha, IconChevronIzquierda, IconReuniones } from "@/components/icons";
 import { MapaSemanal } from "@/components/mapa-semanal";
 import { Toast } from "@/components/toast";
-import { TabsGrupo } from "../_components/tabs-grupo";
+import { MarcoGrupo } from "../_components/marco-grupo";
 
 function nivelDeFranja(libres: number, total: number) {
   if (libres === total) return "bg-estado-completada/15 text-estado-completada";
@@ -57,31 +57,15 @@ export default async function HorariosGrupoPage({
   if (!Number.isInteger(idGrupo)) notFound();
 
   const sesion = await requerirSesion();
-  let grupo, rolActual;
-  try {
-    ({ grupo, rolActual } = await obtenerGrupoDelUsuario(sesion.idUsuario, idGrupo));
-  } catch {
-    notFound();
-  }
-
-  const encabezado = (
-    <>
-      <div>
-        <Link href="/grupos" className="text-sm text-primary hover:underline">
-          Grupos
-        </Link>
-        <h1 className="mt-1 text-xl font-semibold">{grupo.nombre}</h1>
-      </div>
-      <TabsGrupo idGrupo={idGrupo} activa="horarios" mostrarConfiguracion={rolActual === "lider"} />
-    </>
-  );
+  const datos = await obtenerGrupoDelUsuario(sesion.idUsuario, idGrupo).catch(() => null);
+  if (!datos) notFound();
+  const { grupo, rolActual } = datos;
 
   if (rolActual === "observador") {
     return (
-      <div className="animate-page-in mx-auto flex max-w-5xl flex-col gap-6">
-        {encabezado}
-        <p className="text-sm text-text-muted">Los observadores no ven los horarios del grupo.</p>
-      </div>
+      <MarcoGrupo datos={datos} idUsuario={sesion.idUsuario} activa="horarios">
+        <p className="text-[13px] text-muted-foreground">Los horarios del grupo solo los ven sus integrantes, no los observadores.</p>
+      </MarcoGrupo>
     );
   }
 
@@ -136,9 +120,8 @@ export default async function HorariosGrupoPage({
   };
 
   return (
-    <div className="animate-page-in mx-auto flex max-w-5xl flex-col gap-6">
+    <MarcoGrupo datos={datos} idUsuario={sesion.idUsuario} activa="horarios">
       <Toast mensaje={toast} />
-      {encabezado}
 
       <nav aria-label="Navegar por semanas" className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-base font-semibold capitalize">{etiquetaRangoSemana(lunesISO)}</p>
@@ -355,7 +338,7 @@ export default async function HorariosGrupoPage({
           ...(reuniones.length > 0 ? [{ clase: "bg-cat-reunion", texto: "Reunión programada" }] : []),
         ]}
       />
-    </div>
+    </MarcoGrupo>
   );
 }
 

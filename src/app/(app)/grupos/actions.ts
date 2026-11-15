@@ -112,7 +112,7 @@ export async function actualizarPreferenciaCorreoActividadAction(idGrupo: number
     correoActividad: formData.get("correoActividad") === "on",
   });
   if (!parseo.success) {
-    redirect(`/grupos/${idGrupo}?error=${encodeURIComponent("La preferencia no es válida")}#notificaciones`);
+    redirect(`/grupos/${idGrupo}/integrantes?error=${encodeURIComponent("La preferencia no es válida")}`);
   }
 
   try {
@@ -123,11 +123,12 @@ export async function actualizarPreferenciaCorreoActividadAction(idGrupo: number
     );
   } catch (error) {
     const mensaje = mensajeParaUsuario(error, "No se pudo guardar la preferencia");
-    redirect(`/grupos/${idGrupo}?error=${encodeURIComponent(mensaje)}#notificaciones`);
+    redirect(`/grupos/${idGrupo}/integrantes?error=${encodeURIComponent(mensaje)}`);
   }
 
   revalidatePath(`/grupos/${idGrupo}`);
-  redirect(`/grupos/${idGrupo}?toast=${encodeURIComponent("Preferencia de correo guardada")}#notificaciones`);
+  revalidatePath(`/grupos/${idGrupo}/integrantes`);
+  redirect(`/grupos/${idGrupo}/integrantes?toast=${encodeURIComponent("Preferencia de correo guardada")}`);
 }
 
 export async function retirarIntegranteAction(idGrupo: number, idUsuarioObjetivo: number) {

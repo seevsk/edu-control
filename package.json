@@ -11,6 +11,8 @@
     "verificar:acciones-tarea-http": "node scripts/verificar-acciones-tarea-http.mjs"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/utilities": "^3.2.2",
     "@prisma/adapter-pg": "7.10.0",
     "@prisma/client": "7.10.0",
     "class-variance-authority": "^0.7.1",

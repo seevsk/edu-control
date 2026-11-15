@@ -132,6 +132,24 @@ export async function cambiarEstadoTareaAction(
   redirect(ruta);
 }
 
+/** Movimiento desde el tablero: mismas reglas e historial que el boton, pero sin redirigir. */
+export async function moverTareaAction(
+  idGrupo: number,
+  idTarea: number,
+  nuevoEstado: EstadoTarea,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const sesion = await requerirSesion();
+  const contexto = cambiarEstadoTareaSchema.safeParse({ idGrupo, idTarea, nuevoEstado, destino: "lista" });
+  if (!contexto.success) return { ok: false, error: "Movimiento no válido" };
+  try {
+    await tareaService.cambiarEstadoTarea(sesion.idUsuario, contexto.data.idGrupo, contexto.data.idTarea, contexto.data.nuevoEstado);
+  } catch (error) {
+    return { ok: false, error: mensajeParaUsuario(error, "No se pudo mover la tarea") };
+  }
+  revalidarTarea(contexto.data.idGrupo, contexto.data.idTarea);
+  return { ok: true };
+}
+
 export async function editarTareaAction(idGrupo: number, idTarea: number, formData: FormData) {
   const sesion = await requerirSesion();
   const contexto = contextoTareaSchema.safeParse({ idGrupo, idTarea, destino: "detalle" });

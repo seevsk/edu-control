@@ -36,8 +36,8 @@ export function formatearFechaLima(fecha: Date): string {
   }).format(fecha);
 }
 
-/** "03/11/2026 3:00 PM" (America/Lima, 12 h como pide AGENTS.md 9). */
-export function formatearFechaHoraLima(fecha: Date): string {
+/** "3:00 PM" en America/Lima (12 h como pide AGENTS.md 9). */
+export function horaLima(fecha: Date): string {
   const partes = new Intl.DateTimeFormat("en-US", {
     timeZone: ZONA_LIMA,
     hour: "numeric",
@@ -45,7 +45,12 @@ export function formatearFechaHoraLima(fecha: Date): string {
     hourCycle: "h12",
   }).formatToParts(fecha);
   const valor = (tipo: Intl.DateTimeFormatPartTypes) => partes.find((parte) => parte.type === tipo)?.value ?? "";
-  return `${formatearFechaLima(fecha)} ${valor("hour")}:${valor("minute")} ${valor("dayPeriod").toUpperCase()}`;
+  return `${valor("hour")}:${valor("minute")} ${valor("dayPeriod").toUpperCase()}`;
+}
+
+/** "03/11/2026 3:00 PM" (America/Lima, 12 h como pide AGENTS.md 9). */
+export function formatearFechaHoraLima(fecha: Date): string {
+  return `${formatearFechaLima(fecha)} ${horaLima(fecha)}`;
 }
 
 const MINUTO_MS = 60_000;
