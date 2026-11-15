@@ -6,17 +6,19 @@ export function SubmitButton({
   children,
   pendingText = "Guardando...",
   className = "",
+  disabled = false,
 }: {
   children: React.ReactNode;
   pendingText?: string;
   className?: string;
+  disabled?: boolean;
 }) {
   const { pending } = useFormStatus();
 
   return (
     <button
       type="submit"
-      disabled={pending}
+      disabled={pending || disabled}
       aria-busy={pending}
       className={`inline-flex items-center gap-2 transition-opacity duration-150 disabled:cursor-wait disabled:opacity-70 ${className}`}
     >

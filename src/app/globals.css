@@ -82,6 +82,11 @@
   --curso-5: #65a30d;
   --curso-6: #c026d3;
   --curso-7: #475569;
+  /* Calendario: categorías del horario fijo y de las fechas */
+  --cal-personal: #64748b;
+  --cal-tarea: #d97706;
+  --cal-evaluacion: #7c3aed;
+  --cal-reunion: #0891b2;
 
   /* Superficie de marca (login): siempre oscura. */
   --brand-ink: #0a0a0a;
@@ -158,6 +163,10 @@
   --curso-5: #a3e635;
   --curso-6: #e879f9;
   --curso-7: #94a3b8;
+  --cal-personal: #94a3b8;
+  --cal-tarea: #fbbf24;
+  --cal-evaluacion: #a78bfa;
+  --cal-reunion: #22d3ee;
 }
 
 @theme inline {

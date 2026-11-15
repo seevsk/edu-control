@@ -11,6 +11,7 @@
     "verificar:acciones-tarea-http": "node scripts/verificar-acciones-tarea-http.mjs"
   },
   "dependencies": {
+    "@date-fns/tz": "^1.5.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/utilities": "^3.2.2",
     "@prisma/adapter-pg": "7.10.0",
@@ -18,6 +19,7 @@
     "class-variance-authority": "^0.7.1",
     "cmdk": "^1.1.1",
     "cn": "^0.5.2",
+    "date-fns": "^4.4.0",
     "dotenv": "18.0.4",
     "jose": "6.2.12",
     "lucide-react": "^1.73.0",
@@ -27,6 +29,7 @@
     "pg": "8.23.0",
     "radix-ui": "^1.8.1",
     "react": "19.2.8",
+    "react-day-picker": "^10.0.2",
     "react-dom": "19.2.8",
     "shadcn": "^4.23.0",
     "sonner": "^2.0.8",
