@@ -26,10 +26,25 @@ export async function listarMisGrupos(idUsuario: number) {
   });
 }
 
+/** Historial de invitaciones respondidas y retiros del usuario (no incluye los grupos que creó). */
+export async function listarHistorialInvitaciones(idUsuario: number) {
+  return prisma.grupoIntegrante.findMany({
+    where: { idUsuario, estadoInvitacion: { not: "pendiente" }, grupo: { NOT: { idCreador: idUsuario } } },
+    include: {
+      invitador: { select: { idUsuario: true, nombre: true, apellidos: true, fotoUrl: true } },
+      grupo: { select: { idGrupo: true, nombre: true, estado: true, evaluacion: { select: { nombre: true, curso: { select: { idCurso: true, nombre: true } } } } } },
+    },
+    orderBy: [{ fechaRetiro: { sort: "desc", nulls: "last" } }, { fechaRespuesta: "desc" }],
+  });
+}
+
 export async function listarInvitacionesPendientes(idUsuario: number) {
   return prisma.grupoIntegrante.findMany({
     where: { idUsuario, estadoInvitacion: "pendiente" },
-    include: { grupo: { include: { creador: true } } },
+    include: {
+      grupo: { include: { creador: true, evaluacion: { select: { nombre: true, curso: { select: { idCurso: true, nombre: true } } } } } },
+      invitador: { select: { idUsuario: true, nombre: true, apellidos: true, fotoUrl: true } },
+    },
     orderBy: { fechaInvitacion: "desc" },
   });
 }
@@ -195,7 +210,7 @@ export async function invitarIntegrante(idActor: number, idGrupo: number, idUsua
     if (yaEsIntegrante) throw new ErrorDeNegocio("Esa persona ya fue invitada a este grupo antes");
 
     const integrante = await tx.grupoIntegrante.create({
-      data: { idGrupo, idUsuario: idUsuarioInvitado, rol: "miembro", estadoInvitacion: "pendiente" },
+      data: { idGrupo, idUsuario: idUsuarioInvitado, rol: "miembro", estadoInvitacion: "pendiente", idInvitador: idActor },
     });
     return { grupo, integrante };
   });
@@ -291,7 +306,7 @@ export async function retirarIntegrante(idActor: number, idGrupo: number, idUsua
 
     await tx.grupoIntegrante.update({
       where: { idGrupo_idUsuario: { idGrupo, idUsuario: idUsuarioObjetivo } },
-      data: { estadoInvitacion: "retirado" },
+      data: { estadoInvitacion: "retirado", fechaRetiro: new Date() },
     });
 
     if (tareasAbiertas.length > 0) {

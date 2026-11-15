@@ -87,7 +87,9 @@ CREATE TABLE "grupo_integrante" (
   "estado_invitacion" varchar NOT NULL DEFAULT 'pendiente',
   "correo_actividad" boolean NOT NULL DEFAULT true,
   "fecha_invitacion" timestamp DEFAULT (now()),
-  "fecha_respuesta" timestamp
+  "fecha_respuesta" timestamp,
+  "id_invitador" integer,
+  "fecha_retiro" timestamp
 );
 
 CREATE TABLE "tarea" (
@@ -205,6 +207,10 @@ COMMENT ON COLUMN "grupo_integrante"."estado_invitacion" IS 'pendiente | aceptad
 
 COMMENT ON COLUMN "grupo_integrante"."correo_actividad" IS 'false = no recibir correos de actividad de este grupo. Los importantes siguen llegando';
 
+COMMENT ON COLUMN "grupo_integrante"."id_invitador" IS 'Quién envió la invitación. NULL para el creador del grupo. Los registros anteriores a la columna asumen al creador';
+
+COMMENT ON COLUMN "grupo_integrante"."fecha_retiro" IS 'Cuándo el líder lo retiró (estado retirado). NULL si nunca fue retirado o si el retiro es anterior a la columna';
+
 COMMENT ON COLUMN "tarea"."id_asignado" IS 'Integrante aceptado (no observador). NULL = sin asignar';
 
 COMMENT ON COLUMN "tarea"."estado" IS 'pendiente | en_progreso | en_revision | completada | descartada. descartada = no se hará (la cierra el líder con motivo); queda fuera de las métricas';
@@ -260,6 +266,8 @@ ALTER TABLE "grupo" ADD FOREIGN KEY ("id_evaluacion") REFERENCES "evaluacion" ("
 ALTER TABLE "grupo_integrante" ADD FOREIGN KEY ("id_grupo") REFERENCES "grupo" ("id_grupo") ON DELETE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "grupo_integrante" ADD FOREIGN KEY ("id_usuario") REFERENCES "usuario" ("id_usuario") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "grupo_integrante" ADD FOREIGN KEY ("id_invitador") REFERENCES "usuario" ("id_usuario") ON DELETE SET NULL DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "tarea" ADD FOREIGN KEY ("id_grupo") REFERENCES "grupo" ("id_grupo") ON DELETE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
 

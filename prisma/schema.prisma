@@ -106,6 +106,7 @@ model Usuario {
   cursos          Curso[]
   gruposCreados   Grupo[]           @relation("GrupoCreador")
   integraciones   GrupoIntegrante[]
+  invitacionesEnviadas GrupoIntegrante[] @relation("InvitacionesEnviadas")
   tareasCreadas   Tarea[]           @relation("TareaCreador")
   tareasAsignadas Tarea[]           @relation("TareaAsignado")
   historial       TareaHistorial[]
@@ -245,9 +246,14 @@ model GrupoIntegrante {
   correoActividad  Boolean          @default(true) @map("correo_actividad")
   fechaInvitacion  DateTime         @default(now()) @map("fecha_invitacion")
   fechaRespuesta   DateTime?        @map("fecha_respuesta")
+  /// Quién envió la invitación (NULL para el creador del grupo).
+  idInvitador      Int?             @map("id_invitador")
+  /// Cuándo el líder lo retiró del grupo.
+  fechaRetiro      DateTime?        @map("fecha_retiro")
 
-  grupo   Grupo   @relation(fields: [idGrupo], references: [idGrupo], onDelete: Cascade)
-  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario])
+  grupo     Grupo    @relation(fields: [idGrupo], references: [idGrupo], onDelete: Cascade)
+  usuario   Usuario  @relation(fields: [idUsuario], references: [idUsuario])
+  invitador Usuario? @relation("InvitacionesEnviadas", fields: [idInvitador], references: [idUsuario], onDelete: SetNull)
 
   @@unique([idGrupo, idUsuario])
   @@map("grupo_integrante")
