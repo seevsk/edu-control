@@ -58,7 +58,7 @@ function Tarjeta({ fila, ahora, arrastrable, href }: { fila: FilaTarea; ahora: D
       {...attributes}
       {...listeners}
       className={cn(
-        "rounded-lg border bg-card text-card-foreground",
+        "rounded-lg border bg-card text-card-foreground shadow-card",
         arrastrable && "cursor-grab touch-none active:cursor-grabbing",
         isDragging && "opacity-40",
       )}
@@ -76,7 +76,7 @@ function Columna({ estado, cantidad, hrefNueva, children }: { estado: EstadoTare
     <section
       ref={setNodeRef}
       aria-label={ETIQUETA_ESTADO_TAREA[estado]}
-      className={cn("flex min-w-0 flex-col gap-2 rounded-lg p-1 transition-colors", isOver && "bg-accent")}
+      className={cn("flex min-w-0 flex-col gap-2 rounded-[10px] bg-sidebar p-2 transition-colors dark:bg-transparent dark:p-1", isOver && "bg-accent dark:bg-accent")}
     >
       <h2 className="flex h-8 items-center gap-2 px-1 text-[13px]">
         <StatusIcon estado={estado} />

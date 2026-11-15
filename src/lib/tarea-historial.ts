@@ -1,5 +1,5 @@
 import { ETIQUETA_ESTADO_TAREA, type AccionConMotivo } from "@/lib/estado-tarea";
-import { formatearFechaLima } from "@/lib/dates";
+import { diaYMes } from "@/lib/formato-fecha";
 
 /** El motivo viaja dentro de `valor_nuevo`, separado del estado; cada accion tiene su propio rotulo. */
 const SEPARADORES_MOTIVO: Record<AccionConMotivo, string> = {
@@ -36,7 +36,7 @@ export interface EntradaHistorialTarea {
 function fechaHistorial(valor: string | null): string {
   if (!valor) return "sin fecha";
   const fecha = new Date(valor);
-  return Number.isNaN(fecha.getTime()) ? valor : formatearFechaLima(fecha);
+  return Number.isNaN(fecha.getTime()) ? valor : diaYMes(fecha);
 }
 
 /** Texto corto del cambio de estado, segun el par anterior -> nuevo. */

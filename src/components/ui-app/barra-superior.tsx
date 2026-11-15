@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
-import { Users } from "lucide-react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { BuscarPersonas } from "./buscar-personas";
 
 export interface MigaDePan {
   href?: string;
@@ -32,19 +31,6 @@ export function Migas({ items }: { items: MigaDePan[] }) {
 /** Barra de 52px: migas a la izquierda y busqueda de personas (Ctrl K) a la derecha. */
 export function BarraSuperior() {
   const { migas } = useContext(ContextoMigas);
-  const router = useRouter();
-  const entrada = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    function alPresionar(evento: KeyboardEvent) {
-      if (evento.key.toLowerCase() === "k" && (evento.ctrlKey || evento.metaKey)) {
-        evento.preventDefault();
-        entrada.current?.focus();
-      }
-    }
-    document.addEventListener("keydown", alPresionar);
-    return () => document.removeEventListener("keydown", alPresionar);
-  }, []);
 
   return (
     <div className="flex h-[52px] shrink-0 items-center gap-3 border-b px-4 sm:px-6">
@@ -61,26 +47,7 @@ export function BarraSuperior() {
           </span>
         ))}
       </nav>
-      <form
-        role="search"
-        onSubmit={(evento) => {
-          evento.preventDefault();
-          const consulta = entrada.current?.value.trim() ?? "";
-          if (consulta) router.push(`/usuarios?q=${encodeURIComponent(consulta)}`);
-        }}
-        className="flex h-8 w-full max-w-[300px] items-center gap-2 rounded-md border border-transparent bg-secondary px-2.5 text-subtle-foreground focus-within:border-ring max-sm:max-w-[45%]"
-      >
-        <Users className="size-3.5 shrink-0" aria-hidden />
-        <label className="sr-only" htmlFor="buscar-personas">Buscar personas</label>
-        <input
-          ref={entrada}
-          id="buscar-personas"
-          type="search"
-          placeholder="Buscar personas…"
-          className="min-w-0 flex-1 bg-transparent text-[13px] text-foreground outline-none placeholder:text-subtle-foreground"
-        />
-        <kbd className="hidden rounded border border-input px-1.5 font-mono text-[11px] sm:inline">Ctrl K</kbd>
-      </form>
+      <BuscarPersonas />
     </div>
   );
 }

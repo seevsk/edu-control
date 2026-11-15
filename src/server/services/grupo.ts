@@ -170,21 +170,39 @@ export async function buscarUsuarios(idUsuarioActual: number, consulta: string) 
 export async function buscarPersonas(idUsuarioActual: number, consulta: string) {
   const encontrados = await buscarUsuarios(idUsuarioActual, consulta);
   if (encontrados.length === 0) return [];
+  const ids = encontrados.map((u) => u.idUsuario);
 
-  const perfiles = await prisma.perfil.findMany({
-    where: { idUsuario: { in: encontrados.map((u) => u.idUsuario) } },
-    select: { idUsuario: true, carrera: true, institucion: true },
-  });
+  const [perfiles, compartidos] = await Promise.all([
+    prisma.perfil.findMany({
+      where: { idUsuario: { in: ids } },
+      select: { idUsuario: true, carrera: true, institucion: true, ciclo: true },
+    }),
+    // Grupos donde ambos estan aceptados: definen a los companeros (se muestran primero).
+    prisma.grupoIntegrante.findMany({
+      where: {
+        idUsuario: { in: ids },
+        estadoInvitacion: "aceptada",
+        grupo: { integrantes: { some: { idUsuario: idUsuarioActual, estadoInvitacion: "aceptada" } } },
+      },
+      select: { idUsuario: true },
+    }),
+  ]);
   const porUsuario = new Map(perfiles.map((p) => [p.idUsuario, p]));
+  const gruposEnComun = new Map<number, number>();
+  for (const { idUsuario } of compartidos) gruposEnComun.set(idUsuario, (gruposEnComun.get(idUsuario) ?? 0) + 1);
 
-  return encontrados.map(({ idUsuario, nombre, apellidos, fotoUrl }) => ({
-    idUsuario,
-    nombre,
-    apellidos,
-    fotoUrl,
-    carrera: porUsuario.get(idUsuario)?.carrera ?? null,
-    institucion: porUsuario.get(idUsuario)?.institucion ?? null,
-  }));
+  return encontrados
+    .map(({ idUsuario, nombre, apellidos, fotoUrl }) => ({
+      idUsuario,
+      nombre,
+      apellidos,
+      fotoUrl,
+      carrera: porUsuario.get(idUsuario)?.carrera ?? null,
+      institucion: porUsuario.get(idUsuario)?.institucion ?? null,
+      ciclo: porUsuario.get(idUsuario)?.ciclo ?? null,
+      gruposEnComun: gruposEnComun.get(idUsuario) ?? 0,
+    }))
+    .sort((a, b) => Number(b.gruposEnComun > 0) - Number(a.gruposEnComun > 0));
 }
 
 export async function invitarIntegrante(idActor: number, idGrupo: number, idUsuarioInvitado: number) {

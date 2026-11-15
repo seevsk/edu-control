@@ -18,7 +18,7 @@ export function ViewSwitcher({ vista, hrefLista, hrefTablero }: { vista: "lista"
           aria-current={vista === valor ? "true" : undefined}
           className={cn(
             "flex h-7 items-center gap-1.5 px-2.5 text-[13px]",
-            vista === valor ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground",
+            vista === valor ? "bg-background text-foreground shadow-xs dark:bg-accent dark:shadow-none" : "text-muted-foreground hover:text-foreground",
           )}
         >
           <Icono className="size-3.5" aria-hidden />

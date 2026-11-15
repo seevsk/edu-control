@@ -1,27 +1,18 @@
 import { cn } from "@/lib/utils";
-import { horaLima } from "@/lib/dates";
-import { DIAS_CORTOS, diaSemanaISO, diasHasta, diaMesCorto, fechaEnZonaLimaISO } from "@/lib/calendario";
+import { diaYMes, fechaCorta, fechaCompleta } from "@/lib/formato-fecha";
+import { diasHasta } from "@/lib/calendario";
 
-/** Dentro de dos semanas "Vie 20" (se lee mas rapido); mas lejos o en el pasado, "24 nov". */
-const DIAS_CON_NOMBRE = 13;
-
-/** Fecha limite en lenguaje natural, en America/Lima: "Vence hoy 11:59 PM", "Vencida hace 3 días", "22 nov". */
+/** Fecha limite en lenguaje natural (America/Lima): "Hoy, 11:59 pm", "Vencida hace 3 días", "Mar 17". */
 export function textoVencimiento(fecha: Date, ahora: Date, cerrada: boolean): { texto: string; tono: "normal" | "hoy" | "vencida" | "apagado" } {
-  const corta = diaMesCorto(fechaEnZonaLimaISO(fecha));
-  if (cerrada) return { texto: corta, tono: "apagado" };
+  if (cerrada) return { texto: diaYMes(fecha, ahora), tono: "apagado" };
   const dias = diasHasta(fecha, ahora);
   if (fecha < ahora) {
     if (dias === 0) return { texto: "Vencida hoy", tono: "vencida" };
     if (dias === -1) return { texto: "Vencida ayer", tono: "vencida" };
     return { texto: `Vencida hace ${-dias} días`, tono: "vencida" };
   }
-  if (dias === 0) return { texto: `Vence hoy ${horaLima(fecha)}`, tono: "hoy" };
-  if (dias === 1) return { texto: "Mañana", tono: "normal" };
-  if (dias <= DIAS_CON_NOMBRE) {
-    const fechaISO = fechaEnZonaLimaISO(fecha);
-    return { texto: `${DIAS_CORTOS[diaSemanaISO(fechaISO) - 1]} ${Number(fechaISO.slice(8))}`, tono: "normal" };
-  }
-  return { texto: corta, tono: "normal" };
+  if (dias === 0) return { texto: fechaCorta(fecha, { ahora, conHora: true }), tono: "hoy" };
+  return { texto: fechaCorta(fecha, { ahora }), tono: "normal" };
 }
 
 const TONOS = {
@@ -35,8 +26,8 @@ export function DueChip({ fecha, cerrada = false, ahora, className }: { fecha: D
   if (!fecha) return null;
   const { texto, tono } = textoVencimiento(fecha, ahora, cerrada);
   return (
-    <span className={cn("inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-xs tabular-nums whitespace-nowrap", TONOS[tono], className)}>
+    <time dateTime={fecha.toISOString()} title={fechaCompleta(fecha)} className={cn("inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-xs tabular-nums whitespace-nowrap", TONOS[tono], className)}>
       {texto}
-    </span>
+    </time>
   );
 }

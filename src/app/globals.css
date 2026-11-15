@@ -30,8 +30,14 @@
   /* Separador entre filas: mas tenue que el borde de las superficies. */
   --border-subtle: #f1f1f3;
   /* Foco: el unico azul de la interfaz. */
-  --ring: #0070f3;
+  --ring: #2563eb;
   --radius: 0.5rem;
+
+  /* Claro: lo que flota lleva sombra suave; en oscuro solo bordes. */
+  --shadow-xs: 0 1px 2px rgba(24, 24, 27, 0.06), 0 0 0 1px #e9e9eb;
+  --shadow-card: 0 1px 2px rgba(24, 24, 27, 0.05);
+  --shadow-pop: 0 12px 32px rgba(24, 24, 27, 0.12), 0 2px 6px rgba(24, 24, 27, 0.06);
+  --overlay: rgba(24, 24, 27, 0.28);
 
   --sidebar: #f7f7f8;
   --sidebar-foreground: #18181b;
@@ -40,7 +46,7 @@
   --sidebar-accent: #ececee;
   --sidebar-accent-foreground: #18181b;
   --sidebar-border: #e9e9eb;
-  --sidebar-ring: #0070f3;
+  --sidebar-ring: #2563eb;
 
   --estado-pendiente: #71717a;
   --estado-en-progreso: #d97706;
@@ -105,6 +111,11 @@
   --input: #2a2a2a;
   --border-subtle: #1a1a1a;
   --ring: #3b82f6;
+
+  --shadow-xs: none;
+  --shadow-card: none;
+  --shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.5);
+  --overlay: rgba(0, 0, 0, 0.55);
 
   --sidebar: #0a0a0a;
   --sidebar-foreground: #ededed;
@@ -174,6 +185,10 @@
   --color-input: var(--input);
   --color-border-subtle: var(--border-subtle);
   --color-ring: var(--ring);
+  --color-overlay: var(--overlay);
+  --shadow-xs: var(--shadow-xs);
+  --shadow-card: var(--shadow-card);
+  --shadow-pop: var(--shadow-pop);
 
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);

@@ -1,7 +1,8 @@
 import { prisma } from "@/server/db/client";
 import { crearNotificacion } from "@/server/notifications/crear-notificacion";
 import { plantillasNotificacion } from "@/server/notifications/templates";
-import { finDeDiaLimaAUtc, formatearFechaLima } from "@/lib/dates";
+import { finDeDiaLimaAUtc } from "@/lib/dates";
+import { diaYMes } from "@/lib/formato-fecha";
 import { ErrorDeNegocio } from "@/lib/errores";
 import {
   filtrosTareaSchema,
@@ -357,7 +358,7 @@ export async function editarTarea(
       idUsuario: tarea.idAsignado,
       tipo: "tarea_reprogramada",
       idGrupo,
-      ...plantillasNotificacion.tareaReprogramada(tarea.titulo, idGrupo, idTarea, formatearFechaLima(tarea.fechaLimite)),
+      ...plantillasNotificacion.tareaReprogramada(tarea.titulo, idGrupo, idTarea, diaYMes(tarea.fechaLimite)),
     });
   }
   return tarea;
