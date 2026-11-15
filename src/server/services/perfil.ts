@@ -99,6 +99,12 @@ export async function actualizarPerfil(idUsuario: number, datos: z.infer<typeof 
  * nombre/apellidos/correo/foto, se borran perfil y bloque_ocupado, y se conservan tarea y
  * tarea_historial para no romper los grupos de los que fue parte.
  */
+/** Preferencia de privacidad que se guarda al instante desde la vista de lectura. */
+export async function actualizarVisibilidad(idUsuario: number, visibleEnBusqueda: boolean) {
+  await requerirUsuarioValido(idUsuario);
+  await prisma.perfil.update({ where: { idUsuario }, data: { visibleEnBusqueda } });
+}
+
 export async function eliminarCuenta(idUsuario: number) {
   const usuario = await prisma.usuario.findUniqueOrThrow({ where: { idUsuario } });
   const marcaAnonima = `eliminado-${idUsuario}-${Date.now()}@educontrol.local`;
