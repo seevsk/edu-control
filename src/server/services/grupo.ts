@@ -17,7 +17,7 @@ export async function listarMisGrupos(idUsuario: number) {
     where: { integrantes: { some: { idUsuario, estadoInvitacion: "aceptada" } } },
     include: {
       integrantes: { include: { usuario: true }, orderBy: { fechaInvitacion: "asc" } },
-      evaluacion: { include: { curso: { select: { nombre: true, codigo: true, modalidad: true } } } },
+      evaluacion: { include: { curso: { select: { idCurso: true, nombre: true, codigo: true, modalidad: true } } } },
       tareas: {
         select: { idTarea: true, peso: true, estado: true, idAsignado: true, fechaLimite: true },
       },

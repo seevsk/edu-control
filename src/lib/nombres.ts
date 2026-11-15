@@ -1,7 +1,7 @@
 const PARTICULAS = new Set(["de", "del", "la", "las", "los", "y"]);
 
 /** Google entrega nombres en cualquier capitalizacion ("SEBASTIAN JOSE"); se muestran en formato titulo. */
-function formatoTitulo(texto: string): string {
+export function formatoTitulo(texto: string): string {
   return texto
     .toLocaleLowerCase("es-PE")
     .split(/\s+/)
