@@ -20,7 +20,7 @@ export interface FilaTarea {
 }
 
 /** Fila de 40-52px estilo Plane/Linear: icono de estado, titulo, fecha y responsable. */
-export function TaskRow({ tarea, href, ahora, alta = false }: { tarea: FilaTarea; href: string; ahora: Date; alta?: boolean }) {
+export function TaskRow({ tarea, href, ahora, alta = false, conAvatar = true }: { tarea: FilaTarea; href: string; ahora: Date; alta?: boolean; conAvatar?: boolean }) {
   const cerrada = tarea.estado === "completada" || tarea.estado === "descartada";
   return (
     <li>
@@ -40,7 +40,7 @@ export function TaskRow({ tarea, href, ahora, alta = false }: { tarea: FilaTarea
         </span>
         {tarea.nota ? <span className="hidden shrink-0 text-xs text-estado-en-revision sm:inline">{tarea.nota}</span> : null}
         <DueChip fecha={tarea.fechaLimite} cerrada={cerrada} ahora={ahora} />
-        <UserAvatar usuario={tarea.asignado} />
+        {conAvatar ? <UserAvatar usuario={tarea.asignado} /> : null}
       </Link>
     </li>
   );

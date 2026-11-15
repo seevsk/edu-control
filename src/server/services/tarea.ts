@@ -144,6 +144,26 @@ export async function listarTareasAsignadasAlUsuario(idUsuario: number, limite =
   });
 }
 
+/** Tareas en revision que el usuario puede confirmar o devolver (de otros, en grupos activos donde participa). */
+export async function listarTareasPorRevisar(idUsuario: number, limite = 20) {
+  return prisma.tarea.findMany({
+    where: {
+      estado: "en_revision",
+      NOT: { idAsignado: idUsuario },
+      grupo: {
+        estado: "activo",
+        integrantes: { some: { idUsuario, estadoInvitacion: "aceptada", rol: { not: "observador" } } },
+      },
+    },
+    include: {
+      asignado: { select: { idUsuario: true, nombre: true, apellidos: true, fotoUrl: true } },
+      grupo: { select: { idGrupo: true, nombre: true, evaluacion: { select: { curso: { select: { idCurso: true, nombre: true } } } } } },
+    },
+    orderBy: [{ fechaTerminada: "asc" }],
+    take: limite,
+  });
+}
+
 export async function listarTareasDelGrupo(
   idUsuario: number,
   idGrupo: number,
