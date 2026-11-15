@@ -19,7 +19,7 @@ export function ConfirmarAceptacion({
       <button
         type="button"
         onClick={() => dialogRef.current?.showModal()}
-        className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-hover"
+        className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary-hover"
       >
         Aceptar
       </button>
@@ -90,7 +90,7 @@ export function ConfirmarAceptacion({
             </button>
             <SubmitButton
               pendingText="Uniéndome..."
-              className="justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover"
+              className="justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover"
             >
               Aceptar y compartir
             </SubmitButton>

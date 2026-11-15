@@ -1,9 +1,9 @@
 import { IconGoogle } from "@/components/icons";
 
 const vistaPrevia = [
-  { estado: "Completada", color: "var(--color-estado-completada)", persona: "Ana", tarea: "Levantar Postgres local" },
-  { estado: "En revision", color: "var(--color-estado-revision)", persona: "Ana", tarea: "Mockup del tablero" },
-  { estado: "En progreso", color: "var(--color-estado-progreso)", persona: "Bruno", tarea: "Esquema de base de datos" },
+  { estado: "Completada", color: "var(--estado-completada)", persona: "Ana", tarea: "Levantar Postgres local" },
+  { estado: "En revision", color: "var(--estado-en-revision)", persona: "Ana", tarea: "Mockup del tablero" },
+  { estado: "En progreso", color: "var(--estado-en-progreso)", persona: "Bruno", tarea: "Esquema de base de datos" },
 ] as const;
 
 const mensajesError: Record<string, string> = {

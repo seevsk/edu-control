@@ -57,7 +57,7 @@ export default async function PerfilUsuarioPage({ params }: { params: Promise<{ 
         {usuario.puedeVerDisponibilidad ? (
           <Link
             href={`/usuarios/${idUsuario}/disponibilidad`}
-            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white transition-colors duration-150 hover:bg-primary-hover"
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors duration-150 hover:bg-primary-hover"
           >
             <IconCalendario className="size-4" aria-hidden />
             Ver disponibilidad

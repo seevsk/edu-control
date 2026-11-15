@@ -108,7 +108,7 @@ export default async function PerfilPage({
             <input type="checkbox" name="visibleEnBusqueda" defaultChecked={perfil.visibleEnBusqueda} />
             Permitir que otros me encuentren al buscar compañeros
           </label>
-          <SubmitButton className="mt-1 w-fit rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover sm:col-span-2">
+          <SubmitButton className="mt-1 w-fit rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover sm:col-span-2">
             Guardar cambios
           </SubmitButton>
         </form>

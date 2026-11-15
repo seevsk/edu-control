@@ -1,173 +1,257 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
+/* Modo oscuro por clase en <html> (next-themes), como espera shadcn. */
+@custom-variant dark (&:is(.dark *));
+
+/* Paleta "Tinta": neutros para la interfaz; el color solo marca estado, curso o categoria. */
 :root {
   color-scheme: light;
 
-  --color-bg: #f7f8fa;
-  --color-surface: #ffffff;
-  --color-border: #e1e4e8;
-  --color-border-strong: #c7ccd1;
+  --background: #ffffff;
+  --foreground: #171717;
+  --card: #ffffff;
+  --card-foreground: #171717;
+  --popover: #ffffff;
+  --popover-foreground: #171717;
+  --primary: #171717;
+  --primary-foreground: #ffffff;
+  --secondary: #f5f5f5;
+  --secondary-foreground: #171717;
+  --muted: #f5f5f5;
+  --muted-foreground: #525252;
+  --subtle-foreground: #737373;
+  --accent: #f0f0f0;
+  --accent-foreground: #171717;
+  --destructive: #dc2626;
+  --border: #ebebeb;
+  --input: #e5e5e5;
+  /* Foco: el unico azul de la interfaz. */
+  --ring: #0070f3;
+  --radius: 0.5rem;
 
-  --color-primary: #0078d4;
-  --color-primary-hover: #106ebe;
-  --color-primary-soft: #eaf3fc;
+  --sidebar: #fafafa;
+  --sidebar-foreground: #171717;
+  --sidebar-primary: #171717;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f0f0f0;
+  --sidebar-accent-foreground: #171717;
+  --sidebar-border: #ebebeb;
+  --sidebar-ring: #0070f3;
 
-  --color-text: #1b1f24;
-  --color-text-muted: #5b6472;
-
-  --color-estado-pendiente: #6b7280;
-  /* Indigo, distinto del primario: el azul de botones y enlaces no debe leerse como un estado. */
-  --color-estado-progreso: #4f5bd5;
-  --color-estado-revision: #b7791f;
-  --color-estado-completada: #2e7d32;
-  --color-danger: #c4314b;
+  --estado-pendiente: #737373;
+  --estado-en-progreso: #d97706;
+  --estado-en-revision: #7c3aed;
+  --estado-completada: #16a34a;
+  --vencida: #dc2626;
+  --hoy: #b45309;
 
   /* Categorias del calendario: punto/acento, fondo tenue, texto y borde del mismo tono. */
-  --color-cat-clases: #0078d4;
-  --color-cat-clases-bg: #e8f2fc;
-  --color-cat-clases-fg: #0b4a80;
-  --color-cat-clases-borde: #b5d4f4;
-  --color-cat-laboral: #b7791f;
-  --color-cat-laboral-bg: #fcf3e3;
-  --color-cat-laboral-fg: #6e4508;
-  --color-cat-laboral-borde: #ecd2a3;
-  --color-cat-fam: #2e7d32;
-  --color-cat-fam-bg: #e9f5ea;
-  --color-cat-fam-fg: #1b5420;
-  --color-cat-fam-borde: #b9dcbb;
-  --color-cat-reunion: #6b4fbb;
-  --color-cat-reunion-bg: #f1edfb;
-  --color-cat-reunion-fg: #45307f;
-  --color-cat-reunion-borde: #cfc3ef;
+  --cat-clases: #4f46e5;
+  --cat-clases-bg: #eef2ff;
+  --cat-clases-fg: #3730a3;
+  --cat-clases-borde: #c7d2fe;
+  --cat-laboral: #ea580c;
+  --cat-laboral-bg: #fff7ed;
+  --cat-laboral-fg: #9a3412;
+  --cat-laboral-borde: #fed7aa;
+  --cat-fam: #65a30d;
+  --cat-fam-bg: #f7fee7;
+  --cat-fam-fg: #3f6212;
+  --cat-fam-borde: #d9f99d;
+  --cat-reunion: #c026d3;
+  --cat-reunion-bg: #fdf4ff;
+  --cat-reunion-fg: #86198f;
+  --cat-reunion-borde: #f5d0fe;
 
-  /* Superficie de marca: siempre oscura, no sigue el tema claro/oscuro del sistema. */
-  --color-brand-ink: #12141a;
-  --color-brand-ink-border: rgba(255, 255, 255, 0.14);
+  /* Identidad de curso: punto de color derivado de idCurso (src/lib/presentacion.ts). */
+  --curso-0: #0d9488;
+  --curso-1: #db2777;
+  --curso-2: #4f46e5;
+  --curso-3: #ea580c;
+  --curso-4: #0891b2;
+  --curso-5: #65a30d;
+  --curso-6: #c026d3;
+  --curso-7: #475569;
+
+  /* Superficie de marca (login): siempre oscura. */
+  --brand-ink: #0a0a0a;
+  --brand-ink-border: rgba(255, 255, 255, 0.14);
+}
+
+.dark {
+  color-scheme: dark;
+
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --card: #111111;
+  --card-foreground: #ededed;
+  --popover: #111111;
+  --popover-foreground: #ededed;
+  --primary: #ededed;
+  --primary-foreground: #0a0a0a;
+  --secondary: #1a1a1a;
+  --secondary-foreground: #ededed;
+  --muted: #111111;
+  --muted-foreground: #a1a1a1;
+  --subtle-foreground: #8a8a8a;
+  --accent: #161616;
+  --accent-foreground: #ededed;
+  --destructive: #f87171;
+  --border: #1f1f1f;
+  --input: #2a2a2a;
+  --ring: #3b82f6;
+
+  --sidebar: #0a0a0a;
+  --sidebar-foreground: #ededed;
+  --sidebar-primary: #ededed;
+  --sidebar-primary-foreground: #0a0a0a;
+  --sidebar-accent: #1a1a1a;
+  --sidebar-accent-foreground: #ededed;
+  --sidebar-border: #1f1f1f;
+  --sidebar-ring: #3b82f6;
+
+  --estado-pendiente: #8a8a8a;
+  --estado-en-progreso: #f5a524;
+  --estado-en-revision: #a78bfa;
+  --estado-completada: #4ade80;
+  --vencida: #f87171;
+  --hoy: #fbbf24;
+
+  --cat-clases: #818cf8;
+  --cat-clases-bg: #1e1b4b;
+  --cat-clases-fg: #c7d2fe;
+  --cat-clases-borde: #312e81;
+  --cat-laboral: #fb923c;
+  --cat-laboral-bg: #2a1608;
+  --cat-laboral-fg: #fed7aa;
+  --cat-laboral-borde: #7c2d12;
+  --cat-fam: #a3e635;
+  --cat-fam-bg: #1a2e05;
+  --cat-fam-fg: #d9f99d;
+  --cat-fam-borde: #365314;
+  --cat-reunion: #e879f9;
+  --cat-reunion-bg: #2e0a33;
+  --cat-reunion-fg: #f5d0fe;
+  --cat-reunion-borde: #701a75;
+
+  --curso-0: #2dd4bf;
+  --curso-1: #f472b6;
+  --curso-2: #818cf8;
+  --curso-3: #fb923c;
+  --curso-4: #22d3ee;
+  --curso-5: #a3e635;
+  --curso-6: #e879f9;
+  --curso-7: #94a3b8;
 }
 
 @theme inline {
-  --color-bg: var(--color-bg);
-  --color-surface: var(--color-surface);
-  --color-border: var(--color-border);
-  --color-border-strong: var(--color-border-strong);
+  --font-sans: var(--font-geist), "Segoe UI", system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-heading: var(--font-sans);
 
-  --color-primary: var(--color-primary);
-  --color-primary-hover: var(--color-primary-hover);
-  --color-primary-soft: var(--color-primary-soft);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-subtle-foreground: var(--subtle-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
 
-  --color-text: var(--color-text);
-  --color-text-muted: var(--color-text-muted);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
 
-  --color-estado-pendiente: var(--color-estado-pendiente);
-  --color-estado-progreso: var(--color-estado-progreso);
-  --color-estado-revision: var(--color-estado-revision);
-  --color-estado-completada: var(--color-estado-completada);
-  --color-danger: var(--color-danger);
+  --color-estado-pendiente: var(--estado-pendiente);
+  --color-estado-en-progreso: var(--estado-en-progreso);
+  --color-estado-en-revision: var(--estado-en-revision);
+  --color-estado-completada: var(--estado-completada);
+  --color-vencida: var(--vencida);
+  --color-hoy: var(--hoy);
 
-  --color-cat-clases: var(--color-cat-clases);
-  --color-cat-clases-bg: var(--color-cat-clases-bg);
-  --color-cat-clases-fg: var(--color-cat-clases-fg);
-  --color-cat-clases-borde: var(--color-cat-clases-borde);
-  --color-cat-laboral: var(--color-cat-laboral);
-  --color-cat-laboral-bg: var(--color-cat-laboral-bg);
-  --color-cat-laboral-fg: var(--color-cat-laboral-fg);
-  --color-cat-laboral-borde: var(--color-cat-laboral-borde);
-  --color-cat-fam: var(--color-cat-fam);
-  --color-cat-fam-bg: var(--color-cat-fam-bg);
-  --color-cat-fam-fg: var(--color-cat-fam-fg);
-  --color-cat-fam-borde: var(--color-cat-fam-borde);
-  --color-cat-reunion: var(--color-cat-reunion);
-  --color-cat-reunion-bg: var(--color-cat-reunion-bg);
-  --color-cat-reunion-fg: var(--color-cat-reunion-fg);
-  --color-cat-reunion-borde: var(--color-cat-reunion-borde);
+  --color-cat-clases: var(--cat-clases);
+  --color-cat-clases-bg: var(--cat-clases-bg);
+  --color-cat-clases-fg: var(--cat-clases-fg);
+  --color-cat-clases-borde: var(--cat-clases-borde);
+  --color-cat-laboral: var(--cat-laboral);
+  --color-cat-laboral-bg: var(--cat-laboral-bg);
+  --color-cat-laboral-fg: var(--cat-laboral-fg);
+  --color-cat-laboral-borde: var(--cat-laboral-borde);
+  --color-cat-fam: var(--cat-fam);
+  --color-cat-fam-bg: var(--cat-fam-bg);
+  --color-cat-fam-fg: var(--cat-fam-fg);
+  --color-cat-fam-borde: var(--cat-fam-borde);
+  --color-cat-reunion: var(--cat-reunion);
+  --color-cat-reunion-bg: var(--cat-reunion-bg);
+  --color-cat-reunion-fg: var(--cat-reunion-fg);
+  --color-cat-reunion-borde: var(--cat-reunion-borde);
 
-  --color-brand-ink: var(--color-brand-ink);
-  --color-brand-ink-border: var(--color-brand-ink-border);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-ink-border: var(--brand-ink-border);
 
-  --font-sans: var(--font-poppins), "Segoe UI", system-ui, -apple-system, sans-serif;
+  /* ALIAS TEMPORALES de los tokens anteriores; se borran al terminar la migracion. */
+  --color-bg: var(--muted);
+  --color-surface: var(--card);
+  --color-border-strong: var(--input);
+  --color-text: var(--foreground);
+  --color-text-muted: var(--muted-foreground);
+  --color-primary-hover: color-mix(in oklab, var(--primary) 88%, var(--background));
+  --color-primary-soft: var(--accent);
+  --color-danger: var(--destructive);
+  --color-estado-progreso: var(--estado-en-progreso);
+  --color-estado-revision: var(--estado-en-revision);
 
-  --radius-sm: 4px;
-  --radius-md: 6px;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-
-    --color-bg: #14161a;
-    --color-surface: #1c1f24;
-    --color-border: #2c3036;
-    --color-border-strong: #3a3f47;
-
-    --color-primary: #3b9cf2;
-    --color-primary-hover: #62b0f5;
-    --color-primary-soft: #16283a;
-
-    --color-text: #e6e8eb;
-    --color-text-muted: #9aa2ac;
-
-    --color-estado-pendiente: #8b929c;
-    --color-estado-progreso: #8b95f0;
-    --color-estado-revision: #d9a03f;
-    --color-estado-completada: #5fb564;
-
-    --color-cat-clases: #3b9cf2;
-    --color-cat-clases-bg: #142a40;
-    --color-cat-clases-fg: #b3d7f8;
-    --color-cat-clases-borde: #24496d;
-    --color-cat-laboral: #d9a03f;
-    --color-cat-laboral-bg: #33280f;
-    --color-cat-laboral-fg: #f2d398;
-    --color-cat-laboral-borde: #5a4518;
-    --color-cat-fam: #5fb564;
-    --color-cat-fam-bg: #16301a;
-    --color-cat-fam-fg: #b2deb4;
-    --color-cat-fam-borde: #2b5530;
-    --color-cat-reunion: #a48ae6;
-    --color-cat-reunion-bg: #26203d;
-    --color-cat-reunion-fg: #d6cbf6;
-    --color-cat-reunion-borde: #463a6e;
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
   }
 }
 
-body {
-  background: var(--color-bg);
-  color: var(--color-text);
-  font-family: var(--font-sans);
-  font-variant-numeric: tabular-nums;
-}
-
-/* Browser surfaces (seleccion, foco, scrollbar): tambien son parte del diseno. */
-
+/* Superficies del navegador (seleccion, foco, scrollbar): tambien son parte del diseno. */
 ::selection {
-  background: var(--color-primary);
-  color: #ffffff;
+  background: color-mix(in oklab, var(--ring) 30%, transparent);
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-primary);
+  outline: 2px solid var(--ring);
   outline-offset: 2px;
-  border-radius: 2px;
 }
 
 * {
-  scrollbar-color: var(--color-border-strong) transparent;
+  scrollbar-color: var(--input) transparent;
   scrollbar-width: thin;
-}
-
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background-color: var(--color-border-strong);
-  border-radius: 999px;
-  border: 2px solid var(--color-bg);
 }
 
 @media (prefers-reduced-motion: no-preference) {

@@ -277,7 +277,7 @@ export default async function HorariosGrupoPage({
                 {sugerencia.href ? (
                   <Link
                     href={sugerencia.href}
-                    className="mt-auto inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white transition-colors duration-150 hover:bg-primary-hover"
+                    className="mt-auto inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors duration-150 hover:bg-primary-hover"
                   >
                     <IconReuniones className="size-4" aria-hidden />
                     Programar en este horario

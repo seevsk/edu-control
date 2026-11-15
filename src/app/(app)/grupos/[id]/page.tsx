@@ -82,7 +82,7 @@ export default async function GrupoDetallePage({
             </Link>
             <Link
               href={`/grupos/${idGrupo}/tareas?nueva=1`}
-              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-hover"
+              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary-hover"
             >
               <IconAgregar className="size-4" aria-hidden />
               Nueva tarea

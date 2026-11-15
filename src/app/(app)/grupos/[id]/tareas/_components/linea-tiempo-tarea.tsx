@@ -57,7 +57,7 @@ export function LineaTiempoTarea({
     { etiqueta: "En revisión", ms: tiempos.enRevisionMs, color: COLOR_ESTADO_TAREA.en_revision },
     { etiqueta: "Pendiente", ms: tiempos.pendienteMs, color: COLOR_ESTADO_TAREA.pendiente },
     ...(tiempos.sinAsignarMs > 0
-      ? [{ etiqueta: "Sin asignar", ms: tiempos.sinAsignarMs, color: "var(--color-border-strong)" }]
+      ? [{ etiqueta: "Sin asignar", ms: tiempos.sinAsignarMs, color: "var(--input)" }]
       : []),
   ];
   const detalles = [
@@ -78,9 +78,9 @@ export function LineaTiempoTarea({
 
   function colorEntrada(entrada: Entrada): string {
     if (entrada.accion === "estado") {
-      return COLOR_ESTADO_TAREA[leerValorEstadoHistorial(entrada.valorNuevo).estado ?? ""] ?? "var(--color-border-strong)";
+      return COLOR_ESTADO_TAREA[leerValorEstadoHistorial(entrada.valorNuevo).estado ?? ""] ?? "var(--input)";
     }
-    return "var(--color-border-strong)";
+    return "var(--input)";
   }
 
   return (

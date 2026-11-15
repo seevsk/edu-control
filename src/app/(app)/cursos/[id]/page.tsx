@@ -134,7 +134,7 @@ export default async function CursoDetallePage({
             <input type="checkbox" name="activo" defaultChecked={curso.activo} />
             Curso activo este ciclo
           </label>
-          <SubmitButton className="mt-1 w-fit rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover sm:col-span-2">
+          <SubmitButton className="mt-1 w-fit rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover sm:col-span-2">
             Guardar cambios
           </SubmitButton>
         </form>
@@ -172,7 +172,7 @@ export default async function CursoDetallePage({
                     horaFin={timeAValor(horario.horaFin)}
                     tituloDias="Día de clase"
                   />
-                  <SubmitButton className="mt-5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-hover">
+                  <SubmitButton className="mt-5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary-hover">
                     Guardar horario
                   </SubmitButton>
                 </form>

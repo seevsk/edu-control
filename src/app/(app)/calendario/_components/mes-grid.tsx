@@ -171,7 +171,7 @@ export function MesGrid({
                 <div className="mb-1.5 flex items-center justify-between gap-2">
                   <span
                     className={`grid size-6 place-items-center rounded-full text-xs font-semibold tabular-nums ${
-                      esHoy ? "bg-primary text-white" : esDelMes ? "text-text" : "text-text-muted"
+                      esHoy ? "bg-primary text-primary-foreground" : esDelMes ? "text-text" : "text-text-muted"
                     }`}
                   >
                     {Number(diaISO.slice(8))}
@@ -215,7 +215,7 @@ export function MesGrid({
                 <li key={diaISO} className={`overflow-hidden rounded-md border bg-surface ${esHoy ? "border-primary/50" : "border-border"}`}>
                   <div className="flex items-center justify-between border-b border-border px-3 py-2">
                     <p className="text-sm font-semibold">{etiquetaFechaLarga(diaISO)}</p>
-                    {esHoy ? <span className="rounded-full bg-primary px-2 py-0.5 text-[11px] font-medium text-white">Hoy</span> : null}
+                    {esHoy ? <span className="rounded-full bg-primary px-2 py-0.5 text-[11px] font-medium text-primary-foreground">Hoy</span> : null}
                   </div>
                   <div className="flex flex-col gap-1.5 p-2">
                     {eventos.map((evento) => <TarjetaEventoMes key={evento.clave} evento={evento} amplia />)}

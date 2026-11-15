@@ -188,7 +188,7 @@ export function FormularioReunion({
           </div>
 
           <div className="flex items-center gap-2 border-t border-border pt-5">
-            <SubmitButton className="justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover">
+            <SubmitButton className="justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover">
               Programar reunión
             </SubmitButton>
           </div>

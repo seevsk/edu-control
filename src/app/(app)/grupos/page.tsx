@@ -66,7 +66,7 @@ export default async function GruposPage({
         </div>
         <Link
           href="/grupos?nuevo=1"
-          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-hover"
+          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary-hover"
         >
           <IconAgregar className="size-4" aria-hidden />
           Crear grupo
@@ -397,7 +397,7 @@ export default async function GruposPage({
               </select>
             </label>
           ) : null}
-          <SubmitButton className="mt-1 w-fit rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover sm:col-span-2">
+          <SubmitButton className="mt-1 w-fit rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover sm:col-span-2">
             Crear grupo
           </SubmitButton>
           </form>

@@ -41,7 +41,7 @@ export function SemanaGrid({
               </p>
               <p
                 className={`mx-auto mt-0.5 grid size-7 place-items-center rounded-full text-sm font-semibold tabular-nums ${
-                  esHoy ? "bg-primary text-white" : "text-text"
+                  esHoy ? "bg-primary text-primary-foreground" : "text-text"
                 }`}
               >
                 {Number(diaISO.slice(8))}
@@ -89,7 +89,7 @@ export function SemanaGrid({
                 className={`relative border-l border-border ${esHoy ? "bg-primary-soft/35" : ""}`}
                 style={{
                   height: alto,
-                  backgroundImage: "linear-gradient(to bottom, var(--color-border) 1px, transparent 1px)",
+                  backgroundImage: "linear-gradient(to bottom, var(--border) 1px, transparent 1px)",
                   backgroundSize: `100% ${PX_POR_HORA}px`,
                 }}
               >

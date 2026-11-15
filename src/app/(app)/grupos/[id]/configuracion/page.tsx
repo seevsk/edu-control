@@ -76,7 +76,7 @@ export default async function ConfiguracionGrupoPage({
             <p className="rounded-md border border-cat-laboral-borde bg-cat-laboral-bg px-3 py-2 text-xs text-cat-laboral-fg">
               Para finalizar, todas las tareas deben estar completadas o descartadas. Después, el grupo quedará en modo de solo lectura y la acción no se podrá revertir en el MVP.
             </p>
-            <SubmitButton className="w-fit rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover">
+            <SubmitButton className="w-fit rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover">
               Guardar cambios
             </SubmitButton>
           </form>

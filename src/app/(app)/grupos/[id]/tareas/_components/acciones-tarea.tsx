@@ -72,8 +72,8 @@ export function AccionesTarea({
                 <div className="flex items-center gap-2">
                   <SubmitButton
                     pendingText={textos.enviando}
-                    className={`rounded-md px-3 py-1.5 text-xs font-medium text-white ${
-                      destructiva ? "bg-danger hover:bg-danger/90" : "bg-primary hover:bg-primary-hover"
+                    className={`rounded-md px-3 py-1.5 text-xs font-medium ${
+                      destructiva ? "bg-danger text-white hover:bg-danger/90" : "bg-primary text-primary-foreground hover:bg-primary-hover"
                     }`}
                   >
                     {textos.confirmar}
@@ -90,7 +90,7 @@ export function AccionesTarea({
               pendingText={accion.estado === "completada" ? "Completando..." : "Actualizando..."}
               className={
                 accion.estado === "completada"
-                  ? "rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                  ? "rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                   : BOTON_SECUNDARIO
               }
             >
