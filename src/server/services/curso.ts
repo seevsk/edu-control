@@ -49,7 +49,11 @@ export async function listarCursos(idUsuario: number, activo: boolean = true) {
 export async function obtenerCursoDelUsuario(idUsuario: number, idCurso: number) {
   const curso = await prisma.curso.findFirst({
     where: { idCurso, idUsuario },
-    include: { horarios: true, evaluaciones: { orderBy: { fechaCierre: "asc" } } },
+    include: {
+      horarios: { orderBy: [{ diaSemana: "asc" }, { horaInicio: "asc" }] },
+      evaluaciones: { orderBy: { fechaCierre: "asc" } },
+      importadoDe: { select: { nombre: true, usuario: { select: { nombre: true, apellidos: true } } } },
+    },
   });
   if (!curso) throw new ErrorDeNegocio("Curso no encontrado");
   return curso;

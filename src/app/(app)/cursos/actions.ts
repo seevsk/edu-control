@@ -73,14 +73,19 @@ export async function actualizarCursoAction(idCurso: number, formData: FormData)
   });
 
   if (!parseo.success) {
-    redirect(`/cursos/${idCurso}?error=${encodeURIComponent(parseo.error.issues[0].message)}`);
+    redirect(`/cursos/${idCurso}?editar=1&error=${encodeURIComponent(parseo.error.issues[0].message)}`);
   }
 
-  await cursoService.actualizarCurso(sesion.idUsuario, idCurso, parseo.data);
+  try {
+    await cursoService.actualizarCurso(sesion.idUsuario, idCurso, parseo.data);
+  } catch (error) {
+    redirect(`/cursos/${idCurso}?editar=1&error=${encodeURIComponent(mensajeParaUsuario(error))}`);
+  }
   revalidatePath(`/cursos/${idCurso}`);
   revalidatePath("/cursos");
   revalidatePath("/calendario");
-  redirect(`/cursos?toast=${encodeURIComponent("Cambios guardados")}`);
+  revalidatePath("/", "layout");
+  redirect(`/cursos/${idCurso}?toast=${encodeURIComponent("Cambios guardados")}`);
 }
 
 export async function alternarActivoCursoAction(idCurso: number) {
@@ -143,7 +148,7 @@ export async function actualizarHorarioCursoAction(idCurso: number, idHorario: n
   });
 
   if (!parseo.success) {
-    redirect(`/cursos/${idCurso}?error=${encodeURIComponent(parseo.error.issues[0].message)}`);
+    redirect(`/cursos/${idCurso}?sesion=${idHorario}&error=${encodeURIComponent(parseo.error.issues[0].message)}`);
   }
 
   try {
