@@ -1,3 +1,4 @@
+import "./configurar-zod";
 import { z } from "zod";
 import { idRegistroSchema } from "./tarea";
 
