@@ -19,7 +19,7 @@ function FilaReunion({ reunion, idGrupo, pasada = false }: { reunion: Reunion; i
     <li>
       <Link
         href={`/reuniones?grupo=${idGrupo}#reunion-${reunion.idReunion}`}
-        className="flex min-h-[52px] items-center gap-4 border-b px-4 py-2 text-[13px] hover:bg-accent sm:px-6"
+        className="flex min-h-[52px] items-center gap-4 border-b border-border-subtle px-4 py-2 text-[13px] hover:bg-muted sm:px-6"
       >
         <span className="w-24 shrink-0 text-xs leading-5 text-subtle-foreground tabular-nums">
           {diaMesCorto(fechaEnZonaLimaISO(reunion.inicio))}

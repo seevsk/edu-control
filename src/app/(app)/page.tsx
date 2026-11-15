@@ -202,7 +202,7 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
                   <li key={tarea.idTarea}>
                     <Link
                       href={`/grupos/${tarea.grupo.idGrupo}?tarea=${tarea.idTarea}`}
-                      className="flex min-h-[52px] items-center gap-3 border-b px-4 py-2 text-[13px] hover:bg-accent sm:px-8"
+                      className="flex min-h-[52px] items-center gap-3 border-b border-border-subtle px-4 py-2 text-[13px] hover:bg-muted sm:px-8"
                     >
                       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                         <span className="truncate">{tarea.titulo}</span>

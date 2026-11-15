@@ -10,37 +10,39 @@
   color-scheme: light;
 
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #18181b;
   --card: #ffffff;
-  --card-foreground: #171717;
+  --card-foreground: #18181b;
   --popover: #ffffff;
-  --popover-foreground: #171717;
-  --primary: #171717;
+  --popover-foreground: #18181b;
+  --primary: #18181b;
   --primary-foreground: #ffffff;
-  --secondary: #f5f5f5;
-  --secondary-foreground: #171717;
-  --muted: #f5f5f5;
-  --muted-foreground: #525252;
-  --subtle-foreground: #737373;
-  --accent: #f0f0f0;
-  --accent-foreground: #171717;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #18181b;
+  --muted: #fafafa;
+  --muted-foreground: #52525b;
+  --subtle-foreground: #71717a;
+  --accent: #f4f4f5;
+  --accent-foreground: #18181b;
   --destructive: #dc2626;
-  --border: #ebebeb;
-  --input: #e5e5e5;
+  --border: #e9e9eb;
+  --input: #dedee2;
+  /* Separador entre filas: mas tenue que el borde de las superficies. */
+  --border-subtle: #f1f1f3;
   /* Foco: el unico azul de la interfaz. */
   --ring: #0070f3;
   --radius: 0.5rem;
 
-  --sidebar: #fafafa;
-  --sidebar-foreground: #171717;
-  --sidebar-primary: #171717;
+  --sidebar: #f7f7f8;
+  --sidebar-foreground: #18181b;
+  --sidebar-primary: #18181b;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f0f0f0;
-  --sidebar-accent-foreground: #171717;
-  --sidebar-border: #ebebeb;
+  --sidebar-accent: #ececee;
+  --sidebar-accent-foreground: #18181b;
+  --sidebar-border: #e9e9eb;
   --sidebar-ring: #0070f3;
 
-  --estado-pendiente: #737373;
+  --estado-pendiente: #71717a;
   --estado-en-progreso: #d97706;
   --estado-en-revision: #7c3aed;
   --estado-completada: #16a34a;
@@ -101,6 +103,7 @@
   --destructive: #f87171;
   --border: #1f1f1f;
   --input: #2a2a2a;
+  --border-subtle: #1a1a1a;
   --ring: #3b82f6;
 
   --sidebar: #0a0a0a;
@@ -169,6 +172,7 @@
   --color-destructive: var(--destructive);
   --color-border: var(--border);
   --color-input: var(--input);
+  --color-border-subtle: var(--border-subtle);
   --color-ring: var(--ring);
 
   --color-sidebar: var(--sidebar);
@@ -269,4 +273,15 @@
   .animate-page-in {
     animation: fade-slide-in 0.18s ease-out both;
   }
+}
+
+/* Selects nativos: sin esto el navegador pinta sus opciones con colores del sistema y en oscuro se ven mal. */
+select {
+  background-color: var(--background);
+  color: var(--foreground);
+}
+select option,
+select optgroup {
+  background-color: var(--popover);
+  color: var(--popover-foreground);
 }

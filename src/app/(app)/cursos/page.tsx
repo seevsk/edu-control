@@ -9,6 +9,7 @@ import { aOracion } from "@/lib/presentacion";
 import { formatoTitulo } from "@/lib/nombres";
 import { crearCursoAction, alternarActivoCursoAction, eliminarCursoAction, importarCursoAction, sincronizarCursoAction } from "./actions";
 import { SubmitButton } from "@/components/submit-button";
+import { CampoSelect } from "@/components/ui-app/campo-select";
 import { Toast } from "@/components/toast";
 import { BotonConfirmacion } from "@/components/boton-confirmacion";
 import { SelectorHorarioSemanal } from "@/components/selector-horario-semanal";
@@ -167,11 +168,7 @@ export default async function CursosPage({
               </label>
               <label className={CAMPO}>
                 Modalidad
-                <select name="modalidad" defaultValue="" className="h-9 rounded-md border border-input bg-transparent px-3 text-sm font-normal">
-                  <option value="">Sin especificar</option>
-                  <option value="presencial">Presencial</option>
-                  <option value="remoto">Remoto</option>
-                </select>
+                <CampoSelect name="modalidad" opciones={[{ valor: "", texto: "Sin especificar" }, { valor: "presencial", texto: "Presencial" }, { valor: "remoto", texto: "Remoto" }]} />
               </label>
             </div>
             <label className={CAMPO}>

@@ -28,7 +28,7 @@ export function TaskRow({ tarea, href, ahora, alta = false, conAvatar = true }: 
         href={href}
         scroll={false}
         className={cn(
-          "flex items-center gap-3 border-b px-4 text-[13px] hover:bg-accent focus-visible:bg-accent sm:px-6",
+          "flex items-center gap-3 border-b border-border-subtle px-4 text-[13px] hover:bg-muted focus-visible:bg-muted sm:px-6",
           alta ? "min-h-[52px] py-2" : "min-h-10 py-1.5",
           cerrada && "text-muted-foreground",
         )}

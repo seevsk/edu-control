@@ -5,7 +5,8 @@ import { obtenerUsuarioActual } from "@/server/services/usuario";
 import { listarInvitacionesPendientes, listarMisGrupos } from "@/server/services/grupo";
 import { listarCursos } from "@/server/services/curso";
 import { contarNotificacionesNoLeidas } from "@/server/services/notificacion";
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { BarraSuperior, MigasProvider } from "@/components/ui-app/barra-superior";
 import { AppSidebar } from "@/components/ui-app/app-sidebar";
 import { aOracion } from "@/lib/presentacion";
 import { nombreCorto } from "@/lib/nombres";
@@ -33,6 +34,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   };
 
   return (
+    <MigasProvider>
     <SidebarProvider
       defaultOpen={almacen.get("sidebar_state")?.value !== "false"}
       style={{ "--sidebar-width": "15rem" } as CSSProperties}
@@ -40,13 +42,11 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
     >
       <AppSidebar datos={datos} />
       <SidebarInset className="min-w-0 overflow-y-auto">
-        <div className="flex h-12 shrink-0 items-center gap-2 border-b px-3 md:hidden">
-          <SidebarTrigger />
-          <span className="text-sm font-semibold">EduControl</span>
-        </div>
+        <BarraSuperior />
         {/* Las paginas aun no migradas conservan su padding; las nuevas usan <PaginaCompleta>. */}
         <main className="min-w-0 flex-1 p-4 sm:p-6">{children}</main>
       </SidebarInset>
     </SidebarProvider>
+    </MigasProvider>
   );
 }

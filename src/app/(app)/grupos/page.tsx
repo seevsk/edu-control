@@ -5,6 +5,7 @@ import { listarMisGrupos } from "@/server/services/grupo";
 import { listarEvaluacionesDelUsuario } from "@/server/services/curso";
 import { crearGrupoAction } from "./actions";
 import { SubmitButton } from "@/components/submit-button";
+import { CampoSelect } from "@/components/ui-app/campo-select";
 import { Toast } from "@/components/toast";
 import { PaginaCompleta, PageHeader } from "@/components/ui-app/page-header";
 import { PanelLateral } from "@/components/ui-app/panel-lateral";
@@ -67,7 +68,7 @@ export default async function GruposPage({
             const curso = grupo.evaluacion?.curso ?? null;
             return (
               <li key={grupo.idGrupo}>
-                <Link href={`/grupos/${grupo.idGrupo}`} className="flex min-h-[52px] items-center gap-4 border-b px-4 py-2 text-[13px] hover:bg-accent sm:px-8">
+                <Link href={`/grupos/${grupo.idGrupo}`} className="flex min-h-[52px] items-center gap-4 border-b border-border-subtle px-4 py-2 text-[13px] hover:bg-muted sm:px-8">
                   <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <span className="truncate font-medium">{aOracion(grupo.nombre)}</span>
                     <span className="flex items-center gap-1.5 truncate text-xs text-subtle-foreground">
@@ -129,14 +130,10 @@ export default async function GruposPage({
             {evaluaciones.length > 0 ? (
               <label className={CAMPO}>
                 Evaluación relacionada
-                <select name="idEvaluacion" defaultValue="" className="h-9 rounded-md border border-input bg-transparent px-3 text-sm font-normal">
-                  <option value="">Ninguna</option>
-                  {evaluaciones.map((evaluacion) => (
-                    <option key={evaluacion.idEvaluacion} value={evaluacion.idEvaluacion}>
-                      {aOracion(evaluacion.curso.nombre)} · {evaluacion.nombre}
-                    </option>
-                  ))}
-                </select>
+                <CampoSelect
+                  name="idEvaluacion"
+                  opciones={[{ valor: "", texto: "Ninguna" }, ...evaluaciones.map((evaluacion) => ({ valor: String(evaluacion.idEvaluacion), texto: `${aOracion(evaluacion.curso.nombre)} · ${evaluacion.nombre}` }))]}
+                />
                 <span className="text-xs font-normal text-subtle-foreground">Su fecha de cierre será la fecha límite del grupo.</span>
               </label>
             ) : null}

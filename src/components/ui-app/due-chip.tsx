@@ -1,6 +1,9 @@
 import { cn } from "@/lib/utils";
 import { horaLima } from "@/lib/dates";
-import { diasHasta, diaMesCorto, fechaEnZonaLimaISO } from "@/lib/calendario";
+import { DIAS_CORTOS, diaSemanaISO, diasHasta, diaMesCorto, fechaEnZonaLimaISO } from "@/lib/calendario";
+
+/** Dentro de dos semanas "Vie 20" (se lee mas rapido); mas lejos o en el pasado, "24 nov". */
+const DIAS_CON_NOMBRE = 13;
 
 /** Fecha limite en lenguaje natural, en America/Lima: "Vence hoy 11:59 PM", "Vencida hace 3 días", "22 nov". */
 export function textoVencimiento(fecha: Date, ahora: Date, cerrada: boolean): { texto: string; tono: "normal" | "hoy" | "vencida" | "apagado" } {
@@ -14,6 +17,10 @@ export function textoVencimiento(fecha: Date, ahora: Date, cerrada: boolean): { 
   }
   if (dias === 0) return { texto: `Vence hoy ${horaLima(fecha)}`, tono: "hoy" };
   if (dias === 1) return { texto: "Mañana", tono: "normal" };
+  if (dias <= DIAS_CON_NOMBRE) {
+    const fechaISO = fechaEnZonaLimaISO(fecha);
+    return { texto: `${DIAS_CORTOS[diaSemanaISO(fechaISO) - 1]} ${Number(fechaISO.slice(8))}`, tono: "normal" };
+  }
   return { texto: corta, tono: "normal" };
 }
 

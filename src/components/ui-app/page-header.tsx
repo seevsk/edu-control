@@ -1,11 +1,10 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { Migas, type MigaDePan } from "./barra-superior";
 
-export interface MigaDePan {
-  href?: string;
-  texto: string;
-}
+export type { MigaDePan };
+
 
 export interface PestanaEncabezado {
   href: string;
@@ -37,21 +36,8 @@ export function PageHeader({
 }) {
   return (
     <header className={cn("border-b px-4 pt-4 sm:px-6", !pestanas?.length && "pb-4")}>
-      {migas?.length ? (
-        <nav aria-label="Migas de pan" className="flex items-center gap-2 text-[13px] text-subtle-foreground">
-          {migas.map((miga, indice) => (
-            <span key={`${miga.texto}-${indice}`} className="flex items-center gap-2">
-              {indice > 0 ? <span aria-hidden>/</span> : null}
-              {miga.href ? (
-                <Link href={miga.href} className="hover:text-foreground">{miga.texto}</Link>
-              ) : (
-                <span className="text-foreground">{miga.texto}</span>
-              )}
-            </span>
-          ))}
-        </nav>
-      ) : null}
-      <div className={cn("flex flex-wrap items-end justify-between gap-x-4 gap-y-3", migas?.length && "mt-2.5")}>
+      {migas?.length ? <Migas items={migas} /> : null}
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
         <div className="min-w-0">
           <h1 className="text-xl font-semibold tracking-[-0.01em] text-balance">{titulo}</h1>
           {contexto ? <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted-foreground">{contexto}</div> : null}

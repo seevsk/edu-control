@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { SubmitButton } from "@/components/submit-button";
+import { CampoSelect } from "@/components/ui-app/campo-select";
 import { PesoTarea } from "@/components/peso-tarea";
 import { AccionesTarea } from "../tareas/_components/acciones-tarea";
 import { LineaTiempoTarea } from "../tareas/_components/linea-tiempo-tarea";
@@ -23,7 +24,6 @@ type DatosGrupo = Awaited<ReturnType<typeof obtenerGrupoDelUsuario>>;
 type Tarea = Awaited<ReturnType<typeof obtenerTareaDelGrupo>>;
 
 const CAMPO = "flex flex-col gap-1.5 text-[13px] font-medium";
-const SELECT = "h-9 rounded-md border border-input bg-transparent px-3 text-sm";
 
 export function DetalleTarea({
   datos,
@@ -69,11 +69,7 @@ export function DetalleTarea({
           <div className="grid gap-4 sm:grid-cols-2">
             <label className={CAMPO}>
               Peso
-              <select name="peso" defaultValue={String(tarea.peso)} className={SELECT}>
-                <option value="1">1 · liviana</option>
-                <option value="2">2 · media</option>
-                <option value="3">3 · pesada</option>
-              </select>
+              <CampoSelect name="peso" defaultValue={String(tarea.peso)} opciones={[{ valor: "1", texto: "1 · liviana" }, { valor: "2", texto: "2 · media" }, { valor: "3", texto: "3 · pesada" }]} />
             </label>
             <label className={CAMPO}>
               Fecha límite

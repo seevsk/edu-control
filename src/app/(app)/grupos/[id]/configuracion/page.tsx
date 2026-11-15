@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { requerirSesion } from "@/server/auth/session";
 import { obtenerGrupoDelUsuario } from "@/server/services/grupo";
 import { SubmitButton } from "@/components/submit-button";
+import { CampoSelect } from "@/components/ui-app/campo-select";
 import { Toast } from "@/components/toast";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -54,10 +55,7 @@ export default async function ConfiguracionGrupoPage({
           </label>
           <label className={CAMPO}>
             Estado
-            <select name="estado" defaultValue={grupo.estado} className="h-9 rounded-md border border-input bg-transparent px-3 text-sm font-normal">
-              <option value="activo">Activo</option>
-              <option value="finalizado">Finalizado (solo lectura, no se puede revertir)</option>
-            </select>
+            <CampoSelect name="estado" defaultValue={grupo.estado} opciones={[{ valor: "activo", texto: "Activo" }, { valor: "finalizado", texto: "Finalizado (solo lectura, no se puede revertir)" }]} />
             <span className="text-xs font-normal text-subtle-foreground">Para finalizarlo, todas las tareas deben estar completadas o descartadas.</span>
           </label>
           <SubmitButton className="h-9 w-fit rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90">

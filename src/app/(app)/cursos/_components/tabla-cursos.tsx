@@ -20,7 +20,7 @@ export interface FilaCurso {
 }
 
 const TH = "h-9 border-b bg-sidebar px-4 text-left text-xs font-medium whitespace-nowrap text-subtle-foreground";
-const TD = "h-[52px] border-b px-4 text-[13px] whitespace-nowrap";
+const TD = "h-[52px] border-b border-border-subtle px-4 text-[13px] whitespace-nowrap";
 
 /** Tabla de cursos con filtro en vivo (sin boton "Buscar"); con poco ancho, scroll horizontal dentro de su caja. */
 export function TablaCursos({ filas, vacio }: { filas: FilaCurso[]; vacio: ReactNode }) {
@@ -63,7 +63,7 @@ export function TablaCursos({ filas, vacio }: { filas: FilaCurso[]; vacio: React
             {visibles.map((fila) => (
               <tr
                 key={fila.idCurso}
-                className="cursor-pointer hover:bg-sidebar"
+                className="cursor-pointer hover:bg-muted"
                 onClick={(evento) => {
                   if ((evento.target as HTMLElement).closest("a, button, form, [role=menu]")) return;
                   router.push(`/cursos/${fila.idCurso}`);

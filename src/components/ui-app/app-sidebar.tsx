@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, ChevronsUpDown, House, Inbox, LogOut, Mail, User, Users } from "lucide-react";
+import { CalendarDays, ChevronsUpDown, House, Inbox, LogOut, Mail, Plus, User, Users } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
+  SidebarGroupAction,
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
@@ -27,7 +28,6 @@ import {
 import { ThemeToggle } from "@/components/theme-toggle";
 import { CourseDot } from "./course-dot";
 import { UserAvatar } from "./user-avatar";
-import { SearchCommand } from "./search-command";
 
 export interface DatosSidebar {
   usuario: { idUsuario: number; nombre: string; apellidos: string | null; fotoUrl: string | null };
@@ -45,6 +45,9 @@ const NAVEGACION = [
   { href: "/reuniones", texto: "Reuniones", Icono: Users },
   { href: "/invitaciones", texto: "Invitaciones", Icono: Mail, contador: "invitaciones" },
 ] as const;
+
+/** Claro: item activo blanco en relieve; oscuro: fondo apenas mas claro. */
+const ACTIVO = "data-[active=true]:bg-background data-[active=true]:font-normal data-[active=true]:shadow-[0_1px_2px_rgba(24,24,27,0.06),0_0_0_1px_var(--sidebar-border)] dark:data-[active=true]:bg-sidebar-accent dark:data-[active=true]:shadow-none";
 
 function esActivo(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
@@ -69,18 +72,6 @@ export function AppSidebar({ datos }: { datos: DatosSidebar }) {
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SearchCommand
-              paginas={[
-                ...NAVEGACION.map(({ href, texto }) => ({ href, texto })),
-                { href: "/cursos", texto: "Cursos" },
-                { href: "/grupos", texto: "Grupos" },
-                { href: "/perfil", texto: "Perfil" },
-              ]}
-              cursos={datos.cursos.map((curso) => ({ href: `/cursos/${curso.idCurso}`, texto: curso.nombre, idCurso: curso.idCurso }))}
-              grupos={datos.grupos.map((grupo) => ({ href: `/grupos/${grupo.idGrupo}`, texto: grupo.nombre }))}
-            />
-          </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
 
@@ -91,7 +82,7 @@ export function AppSidebar({ datos }: { datos: DatosSidebar }) {
               const contador = "contador" in item ? contadores[item.contador] : 0;
               return (
                 <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton asChild isActive={esActivo(pathname, item.href)} tooltip={item.texto}>
+                  <SidebarMenuButton asChild className={ACTIVO} isActive={esActivo(pathname, item.href)} tooltip={item.texto}>
                     <Link href={item.href}>
                       <item.Icono aria-hidden />
                       <span>{item.texto}</span>
@@ -108,10 +99,13 @@ export function AppSidebar({ datos }: { datos: DatosSidebar }) {
           <SidebarGroupLabel asChild>
             <Link href="/cursos">Cursos</Link>
           </SidebarGroupLabel>
+          <SidebarGroupAction asChild title="Agregar curso">
+            <Link href="/cursos?nuevo=1" aria-label="Agregar curso"><Plus aria-hidden /></Link>
+          </SidebarGroupAction>
           <SidebarMenu>
             {datos.cursos.map((curso) => (
               <SidebarMenuItem key={curso.idCurso}>
-                <SidebarMenuButton asChild isActive={esActivo(pathname, `/cursos/${curso.idCurso}`)}>
+                <SidebarMenuButton asChild className={ACTIVO} isActive={esActivo(pathname, `/cursos/${curso.idCurso}`)}>
                   <Link href={`/cursos/${curso.idCurso}`}>
                     <CourseDot idCurso={curso.idCurso} />
                     <span>{curso.nombre}</span>
@@ -133,10 +127,13 @@ export function AppSidebar({ datos }: { datos: DatosSidebar }) {
           <SidebarGroupLabel asChild>
             <Link href="/grupos">Grupos</Link>
           </SidebarGroupLabel>
+          <SidebarGroupAction asChild title="Crear grupo">
+            <Link href="/grupos?nuevo=1" aria-label="Crear grupo"><Plus aria-hidden /></Link>
+          </SidebarGroupAction>
           <SidebarMenu>
             {datos.grupos.map((grupo) => (
               <SidebarMenuItem key={grupo.idGrupo}>
-                <SidebarMenuButton asChild isActive={esActivo(pathname, `/grupos/${grupo.idGrupo}`)}>
+                <SidebarMenuButton asChild className={ACTIVO} isActive={esActivo(pathname, `/grupos/${grupo.idGrupo}`)}>
                   <Link href={`/grupos/${grupo.idGrupo}`}>
                     <span>{grupo.nombre}</span>
                   </Link>
