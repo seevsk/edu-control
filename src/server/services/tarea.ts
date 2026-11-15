@@ -287,7 +287,7 @@ export async function crearTarea(
       idUsuario: idAsignado,
       tipo: "tarea_asignada",
       idGrupo,
-      ...plantillasNotificacion.tareaAsignada(tarea.titulo, idGrupo),
+      ...plantillasNotificacion.tareaAsignada(tarea.titulo, idGrupo, tarea.idTarea),
     });
   }
 
@@ -453,7 +453,7 @@ export async function reasignarTarea(
       idUsuario: nuevoIdAsignado,
       tipo: "tarea_asignada",
       idGrupo,
-      ...plantillasNotificacion.tareaAsignada(tarea.titulo, idGrupo),
+      ...plantillasNotificacion.tareaAsignada(tarea.titulo, idGrupo, tarea.idTarea),
     });
   }
 
@@ -538,7 +538,7 @@ export async function cambiarEstadoTarea(
         idUsuario: destino.idUsuario,
         tipo: "tarea_en_revision",
         idGrupo,
-        ...plantillasNotificacion.tareaEnRevision(tarea.titulo, idGrupo),
+        ...plantillasNotificacion.tareaEnRevision(tarea.titulo, idGrupo, idTarea),
       });
     }
     return;
@@ -549,7 +549,7 @@ export async function cambiarEstadoTarea(
       idUsuario: asignado,
       tipo: "tarea_devuelta",
       idGrupo,
-      ...plantillasNotificacion.tareaDevuelta(tarea.titulo, idGrupo, motivoValidado),
+      ...plantillasNotificacion.tareaDevuelta(tarea.titulo, idGrupo, idTarea, motivoValidado),
     });
   } else if (accion === "reabrir") {
     await crearNotificacion({
@@ -570,7 +570,7 @@ export async function cambiarEstadoTarea(
       idUsuario: asignado,
       tipo: "tarea_completada",
       idGrupo,
-      ...plantillasNotificacion.tareaCompletada(tarea.titulo, idGrupo),
+      ...plantillasNotificacion.tareaCompletada(tarea.titulo, idGrupo, idTarea),
     });
   }
 }
