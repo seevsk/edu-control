@@ -98,7 +98,7 @@ export async function obtenerHorarioCompanero(idVisitante: number, idUsuario: nu
       eliminadoEn: true,
       cursos: {
         where: { activo: true },
-        select: { nombre: true, horarios: { select: { idHorario: true, diaSemana: true, horaInicio: true, horaFin: true } } },
+        select: { idCurso: true, nombre: true, horarios: { select: { idHorario: true, diaSemana: true, horaInicio: true, horaFin: true } } },
       },
       bloquesOcupados: { select: { idBloqueOcupado: true, tipo: true, diaSemana: true, horaInicio: true, horaFin: true } },
     },
@@ -109,7 +109,7 @@ export async function obtenerHorarioCompanero(idVisitante: number, idUsuario: nu
     nombre: usuario.nombre,
     apellidos: usuario.apellidos,
     fotoUrl: usuario.fotoUrl,
-    horarios: usuario.cursos.flatMap((curso) => curso.horarios.map((h) => ({ ...h, curso: curso.nombre }))),
+    horarios: usuario.cursos.flatMap((curso) => curso.horarios.map((h) => ({ ...h, curso: curso.nombre, idCurso: curso.idCurso }))),
     bloques: usuario.bloquesOcupados.map(({ tipo, ...bloque }) => ({
       ...bloque,
       categoria: tipo === "laboral" ? ("laboral" as const) : ("fam" as const),

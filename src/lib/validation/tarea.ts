@@ -1,3 +1,4 @@
+import "./configurar-zod";
 import { z } from "zod";
 
 function esFechaISOReal(valor: string) {

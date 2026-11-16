@@ -9,14 +9,22 @@ export async function obtenerCalendarioEntre(idUsuario: number, desdeISO: string
   const [cursos, bloquesOcupados, evaluaciones, tareas, reuniones] = await Promise.all([
     prisma.curso.findMany({
       where: { idUsuario, activo: true },
-      include: { horarios: true },
+      include: {
+        horarios: true,
+        evaluaciones: {
+          where: { fechaCierre: { gte: new Date() }, estado: { in: ["pendiente", "en_progreso"] } },
+          orderBy: { fechaCierre: "asc" },
+          take: 1,
+          select: { nombre: true, fechaCierre: true },
+        },
+      },
     }),
     prisma.bloqueOcupado.findMany({
       where: { idUsuario },
       orderBy: [{ diaSemana: "asc" }, { horaInicio: "asc" }],
     }),
     prisma.evaluacion.findMany({
-      where: { curso: { idUsuario }, fechaCierre: { gte: desde, lt: hasta } },
+      where: { curso: { idUsuario }, estado: { not: "descartada" }, fechaCierre: { gte: desde, lt: hasta } },
       include: { curso: true },
       orderBy: { fechaCierre: "asc" },
     }),
@@ -31,7 +39,13 @@ export async function obtenerCalendarioEntre(idUsuario: number, desdeISO: string
   const horarios = cursos.flatMap((curso) =>
     curso.horarios.map((horario) => ({
       ...horario,
-      curso: { idCurso: curso.idCurso, nombre: curso.nombre, modalidad: curso.modalidad },
+      curso: {
+        idCurso: curso.idCurso,
+        nombre: curso.nombre,
+        modalidad: curso.modalidad,
+        docente: curso.docente,
+        proximaEvaluacion: curso.evaluaciones[0] ?? null,
+      },
     })),
   );
 

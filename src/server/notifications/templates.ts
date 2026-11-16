@@ -3,45 +3,45 @@
  * guarda el resultado final (mensaje, enlace), no la plantilla.
  */
 export const plantillasNotificacion = {
-  invitacionGrupo(nombreGrupo: string) {
+  invitacionGrupo(nombreGrupo: string, idGrupo: number, invitador: string | null) {
     return {
-      mensaje: `Te invitaron al grupo "${nombreGrupo}".`,
-      enlace: "/invitaciones",
-      asunto: `Invitacion al grupo ${nombreGrupo}`,
+      mensaje: invitador ? `${invitador} te invitó a ${nombreGrupo}` : `Te invitaron a ${nombreGrupo}`,
+      enlace: `/notificaciones?filtro=invitaciones&sel=inv-${idGrupo}`,
+      asunto: `Invitación al grupo ${nombreGrupo}`,
     };
   },
-  invitacionRespondida(nombreGrupo: string, idGrupo: number, respuesta: "aceptada" | "rechazada") {
+  invitacionRespondida(nombreGrupo: string, idGrupo: number, respuesta: "aceptada" | "rechazada", persona: string | null) {
     return {
-      mensaje: `Respondieron tu invitacion al grupo "${nombreGrupo}": ${respuesta}.`,
+      mensaje: `${persona ?? "Alguien"} ${respuesta === "aceptada" ? "aceptó" : "rechazó"} tu invitación a ${nombreGrupo}`,
       enlace: `/grupos/${idGrupo}`,
-      asunto: `Respuesta a tu invitacion (${nombreGrupo})`,
+      asunto: `Respuesta a tu invitación (${nombreGrupo})`,
     };
   },
-  tareaAsignada(titulo: string, idGrupo: number) {
+  tareaAsignada(titulo: string, idGrupo: number, idTarea: number) {
     return {
-      mensaje: `Se te asigno "${titulo}".`,
-      enlace: `/grupos/${idGrupo}/tareas`,
+      mensaje: `Te asignaron “${titulo}”`,
+      enlace: `/grupos/${idGrupo}/tareas/${idTarea}`,
       asunto: `Nueva tarea asignada: ${titulo}`,
     };
   },
-  tareaEnRevision(titulo: string, idGrupo: number) {
+  tareaEnRevision(titulo: string, idGrupo: number, idTarea: number) {
     return {
-      mensaje: `"${titulo}" esta en revision.`,
-      enlace: `/grupos/${idGrupo}/tareas`,
-      asunto: `Tarea en revision: ${titulo}`,
+      mensaje: `“${titulo}” pasó a revisión`,
+      enlace: `/grupos/${idGrupo}/tareas/${idTarea}`,
+      asunto: `Tarea en revisión: ${titulo}`,
     };
   },
-  tareaDevuelta(titulo: string, idGrupo: number, motivo: string) {
+  tareaDevuelta(titulo: string, idGrupo: number, idTarea: number, motivo: string) {
     return {
-      mensaje: `Te devolvieron "${titulo}". Motivo: ${motivo}`,
-      enlace: `/grupos/${idGrupo}/tareas`,
+      mensaje: `Te devolvieron “${titulo}”. Motivo: ${motivo}`,
+      enlace: `/grupos/${idGrupo}/tareas/${idTarea}`,
       asunto: `Te devolvieron una tarea: ${titulo}`,
     };
   },
-  tareaCompletada(titulo: string, idGrupo: number) {
+  tareaCompletada(titulo: string, idGrupo: number, idTarea: number) {
     return {
-      mensaje: `"${titulo}" quedo completada.`,
-      enlace: `/grupos/${idGrupo}/tareas`,
+      mensaje: `“${titulo}” se completó`,
+      enlace: `/grupos/${idGrupo}/tareas/${idTarea}`,
       asunto: `Tarea completada: ${titulo}`,
     };
   },
@@ -66,11 +66,27 @@ export const plantillasNotificacion = {
       asunto: `Tarea descartada: ${titulo}`,
     };
   },
-  reunionProgramada(titulo: string, nombreGrupo: string, idGrupo: number, cuando: string) {
+  reunionProgramada(titulo: string, nombreGrupo: string, idGrupo: number, idReunion: number, cuando: string) {
     return {
       mensaje: `Nueva reunión en "${nombreGrupo}": "${titulo}", ${cuando}.`,
-      enlace: `/reuniones?grupo=${idGrupo}`,
+      enlace: `/reuniones?grupo=${idGrupo}&reunion=${idReunion}`,
       asunto: `Reunión programada: ${titulo}`,
+    };
+  },
+  integranteSalio(persona: string, nombreGrupo: string, idGrupo: number, ahoraEresLider: boolean) {
+    return {
+      mensaje: ahoraEresLider
+        ? `${persona} salió de ${nombreGrupo} y te dejó como líder`
+        : `${persona} salió de ${nombreGrupo}`,
+      enlace: `/grupos/${idGrupo}/integrantes`,
+      asunto: `${persona} salió de ${nombreGrupo}`,
+    };
+  },
+  evaluacionCreada(nombre: string, nombreCurso: string, idCurso: number, idEvaluacion: number, cierre: string) {
+    return {
+      mensaje: `Registraste ${nombre} de ${nombreCurso}. Cierra ${cierre}`,
+      enlace: `/cursos/${idCurso}?evaluacion=${idEvaluacion}`,
+      asunto: `Nueva evaluación: ${nombre} (${nombreCurso})`,
     };
   },
 };

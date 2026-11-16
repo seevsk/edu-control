@@ -8,7 +8,7 @@ export default function NoEncontrado() {
       <p className="text-sm text-text-muted">
         Revisa el enlace o vuelve al inicio para continuar trabajando.
       </p>
-      <Link href="/" className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover">
+      <Link href="/" className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover">
         Volver al inicio
       </Link>
     </div>

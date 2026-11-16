@@ -1,3 +1,4 @@
+import "./configurar-zod";
 import { z } from "zod";
 
 const horaHHMM = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Hora invalida (HH:mm)");
@@ -8,7 +9,8 @@ const camposCurso = {
   nombre: z.string().trim().min(1, "El nombre es obligatorio").max(120),
   codigo: z.string().trim().max(30).optional().or(z.literal("")),
   docente: z.string().trim().max(120).optional().or(z.literal("")),
-  modalidad: z.enum(["presencial", "remoto"]).optional(),
+  // "Sin especificar" llega como cadena vacía desde el formulario.
+  modalidad: z.enum(["presencial", "remoto"]).optional().or(z.literal("").transform(() => undefined)),
 };
 
 const camposHoras = {

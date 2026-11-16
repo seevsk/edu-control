@@ -1,6 +1,10 @@
 import { prisma } from "@/server/db/client";
 import { horaATime, finDeDiaLimaAUtc, inicioDeDiaLimaAUtc } from "@/lib/dates";
 import { ErrorDeNegocio } from "@/lib/errores";
+import { fechaCompleta } from "@/lib/formato-fecha";
+import { transicionEvaluacionValida, valorConMotivo, type EstadoEvaluacion } from "@/lib/estado-evaluacion";
+import { crearNotificacion } from "@/server/notifications/crear-notificacion";
+import { plantillasNotificacion } from "@/server/notifications/templates";
 import type { Curso } from "../../../generated/prisma/client";
 import type {
   crearCursoSchema,
@@ -22,7 +26,7 @@ export async function listarEvaluacionesDelUsuario(idUsuario: number) {
 /** Para el "Inicio": evaluaciones propias que todavia no cierran, sin depender de ningun grupo. */
 export async function listarEvaluacionesProximas(idUsuario: number, limite = 8) {
   return prisma.evaluacion.findMany({
-    where: { curso: { idUsuario, activo: true }, fechaCierre: { gte: new Date() } },
+    where: { curso: { idUsuario, activo: true }, fechaCierre: { gte: new Date() }, estado: { in: ["pendiente", "en_progreso"] } },
     include: { curso: true },
     orderBy: { fechaCierre: "asc" },
     take: limite,
@@ -49,7 +53,11 @@ export async function listarCursos(idUsuario: number, activo: boolean = true) {
 export async function obtenerCursoDelUsuario(idUsuario: number, idCurso: number) {
   const curso = await prisma.curso.findFirst({
     where: { idCurso, idUsuario },
-    include: { horarios: true, evaluaciones: { orderBy: { fechaCierre: "asc" } } },
+    include: {
+      horarios: { orderBy: [{ diaSemana: "asc" }, { horaInicio: "asc" }] },
+      evaluaciones: { orderBy: { fechaCierre: "asc" } },
+      importadoDe: { select: { nombre: true, usuario: { select: { nombre: true, apellidos: true } } } },
+    },
   });
   if (!curso) throw new ErrorDeNegocio("Curso no encontrado");
   return curso;
@@ -225,6 +233,7 @@ async function sincronizarListasDeCurso(idCursoFuente: number, idCursoLocal: num
           fechaApertura: evaluacion.fechaApertura,
           requiereEntrega: evaluacion.requiereEntrega,
           importadoDeIdEvaluacion: evaluacion.idEvaluacion,
+          historial: { create: { accion: "creada" } },
         },
       });
     }
@@ -354,16 +363,25 @@ export async function agregarEvaluacion(
   idCurso: number,
   datos: z.infer<typeof crearEvaluacionSchema>,
 ) {
-  await obtenerCursoDelUsuario(idUsuario, idCurso);
-  return prisma.evaluacion.create({
+  const curso = await obtenerCursoDelUsuario(idUsuario, idCurso);
+  const evaluacion = await prisma.evaluacion.create({
     data: {
       idCurso,
       nombre: datos.nombre,
       fechaApertura: datos.fechaApertura ? inicioDeDiaLimaAUtc(datos.fechaApertura) : null,
       fechaCierre: finDeDiaLimaAUtc(datos.fechaCierre),
       requiereEntrega: datos.requiereEntrega,
+      historial: { create: { accion: "creada" } },
     },
   });
+
+  // Excepcion aprobada por el usuario (2026-11-16): el aviso de evaluacion creada va al propio dueno.
+  await crearNotificacion({
+    idUsuario,
+    tipo: "evaluacion_creada",
+    ...plantillasNotificacion.evaluacionCreada(evaluacion.nombre, curso.nombre, idCurso, evaluacion.idEvaluacion, `el ${fechaCompleta(evaluacion.fechaCierre)}`),
+  });
+  return evaluacion;
 }
 
 export async function eliminarEvaluacion(idUsuario: number, idCurso: number, idEvaluacion: number) {
@@ -371,14 +389,65 @@ export async function eliminarEvaluacion(idUsuario: number, idCurso: number, idE
   await prisma.evaluacion.deleteMany({ where: { idEvaluacion, idCurso } });
 }
 
+/** Lanza si la evaluacion no es de un curso del usuario. */
+export async function obtenerEvaluacionDelUsuario(idUsuario: number, idEvaluacion: number) {
+  const evaluacion = await prisma.evaluacion.findFirst({
+    where: { idEvaluacion, curso: { idUsuario } },
+    include: { historial: { orderBy: { fecha: "asc" } }, curso: { select: { idCurso: true, nombre: true } } },
+  });
+  if (!evaluacion) throw new ErrorDeNegocio("Evaluación no encontrada");
+  return evaluacion;
+}
+
+/** Primera vez que el dueno abre el detalle: se registra una sola vez. */
+export async function registrarVistaEvaluacion(idUsuario: number, idEvaluacion: number) {
+  await prisma.$transaction(async (tx) => {
+    const actualizada = await tx.evaluacion.updateMany({
+      where: { idEvaluacion, curso: { idUsuario }, fechaVista: null },
+      data: { fechaVista: new Date() },
+    });
+    if (actualizada.count) await tx.evaluacionHistorial.create({ data: { idEvaluacion, accion: "vista" } });
+  });
+}
+
+export async function cambiarEstadoEvaluacion(idUsuario: number, idEvaluacion: number, destino: EstadoEvaluacion, motivo?: string) {
+  await prisma.$transaction(async (tx) => {
+    const evaluacion = await tx.evaluacion.findFirst({ where: { idEvaluacion, curso: { idUsuario } } });
+    if (!evaluacion) throw new ErrorDeNegocio("Evaluación no encontrada");
+    const validacion = transicionEvaluacionValida(evaluacion, destino);
+    if (!validacion.ok) throw new ErrorDeNegocio(validacion.mensaje);
+    const motivoLimpio = motivo?.trim();
+    if (validacion.conMotivo && !motivoLimpio) throw new ErrorDeNegocio("Escribe el motivo");
+
+    await tx.evaluacion.update({ where: { idEvaluacion }, data: { estado: destino } });
+    await tx.evaluacionHistorial.create({
+      data: {
+        idEvaluacion,
+        accion: "estado",
+        valorAnterior: evaluacion.estado,
+        valorNuevo: validacion.conMotivo && motivoLimpio ? valorConMotivo(destino, motivoLimpio) : destino,
+      },
+    });
+  });
+}
+
+/** Marca o desmarca la entrega autodeclarada. Una evaluacion terminada no se puede desmarcar. */
 export async function marcarEvaluacionEntregada(
   idUsuario: number,
   idCurso: number,
   idEvaluacion: number,
+  entregada = true,
 ) {
   await obtenerCursoDelUsuario(idUsuario, idCurso);
-  await prisma.evaluacion.updateMany({
-    where: { idEvaluacion, idCurso },
-    data: { fechaEntrega: new Date() },
+  await prisma.$transaction(async (tx) => {
+    const evaluacion = await tx.evaluacion.findFirst({ where: { idEvaluacion, idCurso } });
+    if (!evaluacion) throw new ErrorDeNegocio("Evaluación no encontrada");
+    if (!evaluacion.requiereEntrega) throw new ErrorDeNegocio("Esta evaluación no requiere entrega");
+    if (!entregada && evaluacion.estado === "completada") throw new ErrorDeNegocio("Reabre la evaluación antes de quitar la entrega");
+    if (Boolean(evaluacion.fechaEntrega) === entregada) return;
+    await tx.evaluacion.update({ where: { idEvaluacion }, data: { fechaEntrega: entregada ? new Date() : null } });
+    await tx.evaluacionHistorial.create({
+      data: { idEvaluacion, accion: "entrega", valorAnterior: entregada ? null : "entregada", valorNuevo: entregada ? "entregada" : null },
+    });
   });
 }

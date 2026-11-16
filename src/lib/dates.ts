@@ -1,4 +1,4 @@
-const ZONA_LIMA = "America/Lima";
+import { fechaCorta, hora, horaDeTime } from "./formato-fecha";
 
 /** Convierte "HH:mm" a un DateTime de Prisma para una columna `time` (sin zona horaria: es solo la hora del dia). */
 export function horaATime(hhmm: string): Date {
@@ -6,15 +6,9 @@ export function horaATime(hhmm: string): Date {
   return new Date(Date.UTC(1970, 0, 1, horas, minutos ?? 0));
 }
 
-/** Lee una columna `time` de Prisma y la formatea como "HH:mm" (24h). */
-/** Lee una columna `time` de Prisma y la formatea en 12h (ej. "7:00 PM"). Solo cambia como se
- * muestra: la columna sigue siendo un `time` normal, nada de esto toca la base de datos. */
+/** Lee una columna `time` de Prisma y la muestra en 12 h ("7 pm"). Solo cambia como se muestra. */
 export function timeAHora(fecha: Date): string {
-  const horas24 = fecha.getUTCHours();
-  const minutos = fecha.getUTCMinutes().toString().padStart(2, "0");
-  const sufijo = horas24 < 12 ? "AM" : "PM";
-  const horas12 = horas24 % 12 === 0 ? 12 : horas24 % 12;
-  return `${horas12}:${minutos} ${sufijo}`;
+  return horaDeTime(fecha);
 }
 
 /** "2026-10-05" (America/Lima, sin hora) -> 23:59 hora Lima, como instante UTC. */
@@ -27,25 +21,19 @@ export function inicioDeDiaLimaAUtc(fechaISO: string): Date {
   return new Date(`${fechaISO}T00:00:00-05:00`);
 }
 
+/** Fecha en lenguaje natural relativo a hoy ("Hoy", "Mar 24", "Mar 24 nov"). Ver src/lib/formato-fecha.ts. */
 export function formatearFechaLima(fecha: Date): string {
-  return new Intl.DateTimeFormat("es-PE", {
-    timeZone: ZONA_LIMA,
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(fecha);
+  return fechaCorta(fecha);
 }
 
-/** "03/11/2026 3:00 PM" (America/Lima, 12 h como pide AGENTS.md 9). */
+/** "3 pm" en America/Lima. */
+export function horaLima(fecha: Date): string {
+  return hora(fecha);
+}
+
+/** "Mar 24 nov, 11:59 pm" (relativo a hoy). */
 export function formatearFechaHoraLima(fecha: Date): string {
-  const partes = new Intl.DateTimeFormat("en-US", {
-    timeZone: ZONA_LIMA,
-    hour: "numeric",
-    minute: "2-digit",
-    hourCycle: "h12",
-  }).formatToParts(fecha);
-  const valor = (tipo: Intl.DateTimeFormatPartTypes) => partes.find((parte) => parte.type === tipo)?.value ?? "";
-  return `${formatearFechaLima(fecha)} ${valor("hour")}:${valor("minute")} ${valor("dayPeriod").toUpperCase()}`;
+  return fechaCorta(fecha, { conHora: true });
 }
 
 const MINUTO_MS = 60_000;

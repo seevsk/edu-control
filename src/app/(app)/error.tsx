@@ -22,7 +22,7 @@ export default function ErrorApp({
       <button
         type="button"
         onClick={() => retry()}
-        className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover"
+        className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover"
       >
         Intentar de nuevo
       </button>

@@ -1,11 +1,18 @@
-import Link from "next/link";
+import { metadataDeGrupo } from "../_components/metadata";
 import { notFound } from "next/navigation";
 import { requerirSesion } from "@/server/auth/session";
 import { obtenerGrupoDelUsuario } from "@/server/services/grupo";
 import { SubmitButton } from "@/components/submit-button";
+import { CampoSelect } from "@/components/ui-app/campo-select";
 import { Toast } from "@/components/toast";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { actualizarGrupoAction } from "../../actions";
-import { TabsGrupo } from "../_components/tabs-grupo";
+import { MarcoGrupo } from "../_components/marco-grupo";
+
+const CAMPO = "flex flex-col gap-1.5 text-[13px] font-medium";
+
+export const generateMetadata = metadataDeGrupo("Configuración");
 
 export default async function ConfiguracionGrupoPage({
   params,
@@ -27,61 +34,38 @@ export default async function ConfiguracionGrupoPage({
   const actualizar = actualizarGrupoAction.bind(null, idGrupo);
 
   return (
-    <div className="animate-page-in mx-auto flex max-w-5xl flex-col gap-6">
+    <MarcoGrupo datos={resultado} idUsuario={sesion.idUsuario} activa="configuracion">
       <Toast mensaje={toast} />
-      <div>
-        <Link href="/grupos" className="text-sm text-primary hover:underline">Grupos</Link>
-        <h1 className="mt-1 text-xl font-semibold">{grupo.nombre}</h1>
-      </div>
-
-      <TabsGrupo idGrupo={idGrupo} activa="configuracion" mostrarConfiguracion />
-
-      {error ? (
-        <p role="alert" className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
-          {error}
-        </p>
-      ) : null}
+      {error ? <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-[13px] text-destructive">{error}</p> : null}
 
       {grupo.estado === "finalizado" ? (
-        <section className="rounded-md border border-border bg-surface p-5">
-          <h2 className="text-sm font-medium">Grupo finalizado</h2>
-          <p className="mt-1 text-sm text-text-muted">
-            La configuración es de solo lectura. Los datos y el historial del grupo se conservan.
-          </p>
-        </section>
+        <p className="text-[13px] text-muted-foreground">
+          El grupo está finalizado: su configuración es de solo lectura y los datos e historial se conservan.
+        </p>
       ) : (
-        <section className="max-w-2xl rounded-md border border-border bg-surface p-5">
-          <h2 className="text-sm font-medium">Datos y estado del grupo</h2>
-          <p className="mt-1 text-xs text-text-muted">Solo el líder puede modificar esta información.</p>
-          <form action={actualizar} className="mt-4 grid gap-4">
-            <label className="flex flex-col gap-1 text-sm">
-              Nombre
-              <input name="nombre" required maxLength={120} defaultValue={grupo.nombre} className="rounded-md border border-border-strong px-3 py-2 text-sm" />
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
-              Descripción
-              <textarea name="descripcion" maxLength={500} rows={3} defaultValue={grupo.descripcion ?? ""} className="rounded-md border border-border-strong px-3 py-2 text-sm" />
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
-              Enlace del trabajo
-              <input name="enlaceTrabajo" placeholder="https://..." defaultValue={grupo.enlaceTrabajo ?? ""} className="rounded-md border border-border-strong px-3 py-2 text-sm" />
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
-              Estado
-              <select name="estado" defaultValue={grupo.estado} className="rounded-md border border-border-strong bg-surface px-3 py-2 text-sm">
-                <option value="activo">Activo</option>
-                <option value="finalizado">Finalizado</option>
-              </select>
-            </label>
-            <p className="rounded-md border border-cat-laboral-borde bg-cat-laboral-bg px-3 py-2 text-xs text-cat-laboral-fg">
-              Para finalizar, todas las tareas deben estar completadas o descartadas. Después, el grupo quedará en modo de solo lectura y la acción no se podrá revertir en el MVP.
-            </p>
-            <SubmitButton className="w-fit rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover">
-              Guardar cambios
-            </SubmitButton>
-          </form>
-        </section>
+        <form action={actualizar} className="flex max-w-xl flex-col gap-5">
+          <label className={CAMPO}>
+            Nombre
+            <Input name="nombre" required maxLength={120} defaultValue={grupo.nombre} />
+          </label>
+          <label className={CAMPO}>
+            Descripción
+            <Textarea name="descripcion" maxLength={500} rows={3} defaultValue={grupo.descripcion ?? ""} />
+          </label>
+          <label className={CAMPO}>
+            Enlace del trabajo
+            <Input name="enlaceTrabajo" type="url" placeholder="https://" defaultValue={grupo.enlaceTrabajo ?? ""} />
+          </label>
+          <label className={CAMPO}>
+            Estado
+            <CampoSelect name="estado" defaultValue={grupo.estado} opciones={[{ valor: "activo", texto: "Activo" }, { valor: "finalizado", texto: "Finalizado (solo lectura, no se puede revertir)" }]} />
+            <span className="text-xs font-normal text-subtle-foreground">Para finalizarlo, todas las tareas deben estar completadas o descartadas.</span>
+          </label>
+          <SubmitButton className="h-9 w-fit rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+            Guardar cambios
+          </SubmitButton>
+        </form>
       )}
-    </div>
+    </MarcoGrupo>
   );
 }

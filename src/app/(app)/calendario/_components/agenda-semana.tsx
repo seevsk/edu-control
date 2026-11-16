@@ -35,7 +35,7 @@ export function AgendaSemana({
                 {DIAS_LARGOS[i]} <span className="font-normal text-text-muted">{diaMesCorto(diaISO)}</span>
               </p>
               {esHoy ? (
-                <span className="rounded-full bg-primary px-2 py-0.5 text-[11px] font-medium text-white">Hoy</span>
+                <span className="rounded-full bg-primary px-2 py-0.5 text-[11px] font-medium text-primary-foreground">Hoy</span>
               ) : null}
             </div>
 

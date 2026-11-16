@@ -1,17 +1,20 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { requerirSesion } from "@/server/auth/session";
 import { crearBloqueOcupadoAction } from "../../actions";
 import { FormularioBloque } from "../../_components/formulario-bloque";
 import { consultaCalendario } from "../../_components/rutas";
 
+export const metadata: Metadata = { title: "Agregar tiempo ocupado" };
+
 export default async function NuevoBloquePage({
   searchParams,
 }: {
-  searchParams: Promise<{ semana?: string; vista?: string; modo?: string; mes?: string; error?: string }>;
+  searchParams: Promise<{ semana?: string; vista?: string; modo?: string; mes?: string; fecha?: string; error?: string }>;
 }) {
   await requerirSesion();
-  const { semana, vista, modo, mes, error } = await searchParams;
-  const consulta = consultaCalendario(semana, vista, modo, mes);
+  const { semana, vista, modo, mes, fecha, error } = await searchParams;
+  const consulta = consultaCalendario(semana, vista, modo, mes, fecha);
 
   return (
     <div className="animate-page-in mx-auto flex max-w-2xl flex-col gap-5">

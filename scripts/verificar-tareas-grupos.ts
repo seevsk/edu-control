@@ -411,6 +411,28 @@ async function verificar() {
         assert.ok(abierta.historial.some((cambio) => cambio.accion === "reasignada" && cambio.valorAnterior === String(ana) && cambio.valorNuevo === null));
       }
     });
+    await caso("salir del grupo libera las tareas, avisa al líder y exige ceder el liderazgo", async () => {
+      const grupo = await crearGrupo();
+      const tarea = await tareaService.crearTarea(ana, grupo, { titulo: "De Ana", peso: 1, idAsignado: String(ana), fechaLimite: fechaLimitePrueba });
+      await grupoService.salirDelGrupo(ana, grupo);
+      const salida = await db!.grupoIntegrante.findUniqueOrThrow({ where: { idGrupo_idUsuario: { idGrupo: grupo, idUsuario: ana } } });
+      assert.equal(salida.estadoInvitacion, "retirado");
+      assert.equal(salida.retiroVoluntario, true);
+      assert.ok(salida.fechaRetiro);
+      assert.equal((await db!.tarea.findUniqueOrThrow({ where: { idTarea: tarea.idTarea } })).idAsignado, null);
+      assert.equal(await db!.notificacion.count({ where: { idUsuario: lider, tipo: "integrante_salio" } }), 1);
+      await assert.rejects(grupoService.salirDelGrupo(ana, grupo), ErrorDeNegocio);
+      await assert.rejects(grupoService.salirDelGrupo(invitado, grupo), ErrorDeNegocio);
+
+      // El líder no sale sin sucesor, ni puede dejar a un observador o a alguien que ya salió.
+      await assert.rejects(grupoService.salirDelGrupo(lider, grupo), ErrorDeNegocio);
+      await assert.rejects(grupoService.salirDelGrupo(lider, grupo, observador), ErrorDeNegocio);
+      await assert.rejects(grupoService.salirDelGrupo(lider, grupo, ana), ErrorDeNegocio);
+      await grupoService.salirDelGrupo(lider, grupo, luis);
+      const integrantes = await db!.grupoIntegrante.findMany({ where: { idGrupo: grupo, estadoInvitacion: "aceptada", rol: "lider" } });
+      assert.deepEqual(integrantes.map((integrante) => integrante.idUsuario), [luis]);
+      assert.equal(await db!.notificacion.count({ where: { idUsuario: luis, tipo: "integrante_salio" } }), 1);
+    });
     const abierta = await tareaService.crearTarea(ana, idGrupo, { titulo: "Consulta posterior", peso: 1, idAsignado: String(ana), fechaLimite: fechaLimitePrueba });
     await caso("solo el líder puede finalizar el grupo", async () => {
       await assert.rejects(grupoService.actualizarGrupo(ana, idGrupo, { nombre: "Grupo", estado: "finalizado" }), ErrorDeNegocio);

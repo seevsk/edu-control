@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { formatearFechaHoraLima } from "@/lib/dates";
+import { nombreCorto } from "@/lib/nombres";
 import { describirCambioTarea, type EntradaHistorialTarea } from "@/lib/tarea-historial";
 
 export function HistorialTareas({
@@ -28,7 +29,7 @@ export function HistorialTareas({
           ) : null}
           <p>{describirCambioTarea(entrada, nombres)}</p>
           <p className="mt-1 text-xs text-text-muted">
-            {entrada.usuario.nombre} {entrada.usuario.apellidos ?? ""} ·{" "}
+            {nombreCorto(entrada.usuario.nombre, entrada.usuario.apellidos)} ·{" "}
             <time dateTime={entrada.fecha.toISOString()}>{formatearFechaHoraLima(entrada.fecha)}</time>
           </p>
         </li>

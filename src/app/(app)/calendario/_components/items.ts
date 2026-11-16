@@ -53,7 +53,7 @@ export type ItemCalendario = {
   /** Posicion de esta parte dentro del dia (0-1440). */
   inicioMin: number;
   finMin: number;
-  /** Horas reales del bloque completo ("9:30 PM", "8:30 AM"), iguales en las dos partes. */
+  /** Horas reales del bloque completo ("9:30pm", "8:30am"), iguales en las dos partes. */
   horaInicio: string;
   horaFin: string;
   sigueDelDiaAnterior: boolean;
@@ -90,7 +90,7 @@ function etiquetaHora(hora: Date) {
 }
 
 export function rangoDe(item: ItemCalendario) {
-  return `${item.horaInicio} – ${item.horaFin}`;
+  return `${item.horaInicio} - ${item.horaFin}`;
 }
 
 export function construirItems(

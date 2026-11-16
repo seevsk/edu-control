@@ -50,7 +50,7 @@ export async function actualizarGrupoAction(idGrupo: number, formData: FormData)
   revalidatePath(`/grupos/${idGrupo}`);
   revalidatePath(`/grupos/${idGrupo}/tareas`);
   revalidatePath(`/grupos/${idGrupo}/tareas/[idTarea]`, "page");
-  revalidatePath("/invitaciones");
+  revalidatePath("/notificaciones");
   revalidatePath("/");
   revalidatePath("/grupos");
   redirect(`/grupos/${idGrupo}/configuracion?toast=${encodeURIComponent("Cambios guardados")}`);
@@ -90,17 +90,17 @@ export async function responderInvitacionAction(
     consentimientoPrivacidad: formData.get("consentimientoPrivacidad"),
   });
   if (!parseo.success) {
-    redirect(`/invitaciones?error=${encodeURIComponent(parseo.error.issues[0].message)}`);
+    redirect(`/notificaciones?filtro=invitaciones&sel=inv-${idGrupo}&error=${encodeURIComponent(parseo.error.issues[0].message)}`);
   }
   try {
     await grupoService.responderInvitacion(sesion.idUsuario, parseo.data.idGrupo, parseo.data.respuesta);
   } catch (error) {
     const mensaje = mensajeParaUsuario(error, "No se pudo responder a la invitación");
-    redirect(`/invitaciones?error=${encodeURIComponent(mensaje)}`);
+    redirect(`/notificaciones?filtro=invitaciones&sel=inv-${idGrupo}&error=${encodeURIComponent(mensaje)}`);
   }
-  revalidatePath("/invitaciones");
+  revalidatePath("/notificaciones");
   revalidatePath("/grupos");
-  redirect("/invitaciones");
+  redirect(`/notificaciones?filtro=invitaciones&sel=inv-${idGrupo}`);
 }
 
 export async function actualizarPreferenciaCorreoActividadAction(idGrupo: number, formData: FormData) {
@@ -112,7 +112,7 @@ export async function actualizarPreferenciaCorreoActividadAction(idGrupo: number
     correoActividad: formData.get("correoActividad") === "on",
   });
   if (!parseo.success) {
-    redirect(`/grupos/${idGrupo}?error=${encodeURIComponent("La preferencia no es válida")}#notificaciones`);
+    redirect(`/grupos/${idGrupo}/integrantes?error=${encodeURIComponent("La preferencia no es válida")}`);
   }
 
   try {
@@ -123,11 +123,35 @@ export async function actualizarPreferenciaCorreoActividadAction(idGrupo: number
     );
   } catch (error) {
     const mensaje = mensajeParaUsuario(error, "No se pudo guardar la preferencia");
-    redirect(`/grupos/${idGrupo}?error=${encodeURIComponent(mensaje)}#notificaciones`);
+    redirect(`/grupos/${idGrupo}/integrantes?error=${encodeURIComponent(mensaje)}`);
   }
 
   revalidatePath(`/grupos/${idGrupo}`);
-  redirect(`/grupos/${idGrupo}?toast=${encodeURIComponent("Preferencia de correo guardada")}#notificaciones`);
+  revalidatePath(`/grupos/${idGrupo}/integrantes`);
+  redirect(`/grupos/${idGrupo}/integrantes?toast=${encodeURIComponent("Preferencia de correo guardada")}`);
+}
+
+/** Salir por cuenta propia. Si es líder, el formulario envía `nuevoLider`. */
+export async function salirDelGrupoAction(idGrupo: number, formData: FormData) {
+  const sesion = await requerirSesion();
+  const grupoId = idRegistroSchema.safeParse(idGrupo);
+  if (!grupoId.success) redirect("/grupos");
+  const nuevoLider = formData.get("nuevoLider");
+  const liderId = nuevoLider ? idRegistroSchema.safeParse(Number(nuevoLider)) : null;
+  if (liderId && !liderId.success) redirect(`/grupos/${idGrupo}/integrantes?error=${encodeURIComponent("Elige un nuevo líder válido")}`);
+
+  try {
+    await grupoService.salirDelGrupo(sesion.idUsuario, grupoId.data, liderId?.success ? liderId.data : undefined);
+  } catch (error) {
+    const mensaje = mensajeParaUsuario(error, "No se pudo salir del grupo");
+    redirect(`/grupos/${idGrupo}/integrantes?error=${encodeURIComponent(mensaje)}`);
+  }
+
+  revalidatePath("/grupos");
+  revalidatePath(`/grupos/${idGrupo}`, "layout");
+  revalidatePath("/calendario");
+  revalidatePath("/");
+  redirect(`/grupos?toast=${encodeURIComponent("Saliste del grupo")}`);
 }
 
 export async function retirarIntegranteAction(idGrupo: number, idUsuarioObjetivo: number) {

@@ -18,11 +18,11 @@ export const ETIQUETA_ESTADO_TAREA: Record<string, string> = {
 };
 
 export const COLOR_ESTADO_TAREA: Record<string, string> = {
-  pendiente: "var(--color-estado-pendiente)",
-  en_progreso: "var(--color-estado-progreso)",
-  en_revision: "var(--color-estado-revision)",
-  completada: "var(--color-estado-completada)",
-  descartada: "var(--color-text-muted)",
+  pendiente: "var(--estado-pendiente)",
+  en_progreso: "var(--estado-en-progreso)",
+  en_revision: "var(--estado-en-revision)",
+  completada: "var(--estado-completada)",
+  descartada: "var(--muted-foreground)",
 };
 
 /** Acciones que requieren escribir un motivo (quedan en el historial). */

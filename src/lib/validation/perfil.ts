@@ -1,3 +1,4 @@
+import "./configurar-zod";
 import { z } from "zod";
 
 export const actualizarPerfilSchema = z.object({

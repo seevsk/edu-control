@@ -21,17 +21,31 @@ export async function actualizarPerfilAction(formData: FormData) {
   });
 
   if (!parseo.success) {
-    redirect(`/perfil?error=${encodeURIComponent(parseo.error.issues[0].message)}`);
+    redirect(`/perfil?editar=1&error=${encodeURIComponent(parseo.error.issues[0].message)}`);
   }
 
   try {
     await perfilService.actualizarPerfil(sesion.idUsuario, parseo.data);
   } catch (error) {
-    redirect(`/perfil?error=${encodeURIComponent(mensajeParaUsuario(error))}`);
+    redirect(`/perfil?editar=1&error=${encodeURIComponent(mensajeParaUsuario(error))}`);
   }
 
   revalidatePath("/perfil");
-  redirect("/perfil");
+  revalidatePath("/", "layout");
+  redirect(`/perfil?toast=${encodeURIComponent("Cambios guardados")}`);
+}
+
+/** Switch de privacidad: se guarda al instante, sin recargar la pagina. */
+export async function cambiarVisibilidadAction(visible: boolean): Promise<{ ok: boolean }> {
+  const sesion = await requerirSesion();
+  if (typeof visible !== "boolean") return { ok: false };
+  try {
+    await perfilService.actualizarVisibilidad(sesion.idUsuario, visible);
+  } catch {
+    return { ok: false };
+  }
+  revalidatePath("/perfil");
+  return { ok: true };
 }
 
 export async function eliminarCuentaAction(formData: FormData) {

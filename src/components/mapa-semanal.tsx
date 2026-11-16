@@ -36,7 +36,7 @@ function agruparFranjas(franjas: Franja[]): Franja[] {
 }
 
 function TarjetaReunion({ evento, movil = false }: { evento: EventoMapaSemanal; movil?: boolean }) {
-  const rango = `${etiquetaMinutos(evento.inicioMin)} – ${etiquetaMinutos(evento.finMin)}`;
+  const rango = `${etiquetaMinutos(evento.inicioMin)} - ${etiquetaMinutos(evento.finMin)}`;
   const descripcion = `Reunión: ${evento.titulo} · ${rango}${evento.subtitulo ? ` · ${evento.subtitulo}` : ""}`;
   const contenido = movil ? (
     <>
@@ -129,7 +129,7 @@ export function MapaSemanal({
                   <p className={`text-[11px] font-semibold uppercase tracking-wide ${esHoy ? "text-primary" : "text-text-muted"}`}>{dia}</p>
                   {fechaISO ? (
                     <p className="mt-0.5 flex items-center justify-center gap-1">
-                      <span className={`grid size-7 place-items-center rounded-full text-sm font-semibold tabular-nums ${esHoy ? "bg-primary text-white" : "text-text"}`}>
+                      <span className={`grid size-7 place-items-center rounded-full text-sm font-semibold tabular-nums ${esHoy ? "bg-primary text-primary-foreground" : "text-text"}`}>
                         {Number(fechaISO.slice(8))}
                       </span>
                       <span className="text-[10px] text-text-muted">{mes}</span>
@@ -237,7 +237,7 @@ export function MapaSemanal({
                   {DIAS_LARGOS[indice]}
                   {fechaISO ? <span className="ml-1 font-normal text-text-muted">{diaMesCorto(fechaISO)}</span> : null}
                 </p>
-                {esHoy ? <span className="rounded-full bg-primary px-2 py-0.5 text-[11px] font-medium text-white">Hoy</span> : null}
+                {esHoy ? <span className="rounded-full bg-primary px-2 py-0.5 text-[11px] font-medium text-primary-foreground">Hoy</span> : null}
               </div>
 
               {eventosDelDia.length > 0 ? (
@@ -252,7 +252,7 @@ export function MapaSemanal({
                   return (
                     <li key={franja.inicioMin} className="flex items-center gap-3 px-3 py-2" title={detalle}>
                       <span className="w-[7.25rem] shrink-0 text-xs tabular-nums text-text-muted">
-                        {etiquetaMinutos(franja.inicioMin)} – {etiquetaMinutos(franja.finMin)}
+                        {etiquetaMinutos(franja.inicioMin)} - {etiquetaMinutos(franja.finMin)}
                       </span>
                       <span className={`h-7 w-1 shrink-0 rounded-full ${claseDeFranja(franja)}`} aria-hidden />
                       <span className="min-w-0 text-xs font-medium text-text">

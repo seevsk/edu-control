@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { requerirSesion } from "@/server/auth/session";
 import { listarMisReuniones } from "@/server/services/reunion";
@@ -15,12 +16,14 @@ import { Toast } from "@/components/toast";
 import { BotonConfirmacion } from "@/components/boton-confirmacion";
 import { cancelarReunionAction, responderReunionAction } from "./actions";
 
+export const metadata: Metadata = { title: "Reuniones" };
+
 type Listado = Awaited<ReturnType<typeof listarMisReuniones>>;
 type Reunion = Listado["proximas"][number];
 type Rol = "lider" | "miembro" | "observador";
 
 function horario(reunion: { inicio: Date; fin: Date }) {
-  return `${etiquetaMinutos(minutosDelDiaLima(reunion.inicio))} – ${etiquetaMinutos(minutosDelDiaLima(reunion.fin))}`;
+  return `${etiquetaMinutos(minutosDelDiaLima(reunion.inicio))} - ${etiquetaMinutos(minutosDelDiaLima(reunion.fin))}`;
 }
 
 export default async function ReunionesPage({
@@ -45,7 +48,7 @@ export default async function ReunionesPage({
         <h1 className="text-xl font-semibold">Reuniones</h1>
         <Link
           href={filtro ? `/reuniones/nueva?grupo=${filtro}` : "/reuniones/nueva"}
-          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white transition-colors duration-150 hover:bg-primary-hover"
+          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors duration-150 hover:bg-primary-hover"
         >
           <IconAgregar className="size-4" aria-hidden />
           Programar reunión

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requerirSesion } from "@/server/auth/session";
@@ -6,6 +7,8 @@ import { actualizarBloqueOcupadoAction, eliminarBloqueOcupadoAction } from "../.
 import { FormularioBloque } from "../../_components/formulario-bloque";
 import { consultaCalendario } from "../../_components/rutas";
 import { BotonConfirmacion } from "@/components/boton-confirmacion";
+
+export const metadata: Metadata = { title: "Editar tiempo ocupado" };
 
 function aHHMM(fecha: Date) {
   return `${String(fecha.getUTCHours()).padStart(2, "0")}:${String(fecha.getUTCMinutes()).padStart(2, "0")}`;
@@ -16,18 +19,18 @@ export default async function EditarBloquePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ semana?: string; vista?: string; modo?: string; mes?: string; error?: string }>;
+  searchParams: Promise<{ semana?: string; vista?: string; modo?: string; mes?: string; fecha?: string; error?: string }>;
 }) {
   const { id } = await params;
   const idBloqueOcupado = Number(id);
   if (!Number.isInteger(idBloqueOcupado)) notFound();
 
   const sesion = await requerirSesion();
-  const { semana, vista, modo, mes, error } = await searchParams;
+  const { semana, vista, modo, mes, fecha, error } = await searchParams;
   const bloque = await obtenerBloqueOcupado(sesion.idUsuario, idBloqueOcupado);
   if (!bloque) notFound();
 
-  const consulta = consultaCalendario(semana, vista, modo, mes);
+  const consulta = consultaCalendario(semana, vista, modo, mes, fecha);
   const volverA = `/calendario${consulta}`;
 
   return (

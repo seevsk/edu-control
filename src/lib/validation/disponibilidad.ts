@@ -1,3 +1,4 @@
+import "./configurar-zod";
 import { z } from "zod";
 
 const horaHHMM = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Hora inválida");
@@ -8,11 +9,17 @@ const camposComunes = {
   horaInicio: horaHHMM,
   horaFin: horaHHMM,
   detalle: z.string().trim().max(120, "El detalle admite hasta 120 caracteres").optional().or(z.literal("")),
+  // Horario excepcional (decisión del usuario, 2026-11-16): el bloque puede terminar al día siguiente.
+  excepcional: z.boolean().default(false),
 };
 
 const rangoHorarioValido = {
-  check: (datos: { horaInicio: string; horaFin: string }) => datos.horaFin > datos.horaInicio,
-  params: { message: "La hora de fin debe ser posterior a la hora de inicio", path: ["horaFin"] },
+  check: (datos: { horaInicio: string; horaFin: string; excepcional: boolean }) =>
+    datos.excepcional ? datos.horaFin !== datos.horaInicio : datos.horaFin > datos.horaInicio,
+  params: {
+    message: "La hora de fin debe ser posterior a la de inicio. Si termina al día siguiente, activa Horario excepcional",
+    path: ["horaFin"],
+  },
 };
 
 /** Al crear se pueden marcar varios dias: se guarda un bloque por dia. */

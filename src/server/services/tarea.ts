@@ -1,7 +1,8 @@
 import { prisma } from "@/server/db/client";
 import { crearNotificacion } from "@/server/notifications/crear-notificacion";
 import { plantillasNotificacion } from "@/server/notifications/templates";
-import { finDeDiaLimaAUtc, formatearFechaLima } from "@/lib/dates";
+import { finDeDiaLimaAUtc } from "@/lib/dates";
+import { diaYMes } from "@/lib/formato-fecha";
 import { ErrorDeNegocio } from "@/lib/errores";
 import {
   filtrosTareaSchema,
@@ -144,6 +145,26 @@ export async function listarTareasAsignadasAlUsuario(idUsuario: number, limite =
   });
 }
 
+/** Tareas en revision que el usuario puede confirmar o devolver (de otros, en grupos activos donde participa). */
+export async function listarTareasPorRevisar(idUsuario: number, limite = 20) {
+  return prisma.tarea.findMany({
+    where: {
+      estado: "en_revision",
+      NOT: { idAsignado: idUsuario },
+      grupo: {
+        estado: "activo",
+        integrantes: { some: { idUsuario, estadoInvitacion: "aceptada", rol: { not: "observador" } } },
+      },
+    },
+    include: {
+      asignado: { select: { idUsuario: true, nombre: true, apellidos: true, fotoUrl: true } },
+      grupo: { select: { idGrupo: true, nombre: true, evaluacion: { select: { curso: { select: { idCurso: true, nombre: true } } } } } },
+    },
+    orderBy: [{ fechaTerminada: "asc" }],
+    take: limite,
+  });
+}
+
 export async function listarTareasDelGrupo(
   idUsuario: number,
   idGrupo: number,
@@ -266,7 +287,7 @@ export async function crearTarea(
       idUsuario: idAsignado,
       tipo: "tarea_asignada",
       idGrupo,
-      ...plantillasNotificacion.tareaAsignada(tarea.titulo, idGrupo),
+      ...plantillasNotificacion.tareaAsignada(tarea.titulo, idGrupo, tarea.idTarea),
     });
   }
 
@@ -337,7 +358,7 @@ export async function editarTarea(
       idUsuario: tarea.idAsignado,
       tipo: "tarea_reprogramada",
       idGrupo,
-      ...plantillasNotificacion.tareaReprogramada(tarea.titulo, idGrupo, idTarea, formatearFechaLima(tarea.fechaLimite)),
+      ...plantillasNotificacion.tareaReprogramada(tarea.titulo, idGrupo, idTarea, diaYMes(tarea.fechaLimite)),
     });
   }
   return tarea;
@@ -432,7 +453,7 @@ export async function reasignarTarea(
       idUsuario: nuevoIdAsignado,
       tipo: "tarea_asignada",
       idGrupo,
-      ...plantillasNotificacion.tareaAsignada(tarea.titulo, idGrupo),
+      ...plantillasNotificacion.tareaAsignada(tarea.titulo, idGrupo, tarea.idTarea),
     });
   }
 
@@ -517,7 +538,7 @@ export async function cambiarEstadoTarea(
         idUsuario: destino.idUsuario,
         tipo: "tarea_en_revision",
         idGrupo,
-        ...plantillasNotificacion.tareaEnRevision(tarea.titulo, idGrupo),
+        ...plantillasNotificacion.tareaEnRevision(tarea.titulo, idGrupo, idTarea),
       });
     }
     return;
@@ -528,7 +549,7 @@ export async function cambiarEstadoTarea(
       idUsuario: asignado,
       tipo: "tarea_devuelta",
       idGrupo,
-      ...plantillasNotificacion.tareaDevuelta(tarea.titulo, idGrupo, motivoValidado),
+      ...plantillasNotificacion.tareaDevuelta(tarea.titulo, idGrupo, idTarea, motivoValidado),
     });
   } else if (accion === "reabrir") {
     await crearNotificacion({
@@ -549,7 +570,7 @@ export async function cambiarEstadoTarea(
       idUsuario: asignado,
       tipo: "tarea_completada",
       idGrupo,
-      ...plantillasNotificacion.tareaCompletada(tarea.titulo, idGrupo),
+      ...plantillasNotificacion.tareaCompletada(tarea.titulo, idGrupo, idTarea),
     });
   }
 }

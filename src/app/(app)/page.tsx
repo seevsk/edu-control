@@ -1,242 +1,271 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { requerirSesion } from "@/server/auth/session";
-import { obtenerUsuarioActual } from "@/server/services/usuario";
-import { listarTareasAsignadasAlUsuario } from "@/server/services/tarea";
-import { listarCursos, listarEvaluacionesProximas, yaImportoCurso } from "@/server/services/curso";
+import { listarTareasAsignadasAlUsuario, listarTareasPorRevisar } from "@/server/services/tarea";
+import { listarCursos } from "@/server/services/curso";
 import { listarInvitacionesPendientes, listarMisGrupos } from "@/server/services/grupo";
-import { ETIQUETA_ESTADO_TAREA, COLOR_ESTADO_TAREA } from "@/lib/estado-tarea";
-import { SubmitButton } from "@/components/submit-button";
+import { obtenerCalendarioEntre } from "@/server/services/calendario";
+import { horaLima, timeAHora } from "@/lib/dates";
+import { diaMesCorto, diaSemanaISO, diasHasta, etiquetaFechaLarga, fechaEnZonaLimaISO, sumarDiasISO } from "@/lib/calendario";
+import { aOracion, colorCurso } from "@/lib/presentacion";
+import { nombreCorto } from "@/lib/nombres";
+import { PaginaCompleta, PageHeader } from "@/components/ui-app/page-header";
+import { TaskRow, type FilaTarea } from "@/components/ui-app/task-row";
+import { CourseDot } from "@/components/ui-app/course-dot";
 import { Toast } from "@/components/toast";
-import { IconoCurso } from "@/components/icono-curso";
-import { AvataresGrupo } from "@/components/avatares-grupo";
-import { DatosTarjeta } from "@/components/datos-tarjeta";
-import { ChipModalidad } from "@/components/chip-modalidad";
-import { EncabezadoTarjeta } from "@/components/encabezado-tarjeta";
-import { formatearFechaLima } from "@/lib/dates";
-import { etiquetaRelativa } from "@/lib/calendario";
-import { importarCursoAction } from "./cursos/actions";
+import { cookies } from "next/headers";
+import { obtenerPerfilCompleto } from "@/server/services/perfil";
+import { Bienvenida } from "./_components/bienvenida";
+import { COOKIE_BIENVENIDA } from "./_components/bienvenida-cookie";
 
-const TARJETA = "flex flex-col gap-3 rounded-md border border-border bg-surface p-4 text-sm transition-colors duration-150";
+export const metadata: Metadata = { title: "Tu trabajo" };
 
-export default async function InicioPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string; toast?: string }>;
-}) {
+const DIAS_AGENDA = 7;
+const MAX_AGENDA = 8;
+const DIAS_CORTOS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+
+interface ItemAgenda {
+  clave: string;
+  orden: number;
+  dia: string;
+  hora: string;
+  titulo: string;
+  tipo: string;
+  color: string;
+  href: string;
+}
+
+function Seccion({ titulo, cantidad, children }: { titulo: string; cantidad: number; children: React.ReactNode }) {
+  return (
+    <section aria-label={titulo}>
+      <h2 className="flex h-10 items-center gap-2 border-b bg-muted px-4 text-[13px] font-medium sm:px-8">
+        {titulo}
+        <span className="font-normal text-subtle-foreground">{cantidad}</span>
+      </h2>
+      {children}
+    </section>
+  );
+}
+
+function Vacio({ children }: { children: React.ReactNode }) {
+  return <p className="border-b px-4 py-4 text-[13px] text-subtle-foreground sm:px-8">{children}</p>;
+}
+
+export default async function InicioPage({ searchParams }: { searchParams: Promise<{ toast?: string }> }) {
   const sesion = await requerirSesion();
-  const { error, toast } = await searchParams;
-  const [usuario, evaluaciones, tareas, cursos, grupos, invitaciones] = await Promise.all([
-    obtenerUsuarioActual(sesion.idUsuario),
-    listarEvaluacionesProximas(sesion.idUsuario),
-    listarTareasAsignadasAlUsuario(sesion.idUsuario),
+  const { toast } = await searchParams;
+  const ahora = new Date();
+  const hoyISO = fechaEnZonaLimaISO(ahora);
+  const [mias, porRevisar, cursos, grupos, invitaciones, agenda, usuario, galletas] = await Promise.all([
+    listarTareasAsignadasAlUsuario(sesion.idUsuario, 50),
+    listarTareasPorRevisar(sesion.idUsuario),
     listarCursos(sesion.idUsuario),
     listarMisGrupos(sesion.idUsuario),
     listarInvitacionesPendientes(sesion.idUsuario),
+    obtenerCalendarioEntre(sesion.idUsuario, hoyISO, sumarDiasISO(hoyISO, DIAS_AGENDA)),
+    obtenerPerfilCompleto(sesion.idUsuario),
+    cookies(),
   ]);
 
-  const tarjetasTareas = await Promise.all(
-    tareas.map(async (tarea) => {
-      const curso = tarea.grupo.evaluacion?.curso ?? null;
-      const puedeImportar =
-        curso !== null &&
-        curso.idUsuario !== sesion.idUsuario &&
-        !(await yaImportoCurso(sesion.idUsuario, curso.idCurso));
-      return { tarea, curso, puedeImportar };
-    }),
+  const detalleGrupo = (grupo: { nombre: string; evaluacion: { curso: { idCurso: number; nombre: string } } | null }) => (
+    <>
+      {grupo.evaluacion ? <CourseDot idCurso={grupo.evaluacion.curso.idCurso} /> : null}
+      {aOracion(grupo.nombre)}
+      {grupo.evaluacion ? ` · ${aOracion(grupo.evaluacion.curso.nombre)}` : ""}
+    </>
   );
 
-  const tareasQueRequierenAccion = tarjetasTareas.filter(({ tarea }) => tarea.estado !== "en_revision");
-  const tareasEnEspera = tarjetasTareas.filter(({ tarea }) => tarea.estado === "en_revision");
-  const tieneCurso = cursos.length > 0;
-  const tienePlanificacion = cursos.some((curso) => curso.horarios.length > 0 || curso.evaluaciones.length > 0);
-  const tieneGrupo = grupos.length > 0;
-  const mostrarPrimerosPasos = !tieneCurso || !tienePlanificacion || !tieneGrupo;
-  const pasos = [
-    {
-      titulo: "Registra tu primer curso",
-      detalle: "Añade el curso que quieres organizar durante este ciclo.",
-      href: "/cursos?nuevo=1",
-      listo: tieneCurso,
-    },
-    {
-      titulo: "Añade un horario o evaluación",
-      detalle: "Esto alimenta tu calendario y tu disponibilidad semanal.",
-      href: tieneCurso ? `/cursos/${cursos[0].idCurso}` : "/cursos?nuevo=1",
-      listo: tienePlanificacion,
-    },
-    {
-      titulo: "Crea o acepta un grupo",
-      detalle: "Después podrás invitar compañeros, repartir tareas y programar reuniones.",
-      href: invitaciones.length > 0 ? "/invitaciones" : "/grupos?nuevo=1",
-      listo: tieneGrupo,
-    },
-  ];
+  const aFila = (tarea: (typeof mias)[number]): FilaTarea => ({
+    idTarea: tarea.idTarea,
+    titulo: tarea.titulo,
+    estado: tarea.estado,
+    fechaLimite: tarea.fechaLimite,
+    asignado: null,
+    detalle: detalleGrupo(tarea.grupo),
+  });
+  const teToca = mias.filter((tarea) => tarea.estado !== "en_revision");
+  const esperandoOtros = mias.filter((tarea) => tarea.estado === "en_revision");
+  const entregasHoy = teToca.filter((tarea) => tarea.fechaLimite && diasHasta(tarea.fechaLimite, ahora) === 0 && tarea.fechaLimite > ahora).length;
 
-  function TarjetaTarea({ item }: { item: (typeof tarjetasTareas)[number] }) {
-    const { tarea, curso, puedeImportar } = item;
-    return (
-      <div className={TARJETA}>
-        <Link href={`/grupos/${tarea.idGrupo}/tareas/${tarea.idTarea}`} className="flex flex-1 flex-col gap-3 hover:opacity-90">
-          <EncabezadoTarjeta etiqueta="Tarea" titulo={tarea.titulo} />
-          <div className="border-t border-border pt-2.5">
-            <DatosTarjeta
-              datos={[
-                {
-                  etiqueta: "Estado",
-                  valor: (
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="size-2 rounded-full" style={{ backgroundColor: COLOR_ESTADO_TAREA[tarea.estado] }} aria-hidden />
-                      {ETIQUETA_ESTADO_TAREA[tarea.estado]}
-                    </span>
-                  ),
-                  titulo: ETIQUETA_ESTADO_TAREA[tarea.estado],
-                },
-                { etiqueta: "Grupo", valor: tarea.grupo.nombre },
-                { etiqueta: "Curso", valor: curso?.nombre },
-                {
-                  etiqueta: "Fecha límite",
-                  valor: tarea.fechaLimite ? etiquetaRelativa(tarea.fechaLimite) : null,
-                  titulo: tarea.fechaLimite ? formatearFechaLima(tarea.fechaLimite) : undefined,
-                },
-              ]}
-            />
-          </div>
-        </Link>
-        <div className="flex items-end justify-between gap-2 border-t border-border pt-2.5">
-          {puedeImportar ? (
-            <form action={importarCursoAction.bind(null, tarea.idGrupo, "/")}>
-              <SubmitButton className="text-xs text-primary hover:underline" pendingText="Añadiendo...">
-                Añadir &quot;{curso!.nombre}&quot; a mis cursos
-              </SubmitButton>
-            </form>
-          ) : (
-            <span />
-          )}
-          <AvataresGrupo personas={tarea.grupo.integrantes.map((integrante) => integrante.usuario)} />
-        </div>
-      </div>
-    );
+  const resumen = [
+    entregasHoy ? `tienes ${entregasHoy} ${entregasHoy === 1 ? "entrega" : "entregas"} hoy` : null,
+    porRevisar.length ? `${porRevisar.length} ${porRevisar.length === 1 ? "revisión pendiente" : "revisiones pendientes"}` : null,
+    invitaciones.length ? `${invitaciones.length} ${invitaciones.length === 1 ? "invitación" : "invitaciones"} por responder` : null,
+  ].filter(Boolean);
+
+  const etiquetaDia = (fechaISO: string) => {
+    if (fechaISO === hoyISO) return "Hoy";
+    if (fechaISO === sumarDiasISO(hoyISO, 1)) return "Mañana";
+    const [, , dia] = fechaISO.split("-").map(Number);
+    return `${DIAS_CORTOS[diaSemanaISO(fechaISO) - 1]} ${dia}`;
+  };
+  const minutos = (fecha: Date) => fecha.getUTCHours() * 60 + fecha.getUTCMinutes();
+  const items: ItemAgenda[] = [];
+  for (let indice = 0; indice < DIAS_AGENDA; indice++) {
+    const fechaISO = sumarDiasISO(hoyISO, indice);
+    for (const horario of agenda.horarios.filter((sesion) => sesion.diaSemana === diaSemanaISO(fechaISO))) {
+      const inicio = new Date(`${fechaISO}T00:00:00-05:00`).getTime() + minutos(horario.horaInicio) * 60_000;
+      if (inicio < ahora.getTime()) continue;
+      items.push({
+        clave: `clase-${horario.idHorario}-${fechaISO}`,
+        orden: inicio,
+        dia: etiquetaDia(fechaISO),
+        hora: timeAHora(horario.horaInicio),
+        titulo: aOracion(horario.curso.nombre),
+        tipo: `Clase · ${horario.curso.modalidad === "presencial" ? "presencial" : "remota"}`,
+        color: colorCurso(horario.curso.idCurso),
+        href: `/cursos/${horario.curso.idCurso}`,
+      });
+    }
   }
+  for (const evaluacion of agenda.evaluaciones) {
+    if (evaluacion.fechaCierre < ahora || evaluacion.estado === "completada") continue;
+    items.push({
+      clave: `evaluacion-${evaluacion.idEvaluacion}`,
+      orden: evaluacion.fechaCierre.getTime(),
+      dia: etiquetaDia(fechaEnZonaLimaISO(evaluacion.fechaCierre)),
+      hora: horaLima(evaluacion.fechaCierre),
+      titulo: evaluacion.nombre,
+      tipo: `Evaluación · ${aOracion(evaluacion.curso.nombre)}`,
+      color: colorCurso(evaluacion.curso.idCurso),
+      href: `/cursos/${evaluacion.curso.idCurso}?evaluacion=${evaluacion.idEvaluacion}`,
+    });
+  }
+  for (const tarea of agenda.tareas) {
+    if (!tarea.fechaLimite || tarea.fechaLimite < ahora || tarea.estado === "completada") continue;
+    items.push({
+      clave: `tarea-${tarea.idTarea}`,
+      orden: tarea.fechaLimite.getTime(),
+      dia: etiquetaDia(fechaEnZonaLimaISO(tarea.fechaLimite)),
+      hora: horaLima(tarea.fechaLimite),
+      titulo: tarea.titulo,
+      tipo: `Tarea · ${aOracion(tarea.grupo.nombre)}`,
+      color: "var(--estado-en-progreso)",
+      href: `/grupos/${tarea.idGrupo}?tarea=${tarea.idTarea}`,
+    });
+  }
+  for (const reunion of agenda.reuniones) {
+    if (reunion.fin < ahora) continue;
+    items.push({
+      clave: `reunion-${reunion.idReunion}`,
+      orden: reunion.inicio.getTime(),
+      dia: etiquetaDia(fechaEnZonaLimaISO(reunion.inicio)),
+      hora: horaLima(reunion.inicio),
+      titulo: reunion.titulo,
+      tipo: "Reunión",
+      color: "var(--cat-reunion)",
+      href: `/grupos/${reunion.idGrupo}/reuniones`,
+    });
+  }
+  const proximas = items.sort((a, b) => a.orden - b.orden).slice(0, MAX_AGENDA);
+  // Guía de primer ingreso: visible hasta completar los tres pasos o hasta que el usuario la oculte.
+  const perfil = usuario.perfil;
+  const datosBienvenida = {
+    nombre: usuario.nombre.split(" ")[0] || usuario.nombre,
+    perfilCompleto: Boolean(perfil?.institucion && perfil.carrera && perfil.ciclo),
+    visibleEnBusqueda: perfil?.visibleEnBusqueda ?? true,
+    cursosConHorario: cursos.filter((curso) => curso.horarios.length > 0).length,
+    tieneGrupo: grupos.length > 0,
+    invitacionesPendientes: invitaciones.length,
+    sesiones: cursos.flatMap((curso) =>
+      curso.horarios
+        .filter((horario) => horario.diaSemana <= 5)
+        .map((horario) => ({ idCurso: curso.idCurso, diaSemana: horario.diaSemana, inicioMin: minutos(horario.horaInicio), finMin: minutos(horario.horaFin) })),
+    ),
+  };
+  const guiaPendiente = !datosBienvenida.perfilCompleto || !datosBienvenida.cursosConHorario || !datosBienvenida.tieneGrupo;
+  const mostrarBienvenida = guiaPendiente && galletas.get(COOKIE_BIENVENIDA)?.value !== "1";
 
   return (
-    <div className="animate-page-in mx-auto flex max-w-5xl flex-col gap-7">
+    <PaginaCompleta>
       <Toast mensaje={toast} />
+      <PageHeader
+        titulo="Tu trabajo"
+        contexto={<span>{etiquetaFechaLarga(hoyISO)}{resumen.length ? ` · ${resumen.join(" y ")}` : " · nada urgente por ahora"}</span>}
+      />
+      {mostrarBienvenida ? <Bienvenida datos={datosBienvenida} fechaTexto="Primeros pasos" /> : null}
+      <div className="flex flex-1 flex-wrap">
+        <div className="min-w-0 flex-[999_1_480px]">
 
-      <div>
-        <h1 className="text-xl font-semibold">Hola, {usuario.nombre}</h1>
-        <p className="mt-1 text-sm text-text-muted">Revisa lo que requiere tu atención y lo que viene después.</p>
-      </div>
+          <Seccion titulo="Te toca" cantidad={teToca.length}>
+            {teToca.length ? (
+              <ul>
+                {teToca.map((tarea) => (
+                  <TaskRow key={tarea.idTarea} tarea={aFila(tarea)} href={`/grupos/${tarea.idGrupo}?tarea=${tarea.idTarea}`} ahora={ahora} alta conAvatar={false} />
+                ))}
+              </ul>
+            ) : (
+              <Vacio>Cuando te asignen una tarea en algún grupo aparecerá aquí, ordenada por su fecha límite.</Vacio>
+            )}
+          </Seccion>
 
-      {error ? (
-        <p role="alert" className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>
-      ) : null}
+          <Seccion titulo="Esperando tu revisión" cantidad={porRevisar.length}>
+            {porRevisar.length ? (
+              <ul>
+                {porRevisar.map((tarea) => (
+                  <li key={tarea.idTarea}>
+                    <Link
+                      href={`/grupos/${tarea.grupo.idGrupo}?tarea=${tarea.idTarea}`}
+                      className="flex min-h-[52px] items-center gap-3 border-b border-border-subtle px-4 py-2 text-[13px] hover:bg-muted sm:px-8"
+                    >
+                      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span className="truncate">{tarea.titulo}</span>
+                        <span className="flex items-center gap-1.5 truncate text-xs text-subtle-foreground">
+                          {detalleGrupo(tarea.grupo)}
+                          {tarea.asignado ? ` · ${nombreCorto(tarea.asignado.nombre, tarea.asignado.apellidos)} la terminó` : ""}
+                          {tarea.fechaTerminada ? ` el ${diaMesCorto(fechaEnZonaLimaISO(tarea.fechaTerminada))}` : ""}
+                        </span>
+                      </span>
+                      <span className="inline-flex h-7 shrink-0 items-center rounded-md border border-input px-2.5 text-[13px]">Revisar</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <Vacio>Cuando un compañero termine una tarea, aparecerá aquí para que la apruebes o la devuelvas.</Vacio>
+            )}
+          </Seccion>
 
-      {invitaciones.length > 0 ? (
-        <Link
-          href="/invitaciones"
-          className="flex items-center justify-between gap-4 rounded-md border border-primary/30 bg-primary-soft px-4 py-3 text-sm hover:border-primary/50"
-        >
-          <span>
-            <strong>Tienes {invitaciones.length} {invitaciones.length === 1 ? "invitación pendiente" : "invitaciones pendientes"}.</strong>{" "}
-            Revísalas para unirte al grupo y comenzar a colaborar.
-          </span>
-          <span className="shrink-0 font-medium text-primary">Ver invitaciones →</span>
-        </Link>
-      ) : null}
-
-      {mostrarPrimerosPasos ? (
-        <section className="rounded-md border border-primary/30 bg-surface p-5" aria-labelledby="titulo-primeros-pasos">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-primary">Primeros pasos</p>
-            <h2 id="titulo-primeros-pasos" className="mt-1 text-base font-semibold">Prepara EduControl para tu ciclo</h2>
-            <p className="mt-1 text-sm text-text-muted">Completa estos pasos en orden; cada dato se reutiliza en el calendario y los grupos.</p>
-          </div>
-          <ol className="mt-4 grid gap-3 lg:grid-cols-3">
-            {pasos.map((paso, indice) => (
-              <li key={paso.titulo}>
-                <Link
-                  href={paso.href}
-                  className={`flex h-full items-start gap-3 rounded-md border p-3 transition-colors ${
-                    paso.listo ? "border-border bg-bg/60" : "border-border-strong hover:border-primary"
-                  }`}
-                >
-                  <span
-                    className={`grid size-6 shrink-0 place-items-center rounded-full text-xs font-semibold ${
-                      paso.listo ? "bg-estado-completada text-white" : "bg-primary-soft text-primary"
-                    }`}
-                    aria-hidden
-                  >
-                    {paso.listo ? "✓" : indice + 1}
-                  </span>
-                  <span>
-                    <span className="block text-sm font-medium">{paso.titulo}</span>
-                    <span className="mt-0.5 block text-xs leading-relaxed text-text-muted">{paso.detalle}</span>
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ol>
-        </section>
-      ) : null}
-
-      <section>
-        <div className="flex items-end justify-between gap-3">
-          <div>
-            <h2 className="text-base font-semibold">Requiere tu atención</h2>
-            <p className="mt-0.5 text-xs text-text-muted">Tareas que puedes continuar o enviar a revisión.</p>
-          </div>
-          {tareasQueRequierenAccion.length > 0 ? <Link href="/grupos" className="text-sm text-primary hover:underline">Ver grupos</Link> : null}
+          <Seccion titulo="Esperando a otros" cantidad={esperandoOtros.length}>
+            {esperandoOtros.length ? (
+              <ul>
+                {esperandoOtros.map((tarea) => (
+                  <TaskRow key={tarea.idTarea} tarea={aFila(tarea)} href={`/grupos/${tarea.idGrupo}?tarea=${tarea.idTarea}`} ahora={ahora} alta conAvatar={false} />
+                ))}
+              </ul>
+            ) : (
+              <Vacio>Cuando termines una tarea y pase a revisión, aparecerá aquí hasta que un compañero la confirme.</Vacio>
+            )}
+          </Seccion>
         </div>
-        <div className="mt-3 grid gap-3 lg:grid-cols-2">
-          {tareasQueRequierenAccion.map((item) => <TarjetaTarea key={item.tarea.idTarea} item={item} />)}
-          {tareasQueRequierenAccion.length === 0 ? (
-            <div className="rounded-md border border-dashed border-border-strong px-4 py-5 text-sm text-text-muted lg:col-span-2">
-              No tienes tareas que requieran una acción ahora mismo.
-            </div>
-          ) : null}
-        </div>
-      </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <section>
-          <h2 className="text-base font-semibold">Próximas evaluaciones</h2>
-          <div className="mt-3 flex flex-col gap-3">
-            {evaluaciones.slice(0, 4).map((evaluacion) => (
-              <Link key={evaluacion.idEvaluacion} href={`/cursos/${evaluacion.idCurso}`} className={`${TARJETA} hover:border-border-strong`}>
-                <EncabezadoTarjeta etiqueta="Evaluación" titulo={evaluacion.nombre} icono={<IconoCurso nombre={evaluacion.curso.nombre} codigo={evaluacion.curso.codigo} />} />
-                <div className="border-t border-border pt-2.5">
-                  <DatosTarjeta datos={[
-                    { etiqueta: "Curso", valor: evaluacion.curso.nombre },
-                    { etiqueta: "Modalidad", valor: evaluacion.curso.modalidad ? <ChipModalidad modalidad={evaluacion.curso.modalidad} /> : null },
-                    { etiqueta: "Fecha límite", valor: etiquetaRelativa(evaluacion.fechaCierre), titulo: formatearFechaLima(evaluacion.fechaCierre) },
-                  ]} />
-                </div>
-              </Link>
-            ))}
-            {evaluaciones.length === 0 ? (
-              <div className="rounded-md border border-dashed border-border-strong px-4 py-5 text-sm text-text-muted">
-                No tienes evaluaciones próximas.{" "}
-                <Link href={tieneCurso ? `/cursos/${cursos[0].idCurso}` : "/cursos?nuevo=1"} className="font-medium text-primary hover:underline">
-                  {tieneCurso ? "Registrar una evaluación" : "Agregar un curso"}
-                </Link>
-              </div>
-            ) : null}
-          </div>
-        </section>
-
-        <section>
-          <h2 className="text-base font-semibold">En espera</h2>
-          <p className="mt-0.5 text-xs text-text-muted">Tareas terminadas que otro integrante debe revisar.</p>
-          <div className="mt-3 flex flex-col gap-3">
-            {tareasEnEspera.map((item) => <TarjetaTarea key={item.tarea.idTarea} item={item} />)}
-            {tareasEnEspera.length === 0 ? (
-              <div className="rounded-md border border-dashed border-border-strong px-4 py-5 text-sm text-text-muted">
-                No tienes tareas esperando revisión.
-              </div>
-            ) : null}
-          </div>
-        </section>
+        <aside aria-label="Próximas fechas" className="flex-[1_1_300px] border-l px-4 py-5 sm:px-6 lg:max-w-[380px]">
+          <h2 className="mb-3 text-[13px] font-medium">Próximas fechas</h2>
+          {proximas.length ? (
+            <ul>
+              {proximas.map((item) => (
+                <li key={item.clave}>
+                  <Link href={item.href} className="flex gap-3 border-b py-2.5 text-[13px] hover:text-foreground">
+                    <span className="w-16 shrink-0 text-xs leading-5 text-subtle-foreground tabular-nums">
+                      {item.dia}
+                      <br />
+                      {item.hora}
+                    </span>
+                    <span className="w-[3px] shrink-0 rounded-full" style={{ backgroundColor: item.color }} aria-hidden />
+                    <span className="min-w-0">
+                      <span className="block truncate">{item.titulo}</span>
+                      <span className="mt-0.5 block truncate text-xs text-subtle-foreground">{item.tipo}</span>
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-[13px] text-subtle-foreground">Tus clases, evaluaciones, entregas y reuniones de los próximos 7 días aparecerán aquí.</p>
+          )}
+          <Link href="/calendario" className="mt-3.5 inline-block text-[13px] text-muted-foreground hover:text-foreground">Abrir calendario</Link>
+        </aside>
       </div>
-    </div>
+    </PaginaCompleta>
   );
 }

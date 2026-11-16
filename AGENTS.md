@@ -78,6 +78,7 @@ Nació como proyecto del curso *Proyecto Tecnológico* (NRC 3708, ISIL, metodolo
 | Base de datos | PostgreSQL |
 | ORM y migraciones | Prisma |
 | Validación | Zod (esquemas compartidos entre cliente y servidor) |
+| Animaciones | `motion` (solo en el login, pedido del usuario 2026-11-16) |
 | Autenticación | Google OAuth únicamente, flujo manual con `openid-client` + `jose` (ver 8.1) |
 | Correo | Resend mediante `EmailSender` configurable por entorno (ver 8.6) |
 | Entorno local | Docker solo para PostgreSQL |
@@ -158,7 +159,7 @@ Reglas de arquitectura:
 
 ## 7. Modelo de datos
 
-**La especificación exacta está en `docs/educontrol.dbml`** (13 tablas). Si ese archivo no existe, pídelo al usuario; no inventes el esquema. Una vez creado `prisma/schema.prisma`, este pasa a ser la fuente de verdad y el `.dbml` se actualiza en el mismo cambio.
+**La especificación exacta está en `docs/educontrol.dbml`** (14 tablas). Si ese archivo no existe, pídelo al usuario; no inventes el esquema. Una vez creado `prisma/schema.prisma`, este pasa a ser la fuente de verdad y el `.dbml` se actualiza en el mismo cambio.
 
 | Tabla | Propósito |
 |---|---|
@@ -175,6 +176,7 @@ Reglas de arquitectura:
 | `notificacion` | Avisos por destinatario, con estado de envío de correo |
 | `reunion` | Reunión de un grupo, de una sola vez (título, inicio, fin, lugar y enlace opcionales) |
 | `reunion_asistente` | Confirmación de asistencia por integrante (`pendiente` \| `asistire` \| `no_asistire`) |
+| `evaluacion_historial` | Registro inmutable del avance personal de cada evaluación (como `tarea_historial`) |
 
 **Lo que NO tiene tabla** (se calcula con consultas): el calendario, el avance del grupo, la carga y el cumplimiento por integrante, el feed de actividad y el tiempo libre.
 
@@ -227,9 +229,11 @@ Reglas de arquitectura:
 - `horario_curso` es un patrón **semanal** (día 1 = lunes … 7 = domingo), pero en la práctica los cursos no dictan clase en domingo: la UI y la validación limitan `horario_curso` a **1-6 (lunes a sábado)**. `bloque_ocupado` sí usa el rango completo 1-7. Un curso puede tener varias sesiones. La hora de fin debe ser estrictamente posterior a la hora de inicio; las sesiones no cruzan la medianoche.
 - **Horario estable del curso (confirmado por el usuario, 2026-11-02):** una vez que el curso tiene horario, no se pueden agregar ni eliminar sesiones manualmente; solo editar el día y la franja de cada sesión existente. El formulario para configurar horario solo aparece en cursos antiguos o importados que todavía no tengan ninguna sesión. La sincronización manual de un curso importado conserva su comportamiento aprobado y puede traer sesiones nuevas desde el curso original.
 - Los horarios de un curso solo aparecen en el Calendario mientras `curso.activo = true`. Al desactivar el curso se conservan sus sesiones en la base de datos, pero se retiran inmediatamente del Calendario; al reactivarlo vuelven a mostrarse.
-- `bloque_ocupado` es un patrón semanal **personal**: `laboral` | `familiar` | `personal`. `dia_semana` indica el día del bloque. La hora de fin debe ser estrictamente posterior a la hora de inicio; no se permiten bloques que crucen la medianoche (decisión del usuario, 2026-10-19).
+- `bloque_ocupado` es un patrón semanal **personal**: `laboral` | `familiar` | `personal`. `dia_semana` indica el día del bloque. La hora de fin debe ser posterior a la de inicio, salvo que el usuario active **Horario excepcional**: entonces el bloque termina al día siguiente (p. ej. 9:00pm - 8:00am; fin = inicio sigue prohibido). No hay columna: `hora_fin < hora_inicio` significa que cruza la medianoche, y el cálculo de disponibilidad y el Calendario ya lo reparten entre los dos días (decisión del usuario, 2026-11-16, reemplaza la del 2026-10-19). Solo aplica a `bloque_ocupado`; las sesiones de curso siguen sin cruzar la medianoche.
 - **Tiempo ocupado** de un usuario = `horario_curso` de sus cursos activos + sus `bloque_ocupado`. **El tiempo libre se calcula restando; nunca se guarda.** Los solapes se calculan en TypeScript.
 - `evaluacion`: pertenece a un curso. `fecha_cierre` es obligatoria. `fecha_apertura` es opcional (una evaluación presencial no tiene ventana). Si el usuario solo indica el día, usa **23:59 (America/Lima)** como hora de cierre. `requiere_entrega` indica si se sube algo; `fecha_entrega` la marca el propio usuario (`NULL` = aún no entrega) y es autodeclarada, no verificada.
+- **Avance de una evaluación (confirmado, 2026-11-16, `src/lib/estado-evaluacion.ts`):** mismos criterios que las tareas, pero lo maneja solo el dueño. `evaluacion.estado`: `pendiente` → `en_progreso` → `completada` ("Terminada"), más `descartada` (motivo obligatorio). Terminar exige haber marcado la entrega si `requiere_entrega`; una terminada no puede quitar la entrega sin reabrirla. Reabrir: `completada` → `en_progreso`; restaurar: `descartada` → `pendiente`. `fecha_vista` + acción `vista` registran la primera vez que se abre el detalle (`/cursos/[id]?evaluacion=`). Cada cambio escribe en `evaluacion_historial` (`creada` | `vista` | `estado` | `entrega`) en la misma transacción; el motivo va en `valor_nuevo`. El estado es personal: no se copia al importar ni al traer actualizaciones. Inicio y Calendario ocultan las descartadas; Inicio también las terminadas.
+- **"Origen" del curso (creado por ti / importado):** oculto por ahora en el detalle del curso (`MOSTRAR_ORIGEN`, pedido del usuario 2026-11-16).
 - **El calendario es una vista, no una tabla.** Eventos con fecha: cierres de evaluaciones y fechas límite de tareas de grupo. Patrones semanales (`horario_curso` y `bloque_ocupado`): franjas de fondo proyectadas sobre los días de la semana mostrada.
 - **Fechas:** se guardan en UTC y se muestran en `America/Lima` (UTC-5, sin horario de verano). Centraliza la conversión en `src/lib/dates`.
 - La disponibilidad es información sensible (decisión del usuario, 2026-10-05): un **compañero** (comparten un grupo donde ambos están `aceptada` y ninguno es observador) puede ver el horario semanal del otro en `/usuarios/[id]/disponibilidad`, con la misma segmentación y colores del Calendario: clases con el nombre del curso y bloques con su categoría (Laboral / Familiar-Personal). **Nunca el `detalle` de un bloque** ni las entregas. En la pestaña "Horarios" del grupo se sigue mostrando solo ocupado/libre por persona. Nadie fuera de esa condición ve la disponibilidad.
@@ -243,11 +247,14 @@ Reglas de arquitectura:
 - **Invitaciones:** el líder busca a un usuario ya registrado y crea una fila con `estado_invitacion = 'pendiente'`. **El invitado acepta o rechaza dentro de la web**, nunca desde un enlace del correo (no hay tokens de aceptación). Al responder se llena `fecha_respuesta`.
 - Antes de aceptar, el invitado debe confirmar expresamente que fue informado de los datos personales que compartirán los integrantes del grupo, la finalidad de coordinación y las consecuencias de aceptar o rechazar. Esta confirmación se valida también en el servidor (decisión del usuario, 2026-10-19).
 - Estados: `pendiente` | `aceptada` | `rechazada` | `retirado`. **Solo los integrantes `aceptada` cuentan** para asignaciones, métricas, notificaciones y permisos.
-- **Retirar a un integrante:** cambia su estado a `retirado`; **no borres la fila** (conserva su historial de aporte). Desasigna sus tareas abiertas y registra el cambio en `tarea_historial`.
+- **Retirar a un integrante:** cambia su estado a `retirado` y llena `fecha_retiro`; **no borres la fila** (conserva su historial de aporte). Desasigna sus tareas abiertas y registra el cambio en `tarea_historial`.
+- **Salir del grupo (confirmado, 2026-11-16):** cualquier integrante aceptado de un grupo activo puede salir por su cuenta desde Integrantes. Queda igual que un retiro (`retirado`, `fecha_retiro`, tareas abiertas desasignadas con historial) pero con `retiro_voluntario = true`. El líder primero cede el liderazgo a un miembro aceptado (no observador); si no hay ninguno, no puede salir. Se avisa al líder (o al nuevo líder) con `integrante_salio`. Hoy no se puede volver a invitar a quien salió (la fila ya existe).
+- **Historial de invitaciones (confirmado, 2026-11-15):** cada invitación guarda quién la envió (`id_invitador`). En la Bandeja (filtro Invitaciones; el módulo Invitaciones se integró ahí el 2026-11-16), cada usuario ve las pendientes y su historial: qué aceptó o rechazó (con la fecha de respuesta, quién lo invitó y a qué grupo y curso) y de qué grupos lo retiraron (con `fecha_retiro`). Los registros anteriores a estas columnas asumen al creador del grupo como invitador y no tienen fecha de retiro.
 - Roles: `lider` | `miembro` | `observador`.
   - **Observador:** solo lectura de tareas, avance e historial. No cuenta en las métricas, no se le asignan tareas y **no ve los `bloque_ocupado` de nadie**. Así se incorpora a un profesor: el grupo lo invita como observador.
 - Permisos por defecto (confirmado): el líder invita, retira y edita el grupo; líder y miembros crean y asignan tareas.
 - Un grupo solo es visible para sus integrantes. **Verifica membresía y rol en cada acceso a datos de un grupo.**
+- **Sin acceso = 404, nunca 403 (decidido 2026-11-16):** a quien no es integrante (o no es dueño del curso, o no puede ver un perfil) se le responde igual que si el recurso no existiera, para no confirmar que existe. `src/proxy.ts` + `src/server/auth/acceso-rutas.ts` lo resuelven en las cargas de página antes de transmitirla, para que el código HTTP sea un 404 real (`src/app/not-found.tsx`). No reemplaza las verificaciones de páginas y servicios; las Server Actions (POST) siguen validando permisos y respondiendo su error.
 
 ### 8.4 Tareas
 
@@ -314,6 +321,8 @@ Reglas de arquitectura:
 | El líder descarta una tarea | `tarea_descartada` | El asignado | No |
 | Cambio a `en_progreso` | — | Nadie (solo queda en el historial) | No |
 | Programan una reunión | `reunion_programada` | Integrantes aceptados no observadores, menos quien la programó | Sí (confirmado por el usuario, 2026-11-02) |
+| Un integrante sale del grupo | `integrante_salio` | El líder (o quien queda como líder) | No |
+| Registras una evaluación | `evaluacion_creada` | **El propio dueño** (excepción a "nunca notifiques a quien realizó la acción", pedida por el usuario 2026-11-16) | Sí |
 
 - Mantén la **lista de eventos que envían correo en un único lugar** (una constante o archivo de configuración), para poder cambiar la política sin tocar la lógica.
 - `grupo_integrante.correo_actividad = false` silencia los correos de **actividad** de ese grupo (revisión, completada). Los importantes (invitaciones, tareas asignadas o devueltas y reuniones programadas) siguen llegando.
@@ -342,7 +351,10 @@ Usa **Azure DevOps** como referencia visual: se siente profesional, densa en inf
 **Estructura general**
 
 - Barra superior: nombre del producto, búsqueda, campana de notificaciones y avatar.
-- Barra lateral izquierda con íconos: Inicio, Cursos, Calendario, Grupos, Reuniones, Invitaciones (con contador si hay pendientes) y Perfil.
+- Barra lateral izquierda con íconos: Inicio, Bandeja (con contador), Calendario, Reuniones, Cursos, Grupos y Perfil. **No hay módulo Invitaciones**: `/invitaciones` redirige a la Bandeja, filtro Invitaciones (pendientes con Aceptar/Rechazar e historial).
+- **Bandeja (2026-11-16):** cada aviso se lista con un título corto (qué pasó) y su objeto (sobre qué); el detalle va al panel derecho: quién lo hizo, cuándo, el motivo, y los datos de la tarea, invitación, reunión o evaluación (`src/lib/bandeja.ts`).
+- **Marca:** monograma "e" de Claude Design (`src/components/marca/monograma.tsx`, `src/app/icon.svg`). El tema arranca en claro.
+- **SEO:** cada página define su título (`%s · EduControl`). Solo `/login` se indexa; el resto lleva `noindex` y `robots.txt` lo bloquea. Hay `sitemap.xml`, `manifest`, imagen Open Graph e ícono de Apple generados con `next/og`.
 - Migas de pan (*breadcrumbs*) y pestañas dentro de cada página. Ejemplo, página de un grupo: **Resumen · Tareas · Integrantes · Actividad**.
 - Franjas informativas en azul claro para avisos (por ejemplo, "Tienes 2 invitaciones pendientes").
 
@@ -368,7 +380,7 @@ Usa **Azure DevOps** como referencia visual: se siente profesional, densa en inf
 **Reglas transversales**
 
 - **Responsivo y móvil primero:** los estudiantes consultarán desde el celular.
-- Textos de la interfaz **en español (Perú)**. Fechas `dd/mm/aaaa` y horas en formato de 12 h con AM/PM (`src/lib/dates.ts#timeAHora`).
+- Textos de la interfaz **en español (Perú)**. Fechas en lenguaje natural y relativas a hoy, siempre en America/Lima: "Hoy", "Mañana", "Mar 24", "Mar 24 nov" (de otro año: "Lun 5 nov 2025"); la fecha completa ("martes 24 de noviembre de 2026, 11:59pm") va en el `title` y en los correos (`src/lib/formato-fecha.ts#fechaCorta` y `#fechaCompleta`). Horas en 12 h, siempre con minutos y sin espacio: `7:00pm`, rangos `7:00pm - 9:30pm` (`src/lib/formato-fecha.ts#formatoHora` y `#rangoHoras`, pedido del usuario 2026-11-16).
 - Accesibilidad básica: contraste suficiente, navegación por teclado y foco visible.
 - No agregues una librería de componentes ni de íconos sin consultarlo.
 
@@ -448,6 +460,7 @@ Datos de ejemplo (`prisma/seed.ts`, **solo desarrollo**): varios usuarios de pru
 
 - **Dominio definitivo de producción:** la demo ya puede usar un dominio temporal verificado mediante `EMAIL_FROM`; antes de producción se debe elegir y verificar el dominio definitivo del equipo.
 - **Framework de pruebas**, librería de formularios, librería de componentes e íconos, y React Compiler.
+- **Recordatorios de evaluaciones (pendiente, 2026-11-16):** avisos en la Bandeja y por correo a 7 y 3 días del cierre (no si ya está terminada). Falta decidir cómo se disparan: ruta protegida llamada por GitHub Actions, revisión al entrar a la app, o ambas. El correo de "evaluación creada" ya funciona.
 - **Privacidad:** con usuarios reales aplica la Ley 29733 de Protección de Datos Personales (Perú). Antes de abrir la app hacen falta política de privacidad, términos y consentimiento; lo decide el equipo, no lo improvises.
 
 ## 14. Lo que NO debes hacer
