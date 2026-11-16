@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { requerirSesion } from "@/server/auth/session";
 import { listarMisReuniones } from "@/server/services/reunion";
@@ -15,12 +16,14 @@ import { Toast } from "@/components/toast";
 import { BotonConfirmacion } from "@/components/boton-confirmacion";
 import { cancelarReunionAction, responderReunionAction } from "./actions";
 
+export const metadata: Metadata = { title: "Reuniones" };
+
 type Listado = Awaited<ReturnType<typeof listarMisReuniones>>;
 type Reunion = Listado["proximas"][number];
 type Rol = "lider" | "miembro" | "observador";
 
 function horario(reunion: { inicio: Date; fin: Date }) {
-  return `${etiquetaMinutos(minutosDelDiaLima(reunion.inicio))} – ${etiquetaMinutos(minutosDelDiaLima(reunion.fin))}`;
+  return `${etiquetaMinutos(minutosDelDiaLima(reunion.inicio))} - ${etiquetaMinutos(minutosDelDiaLima(reunion.fin))}`;
 }
 
 export default async function ReunionesPage({

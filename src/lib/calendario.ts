@@ -1,3 +1,4 @@
+import { formatoHora } from "./formato-fecha";
 /**
  * Helpers puros para la vista semanal del calendario (America/Lima). El calendario es una
  * vista, no una tabla: nada de esto se guarda (AGENTS.md 8.2).
@@ -207,20 +208,14 @@ export function partesPorDia(diaSemana: number, horaInicio: Date, horaFin: Date)
   ];
 }
 
-/** Minutos desde medianoche -> etiqueta 12h ("6:00 AM", "1:30 PM"). */
+/** Minutos desde medianoche -> "6:00am", "1:30pm" (mismo formato que toda la app). */
 export function etiquetaMinutos(min: number): string {
-  const horas24 = Math.floor(min / 60) % 24;
-  const minutos = min % 60;
-  const sufijo = horas24 < 12 ? "AM" : "PM";
-  const horas12 = horas24 % 12 === 0 ? 12 : horas24 % 12;
-  return `${horas12}:${minutos.toString().padStart(2, "0")} ${sufijo}`;
+  return formatoHora(Math.floor(min / 60) % 24, min % 60);
 }
 
-/** Etiqueta corta para el eje de horas ("6 AM", "12 PM"). */
+/** Etiqueta del eje de horas ("6:00am", "12:00pm"). */
 export function etiquetaHoraEje(hora24: number): string {
-  const sufijo = hora24 % 24 < 12 ? "AM" : "PM";
-  const horas12 = hora24 % 12 === 0 ? 12 : hora24 % 12;
-  return `${horas12} ${sufijo}`;
+  return formatoHora(hora24 % 24, 0);
 }
 
 /** 90 -> "1 h 30 min"; 600 -> "10 h"; 45 -> "45 min". */

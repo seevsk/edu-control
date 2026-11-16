@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { requerirSesion } from "@/server/auth/session";
 import { buscarPersonas } from "@/server/services/grupo";
 import { Avatar } from "@/components/avatar";
 import { IconBuscarPersonas } from "@/components/icons";
+
+export const metadata: Metadata = { title: "Personas" };
 
 export default async function BuscarPersonasPage({
   searchParams,

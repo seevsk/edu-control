@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { requerirSesion } from "@/server/auth/session";
 import { crearBloqueOcupadoAction } from "../../actions";
 import { FormularioBloque } from "../../_components/formulario-bloque";
 import { consultaCalendario } from "../../_components/rutas";
+
+export const metadata: Metadata = { title: "Agregar tiempo ocupado" };
 
 export default async function NuevoBloquePage({
   searchParams,

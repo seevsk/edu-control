@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { requerirSesion } from "@/server/auth/session";
 import { obtenerCalendarioEntre } from "@/server/services/calendario";
 import { diasDeVistaMes, fechaEnZonaLimaISO, lunesDeSemanaISO, sumarDiasISO } from "@/lib/calendario";
@@ -10,6 +11,8 @@ import { CalendarioVista } from "./_components/calendario-vista";
 import { construirEventos, minutosPorFiltro } from "./_components/eventos";
 import type { ModoCalendario } from "./_components/tipos-calendario";
 import { crearBloqueOcupadoAction } from "./actions";
+
+export const metadata: Metadata = { title: "Calendario" };
 
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 

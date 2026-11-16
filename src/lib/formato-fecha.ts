@@ -49,11 +49,12 @@ function diaAbsoluto(partes: PartesLima): number {
   return Date.UTC(partes.anio, partes.mes - 1, partes.dia) / DIA_MS;
 }
 
-/** "9 am", "2:50 pm", "12 pm". */
+/** "9:00am", "2:50pm", "12:00pm": siempre con minutos y sin espacio (pedido del usuario, 2026-11-16). */
 export function formatoHora(horas: number, minutos: number): string {
-  const sufijo = horas < 12 ? "am" : "pm";
-  const hora12 = horas % 12 === 0 ? 12 : horas % 12;
-  return minutos ? `${hora12}:${String(minutos).padStart(2, "0")} ${sufijo}` : `${hora12} ${sufijo}`;
+  const horas24 = ((horas % 24) + 24) % 24;
+  const sufijo = horas24 < 12 ? "am" : "pm";
+  const hora12 = horas24 % 12 === 0 ? 12 : horas24 % 12;
+  return `${hora12}:${String(minutos).padStart(2, "0")}${sufijo}`;
 }
 
 export function hora(fecha: Date): string {
@@ -61,17 +62,14 @@ export function hora(fecha: Date): string {
   return formatoHora(partes.hora, partes.minuto);
 }
 
-/** Columna `time` de Prisma (sin zona): "11 am". */
+/** Columna `time` de Prisma (sin zona): "11:00am". */
 export function horaDeTime(time: Date): string {
   return formatoHora(time.getUTCHours(), time.getUTCMinutes());
 }
 
-/** "9 – 10:50 am", "11 am – 2:50 pm": el sufijo va una sola vez si coincide. */
+/** "7:00pm - 9:30pm": cada extremo completo, para leerlo de un vistazo. */
 export function rangoHoras(inicio: { horas: number; minutos: number }, fin: { horas: number; minutos: number }): string {
-  const desde = formatoHora(inicio.horas, inicio.minutos);
-  const hasta = formatoHora(fin.horas, fin.minutos);
-  const mismoSufijo = (inicio.horas < 12) === (fin.horas < 12);
-  return mismoSufijo ? `${desde.replace(/ (am|pm)$/, "")} – ${hasta}` : `${desde} – ${hasta}`;
+  return `${formatoHora(inicio.horas, inicio.minutos)} - ${formatoHora(fin.horas, fin.minutos)}`;
 }
 
 /** Inicio (lunes) de la semana de `partes`, como dia absoluto. */

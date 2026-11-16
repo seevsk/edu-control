@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { requerirSesion } from "@/server/auth/session";
 import { gruposParaProgramar, reunionesDelGrupoEntre } from "@/server/services/reunion";
@@ -15,6 +16,8 @@ import {
 import { bloquearReunionesParaTodos, huecos, mapaDeDisponibilidad, type Franja } from "@/lib/disponibilidad";
 import { MapaSemanal } from "@/components/mapa-semanal";
 import { FormularioReunion, type Sugerencia } from "./formulario-reunion";
+
+export const metadata: Metadata = { title: "Programar reunión" };
 
 const HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -81,7 +84,7 @@ export default async function NuevaReunionPage({
           fecha: dia,
           inicio: hhmm(desde),
           fin: hhmm(desde + 60),
-          etiqueta: `${DIAS_CORTOS[hueco.diaSemana - 1]} ${Number(dia.slice(8))} · ${etiquetaMinutos(desde)} – ${etiquetaMinutos(desde + 60)}`,
+          etiqueta: `${DIAS_CORTOS[hueco.diaSemana - 1]} ${Number(dia.slice(8))} · ${etiquetaMinutos(desde)} - ${etiquetaMinutos(desde + 60)}`,
           faltan: hueco.faltan.map((id) => nombres.get(id) ?? "").join(", ") || null,
         };
       })
@@ -93,7 +96,7 @@ export default async function NuevaReunionPage({
   const describirFranja = (franja: Franja) => {
     const libres = total - franja.ocupados.length;
     const faltan = franja.ocupados.map((id) => nombres.get(id)).join(", ");
-    return `${DIAS_LARGOS[franja.diaSemana - 1]} ${etiquetaMinutos(franja.inicioMin)} – ${etiquetaMinutos(franja.finMin)} · ${
+    return `${DIAS_LARGOS[franja.diaSemana - 1]} ${etiquetaMinutos(franja.inicioMin)} - ${etiquetaMinutos(franja.finMin)} · ${
       libres === total ? "todos libres" : `${libres} de ${total} libres · falta ${faltan}`
     }`;
   };

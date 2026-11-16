@@ -36,7 +36,7 @@ function agruparFranjas(franjas: Franja[]): Franja[] {
 }
 
 function TarjetaReunion({ evento, movil = false }: { evento: EventoMapaSemanal; movil?: boolean }) {
-  const rango = `${etiquetaMinutos(evento.inicioMin)} – ${etiquetaMinutos(evento.finMin)}`;
+  const rango = `${etiquetaMinutos(evento.inicioMin)} - ${etiquetaMinutos(evento.finMin)}`;
   const descripcion = `Reunión: ${evento.titulo} · ${rango}${evento.subtitulo ? ` · ${evento.subtitulo}` : ""}`;
   const contenido = movil ? (
     <>
@@ -252,7 +252,7 @@ export function MapaSemanal({
                   return (
                     <li key={franja.inicioMin} className="flex items-center gap-3 px-3 py-2" title={detalle}>
                       <span className="w-[7.25rem] shrink-0 text-xs tabular-nums text-text-muted">
-                        {etiquetaMinutos(franja.inicioMin)} – {etiquetaMinutos(franja.finMin)}
+                        {etiquetaMinutos(franja.inicioMin)} - {etiquetaMinutos(franja.finMin)}
                       </span>
                       <span className={`h-7 w-1 shrink-0 rounded-full ${claseDeFranja(franja)}`} aria-hidden />
                       <span className="min-w-0 text-xs font-medium text-text">

@@ -20,7 +20,7 @@ export type IconoLinea = "hora" | "repite" | "lugar" | "evaluacion" | "grupo" | 
 /** Lo que muestra el popover de un evento: nunca datos que el usuario no pueda ver. */
 export interface DatoEvento {
   filtro: FiltroCalendario;
-  /** Segunda línea de la ficha ("11 am – 2:50 pm · Presencial"). */
+  /** Segunda línea de la ficha ("11:00am - 2:50pm · Presencial"). */
   subtitulo: string;
   lineas: { icono: IconoLinea; texto: string }[];
   acciones: { texto: string; href: string; principal?: boolean }[];

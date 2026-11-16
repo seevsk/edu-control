@@ -30,6 +30,7 @@ function camposBase(formData: FormData) {
     horaInicio: formData.get("horaInicio"),
     horaFin: formData.get("horaFin"),
     detalle: formData.get("detalle") ?? "",
+    excepcional: formData.get("excepcional") === "on",
   };
 }
 

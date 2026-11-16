@@ -12,6 +12,8 @@ import {
   ChevronRight,
   Clock,
   MapPin,
+  PanelLeftClose,
+  PanelLeftOpen,
   Plus,
   Repeat,
   Tag,
@@ -45,6 +47,10 @@ const VISTA_DE_MODO: Record<ModoCalendario, CalendarView> = { mes: "month", sema
 const MODO_DE_VISTA: Partial<Record<CalendarView, ModoCalendario>> = { month: "mes", week: "semana", agenda: "agenda" };
 const ICONOS: Record<IconoLinea, typeof Clock> = { hora: Clock, repite: Repeat, lugar: MapPin, evaluacion: BookOpen, grupo: Users, estado: Tag };
 const ID_BORRADOR = "__nuevo";
+/** Disponibilidad de un compañero: familiar y personal se muestran juntos, sin detalle (AGENTS.md 8.2). */
+const FILTROS_COMPANERO = FILTROS_HORARIO.filter((filtro) => filtro.clave !== "personal").map((filtro) =>
+  filtro.clave === "familiar" ? { ...filtro, texto: "Familiar / Personal" } : filtro,
+);
 const COLOR_TIPO = { laboral: "var(--cat-laboral)", familiar: "var(--cat-fam)", personal: "var(--cal-personal)" } as const;
 
 const minutosAPartes = (minutos: number) => ({ horas: Math.floor(minutos / 60), minutos: minutos % 60 });
@@ -69,7 +75,7 @@ const I18N = {
     timeUntil: (hora: string) => `Hasta ${hora}`,
     toggleDayEvents: (n: number) => (n === 1 ? "1 evento" : `${n} eventos`),
     moreCompact: (n: number) => `+${n}`,
-    timeRange: (desde: string, hasta: string) => `${desde} – ${hasta}`,
+    timeRange: (desde: string, hasta: string) => `${desde} - ${hasta}`,
   },
   viewNames: { month: "Mes", week: "Semana", day: "Día", agenda: "Agenda" },
   formats: {
@@ -79,6 +85,9 @@ const I18N = {
     agendaDayHeader: "EEEE d 'de' MMMM",
     moreDayHeader: "EEEE d 'de' MMMM",
     agendaWeekday: "EEE",
+    timeGutter: "h:mmaaa",
+    timeGutterMinute: "h:mmaaa",
+    eventTime: "h:mmaaa",
   },
   functions: {
     formatEventTime: (inicio: Date, fin: Date, todoElDia: boolean) =>
@@ -109,12 +118,18 @@ export function CalendarioVista({
   modo,
   fecha,
   hoyISO,
+  rutaBase = "/calendario",
+  soloLectura = false,
 }: {
   eventos: EventoCalendario[];
   minutos: Partial<Record<FiltroCalendario, number>>;
   modo: ModoCalendario;
   fecha: string;
   hoyISO: string;
+  /** Ruta que se actualiza al navegar (la disponibilidad de un compañero usa la suya). */
+  rutaBase?: string;
+  /** Horario de otra persona: sin crear tiempo ocupado ni filtros de fechas. */
+  soloLectura?: boolean;
 }) {
   const router = useRouter();
   const apiRef = useRef<EventCalendarApi<DatoEvento> | null>(null);
@@ -122,6 +137,7 @@ export function CalendarioVista({
   const [ocultos, setOcultos] = useState<FiltroCalendario[]>([]);
   const [detalle, setDetalle] = useState<DetalleAbierto | null>(null);
   const [borrador, setBorrador] = useState<BorradorTiempo | null>(null);
+  const [panelVisible, setPanelVisible] = useState(true);
 
   const visibles: EventoCalendario[] = eventos.filter((evento) => !evento.data || !ocultos.includes(evento.data.filtro));
   if (borrador) {
@@ -140,7 +156,7 @@ export function CalendarioVista({
     const nuevoModo = MODO_DE_VISTA[vista] ?? "semana";
     const nuevaFecha = fechaEnZonaLimaISO(ancla);
     if (nuevoModo === modo && nuevaFecha === fecha) return;
-    router.replace(`/calendario?modo=${nuevoModo}&fecha=${nuevaFecha}`, { scroll: false });
+    router.replace(`${rutaBase}?modo=${nuevoModo}&fecha=${nuevaFecha}`, { scroll: false });
   }
 
   function abrirBorrador(slot: EventCalendarSlotDraft) {
@@ -179,7 +195,7 @@ export function CalendarioVista({
       slotDuration={30}
       snapDuration={30}
       agendaDayCount={14}
-      interactions={{ drag: false, resize: false, selectSlot: true }}
+      interactions={{ drag: false, resize: false, selectSlot: !soloLectura }}
       i18n={I18N}
       scrollMode="page"
       enableShortcuts={false}
@@ -212,9 +228,9 @@ export function CalendarioVista({
         ultimoPuntero.current = { x: evento.clientX, y: evento.clientY };
       }}
     >
-      <Lateral hoyISO={hoyISO} minutos={minutos} ocultos={ocultos} setOcultos={setOcultos} />
+      {panelVisible ? <Lateral hoyISO={hoyISO} minutos={minutos} ocultos={ocultos} setOcultos={setOcultos} soloLectura={soloLectura} /> : null}
       <div className="flex min-w-0 flex-[999_1_640px] flex-col">
-        <BarraCalendario fecha={fecha} />
+        <BarraCalendario fecha={fecha} panelVisible={panelVisible} onAlternarPanel={() => setPanelVisible((visible) => !visible)} soloLectura={soloLectura} />
         <div className="overflow-hidden rounded-[10px] border bg-background">
           <EventCalendarContent />
         </div>
@@ -281,7 +297,7 @@ function CabeceraDia({ dia, vista, hoy }: { dia: Date; vista: CalendarView; hoy:
   );
 }
 
-function BarraCalendario({ fecha }: { fecha: string }) {
+function BarraCalendario({ fecha, panelVisible, onAlternarPanel, soloLectura }: { fecha: string; panelVisible: boolean; onAlternarPanel: () => void; soloLectura: boolean }) {
   const navegacion = useEventCalendarNavigation();
   const { view, setView } = useEventCalendarView();
   const modo = MODO_DE_VISTA[view];
@@ -289,6 +305,18 @@ function BarraCalendario({ fecha }: { fecha: string }) {
   const anterior = modo === "mes" ? "Mes anterior" : "Semana anterior";
   return (
     <div className="mb-3.5 flex flex-wrap items-center gap-2">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="size-[30px] text-muted-foreground"
+        aria-label={panelVisible ? "Ocultar panel de fechas y filtros" : "Mostrar panel de fechas y filtros"}
+        title={panelVisible ? "Ocultar panel" : "Mostrar panel"}
+        aria-expanded={panelVisible}
+        aria-controls="calendario-lateral"
+        onClick={onAlternarPanel}
+      >
+        {panelVisible ? <PanelLeftClose aria-hidden /> : <PanelLeftOpen aria-hidden />}
+      </Button>
       <h1 className="mr-2 text-xl font-semibold tracking-[-0.01em] first-letter:uppercase">
         {tituloPeriodo(modo, navegacion.activeRange.start, navegacion.activeRange.end)}
       </h1>
@@ -314,7 +342,7 @@ function BarraCalendario({ fecha }: { fecha: string }) {
           </button>
         ))}
       </div>
-      <BotonAgregar fecha={fecha} />
+      {soloLectura ? null : <BotonAgregar fecha={fecha} />}
     </div>
   );
 }
@@ -348,11 +376,13 @@ function Lateral({
   minutos,
   ocultos,
   setOcultos,
+  soloLectura,
 }: {
   hoyISO: string;
   minutos: Partial<Record<FiltroCalendario, number>>;
   ocultos: FiltroCalendario[];
   setOcultos: (valor: FiltroCalendario[]) => void;
+  soloLectura: boolean;
 }) {
   const alternar = (clave: FiltroCalendario) =>
     setOcultos(ocultos.includes(clave) ? ocultos.filter((otro) => otro !== clave) : [...ocultos, clave]);
@@ -374,17 +404,23 @@ function Lateral({
     );
   };
   return (
-    <aside className="flex w-full flex-col gap-6 lg:w-[248px] lg:flex-none">
+    <aside id="calendario-lateral" aria-label="Fechas y filtros" className="flex w-full animate-in flex-col gap-6 fade-in-0 slide-in-from-left-2 duration-200 lg:w-[248px] lg:flex-none">
       <MiniMes hoyISO={hoyISO} />
       <div>
-        <p className="mb-1 text-xs text-subtle-foreground">Mi horario fijo</p>
-        {FILTROS_HORARIO.map((filtro) => fila(filtro, minutos[filtro.clave] ? duracionMinutos(minutos[filtro.clave]!) : "0 h"))}
-        <p className="mt-3.5 mb-1 text-xs text-subtle-foreground">Fechas</p>
-        {FILTROS_FECHAS.map((filtro) => fila(filtro))}
+        <p className="mb-1 text-xs text-subtle-foreground">{soloLectura ? "Horario fijo" : "Mi horario fijo"}</p>
+        {(soloLectura ? FILTROS_COMPANERO : FILTROS_HORARIO).map((filtro) => fila(filtro, minutos[filtro.clave] ? duracionMinutos(minutos[filtro.clave]!) : "0 h"))}
+        {soloLectura ? null : (
+          <>
+            <p className="mt-3.5 mb-1 text-xs text-subtle-foreground">Fechas</p>
+            {FILTROS_FECHAS.map((filtro) => fila(filtro))}
+          </>
+        )}
       </div>
-      <p className="text-xs leading-normal text-subtle-foreground">
-        Las clases y el tiempo ocupado se repiten cada semana y son lo que tu grupo ve como “ocupado”, sin el detalle.
-      </p>
+      {soloLectura ? null : (
+        <p className="text-xs leading-normal text-subtle-foreground">
+          Las clases y el tiempo ocupado se repiten cada semana y son lo que tu grupo ve como “ocupado”, sin el detalle.
+        </p>
+      )}
     </aside>
   );
 }

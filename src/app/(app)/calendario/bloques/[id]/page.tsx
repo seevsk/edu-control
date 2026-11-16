@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requerirSesion } from "@/server/auth/session";
@@ -6,6 +7,8 @@ import { actualizarBloqueOcupadoAction, eliminarBloqueOcupadoAction } from "../.
 import { FormularioBloque } from "../../_components/formulario-bloque";
 import { consultaCalendario } from "../../_components/rutas";
 import { BotonConfirmacion } from "@/components/boton-confirmacion";
+
+export const metadata: Metadata = { title: "Editar tiempo ocupado" };
 
 function aHHMM(fecha: Date) {
   return `${String(fecha.getUTCHours()).padStart(2, "0")}:${String(fecha.getUTCMinutes()).padStart(2, "0")}`;

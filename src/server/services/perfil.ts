@@ -29,6 +29,7 @@ export async function obtenerPerfilPublico(idVisitante: number, idUsuario: numbe
       apellidos: true,
       fotoUrl: true,
       eliminadoEn: true,
+      fechaRegistro: true,
       perfil: {
         select: {
           tipoCuenta: true,
@@ -54,7 +55,9 @@ export async function obtenerPerfilPublico(idVisitante: number, idUsuario: numbe
     select: {
       idGrupo: true,
       nombre: true,
-      integrantes: { where: { idUsuario: { in: [idVisitante, idUsuario] } }, select: { rol: true } },
+      estado: true,
+      evaluacion: { select: { curso: { select: { idCurso: true, nombre: true } } } },
+      integrantes: { where: { idUsuario: { in: [idVisitante, idUsuario] } }, select: { idUsuario: true, rol: true } },
     },
     orderBy: { fechaCreacion: "desc" },
   });
@@ -68,7 +71,15 @@ export async function obtenerPerfilPublico(idVisitante: number, idUsuario: numbe
     apellidos: usuario.apellidos,
     fotoUrl: usuario.fotoUrl,
     perfil: { tipoCuenta, institucion, carrera, ciclo, biografia, trabaja },
-    gruposEnComun: gruposEnComun.map(({ idGrupo, nombre }) => ({ idGrupo, nombre })),
+    gruposEnComun: gruposEnComun.map((grupo) => ({
+      idGrupo: grupo.idGrupo,
+      nombre: grupo.nombre,
+      activo: grupo.estado === "activo",
+      curso: grupo.evaluacion?.curso ?? null,
+      // Rol de la persona visitada en ese grupo.
+      rol: grupo.integrantes.find((integrante) => integrante.idUsuario === idUsuario)?.rol ?? "miembro",
+    })),
+    fechaRegistro: usuario.fechaRegistro,
     puedeVerDisponibilidad: gruposEnComun.some((grupo) => grupo.integrantes.every((i) => i.rol !== "observador")),
   };
 }

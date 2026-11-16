@@ -80,6 +80,8 @@ export function FormularioBloque({
         diasSeleccionados={valores.dias}
         horaInicio={valores.horaInicio}
         horaFin={valores.horaFin}
+        permitirExcepcional
+        excepcional={valores.horaFin < valores.horaInicio}
       />
 
       <label className="flex max-w-md flex-col gap-1 text-sm font-medium">

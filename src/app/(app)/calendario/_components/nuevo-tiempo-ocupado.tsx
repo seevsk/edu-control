@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/submit-button";
 import { DIAS_LARGOS } from "@/lib/calendario";
-import { rangoHoras } from "@/lib/formato-fecha";
+import { formatoHora, rangoHoras } from "@/lib/formato-fecha";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { crearBloqueOcupadoAction } from "../actions";
 import type { EventoCalendario } from "./eventos";
@@ -34,12 +35,12 @@ const TIPOS: { valor: TipoTiempo; texto: string; color: string }[] = [
 ];
 const DIAS_CORTOS = ["Lu", "Ma", "Mi", "Ju", "Vi", "Sá", "Do"];
 
-/** Cada 30 min, con minutos siempre visibles ("2:00 pm"), como en la maqueta. */
+/** Cada 30 min, con minutos siempre visibles ("2:00pm"). */
 const HORAS = Array.from({ length: 48 }, (_, indice) => {
   const minutos = indice * 30;
   const horas = Math.floor(minutos / 60);
   const valor = `${String(horas).padStart(2, "0")}:${String(minutos % 60).padStart(2, "0")}`;
-  const texto = `${horas % 12 === 0 ? 12 : horas % 12}:${String(minutos % 60).padStart(2, "0")} ${horas < 12 ? "am" : "pm"}`;
+  const texto = formatoHora(horas, minutos % 60);
   return { valor, texto, minutos };
 });
 
@@ -51,7 +52,12 @@ function buscarChoque(eventos: EventoCalendario[], dias: number[], inicio: numbe
   for (const dia of dias) {
     for (const evento of eventos) {
       const ventana = evento.data?.semanal;
-      if (ventana && ventana.diaSemana === dia && inicio < ventana.finMin && fin > ventana.inicioMin) {
+      if (!ventana) continue;
+      // Una ventana que cruza la medianoche ocupa el final de su día y el inicio del siguiente.
+      const tramos = ventana.finMin > ventana.inicioMin
+        ? [{ dia: ventana.diaSemana, desde: ventana.inicioMin, hasta: ventana.finMin }]
+        : [{ dia: ventana.diaSemana, desde: ventana.inicioMin, hasta: 1440 }, { dia: (ventana.diaSemana % 7) + 1, desde: 0, hasta: ventana.finMin }];
+      if (tramos.some((tramo) => tramo.dia === dia && inicio < tramo.hasta && fin > tramo.desde)) {
         return { dia, titulo: evento.title, rango: rangoHoras(partes(ventana.inicioMin), partes(ventana.finMin)) };
       }
     }
@@ -74,8 +80,10 @@ export function NuevoTiempoOcupado({
 }) {
   const [dias, setDias] = useState<number[]>([borrador.dia]);
   const [detalle, setDetalle] = useState("");
+  const [excepcional, setExcepcional] = useState(false);
   const inicio = aMinutos(borrador.inicio);
   const fin = aMinutos(borrador.fin);
+  const rangoValido = excepcional ? fin !== inicio : fin > inicio;
   const choque = fin > inicio ? buscarChoque(eventos, dias, inicio, fin) : null;
   const ancla: CSSProperties = { position: "fixed", left: borrador.punto.x, top: borrador.punto.y, width: 1, height: 1, pointerEvents: "none" };
   const masOpciones = `${volverA}&nuevoBloque=1`;
@@ -102,6 +110,7 @@ export function NuevoTiempoOcupado({
           <input type="hidden" name="tipo" value={borrador.tipo} />
           <input type="hidden" name="horaInicio" value={borrador.inicio} />
           <input type="hidden" name="horaFin" value={borrador.fin} />
+          {excepcional ? <input type="hidden" name="excepcional" value="on" /> : null}
           <input type="hidden" name="volverA" value={volverA} />
           <input type="hidden" name="origen" value={masOpciones} />
           {dias.map((dia) => <input key={dia} type="hidden" name="dias" value={dia} />)}
@@ -161,13 +170,23 @@ export function NuevoTiempoOcupado({
               <CampoHora etiqueta="Hasta" valor={borrador.fin} onCambiar={(valor) => onCambiar({ fin: valor })} />
             </div>
 
+            <label className="flex items-center justify-between gap-3 text-[13px]">
+              <span>
+                Horario excepcional
+                <span className="block text-xs text-subtle-foreground">Termina al día siguiente</span>
+              </span>
+              <Switch checked={excepcional} onCheckedChange={setExcepcional} aria-label="Horario excepcional: termina al día siguiente" />
+            </label>
+
             <label>
               <span className="sr-only">Detalle</span>
               <Input name="detalle" value={detalle} onChange={(evento) => setDetalle(evento.target.value)} maxLength={120} placeholder="Detalle (solo tú lo ves). Ej. turno en la tienda" className="h-9" />
             </label>
 
-            {fin <= inicio ? (
-              <p role="alert" className="text-xs text-destructive">La hora de fin debe ser posterior a la de inicio.</p>
+            {!rangoValido ? (
+              <p role="alert" className="text-xs text-destructive">
+                {fin === inicio ? "La hora de inicio y la de fin no pueden ser iguales." : "La hora de fin debe ser posterior a la de inicio. Si termina al día siguiente, activa Horario excepcional."}
+              </p>
             ) : choque ? (
               <p className="flex items-start gap-2 rounded-lg border border-amber-700/25 bg-amber-700/8 px-2.5 py-2 text-xs text-amber-700 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-300">
                 <AlertTriangle className="mt-px size-3.5 shrink-0" aria-hidden />
@@ -182,7 +201,7 @@ export function NuevoTiempoOcupado({
             <Link href={masOpciones} scroll={false} className="flex-1 text-[13px] text-muted-foreground hover:text-foreground">Más opciones</Link>
             <Button type="button" variant="ghost" size="sm" onClick={onCerrar}>Cancelar</Button>
             <SubmitButton
-              disabled={dias.length === 0 || fin <= inicio}
+              disabled={dias.length === 0 || !rangoValido}
               className="h-8 rounded-md bg-primary px-3 text-[13px] font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
               Guardar

@@ -1,20 +1,10 @@
-import { DIAS_CORTOS, DIAS_LARGOS, OPCIONES_HORA, etiquetaMinutos } from "@/lib/calendario";
+import { DIAS_CORTOS, DIAS_LARGOS } from "@/lib/calendario";
+import { RangoHoras } from "@/components/ui-app/rango-horas";
 
 const OPCION_DIA =
   "flex min-w-12 cursor-pointer select-none items-center justify-center rounded-md border border-border-strong bg-surface px-2.5 py-1.5 text-sm transition-colors duration-150 hover:bg-bg has-[:checked]:border-primary has-[:checked]:bg-primary-soft has-[:checked]:font-medium has-[:checked]:text-primary has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-primary";
-const CAMPO = "rounded-md border border-border-strong bg-surface px-3 py-1.5 text-sm font-normal tabular-nums";
 
-/** Conserva horas antiguas que no caen en los intervalos actuales de 30 minutos. */
-function opcionesCon(...valores: string[]) {
-  const opciones = [...OPCIONES_HORA];
-  for (const valor of valores) {
-    if (opciones.some((opcion) => opcion.valor === valor)) continue;
-    const [horas, minutos] = valor.split(":").map(Number);
-    opciones.push({ valor, etiqueta: etiquetaMinutos(horas * 60 + minutos) });
-  }
-  return opciones.sort((a, b) => a.valor.localeCompare(b.valor));
-}
-
+/** Días (chips) + franja horaria. Envía `dias`/`diaSemana`, `horaInicio`, `horaFin` y, si aplica, `excepcional`. */
 export function SelectorHorarioSemanal({
   modo = "multiple",
   incluirDomingo = true,
@@ -22,6 +12,8 @@ export function SelectorHorarioSemanal({
   horaInicio = "09:00",
   horaFin = "13:00",
   tituloDias,
+  permitirExcepcional = false,
+  excepcional = false,
 }: {
   modo?: "multiple" | "unico";
   incluirDomingo?: boolean;
@@ -29,8 +21,10 @@ export function SelectorHorarioSemanal({
   horaInicio?: string;
   horaFin?: string;
   tituloDias?: string;
+  /** Solo tiempo ocupado: permite horarios que terminan al día siguiente (p. ej. 9:00pm - 8:00am). */
+  permitirExcepcional?: boolean;
+  excepcional?: boolean;
 }) {
-  const opcionesHora = opcionesCon(horaInicio, horaFin);
   const dias = incluirDomingo ? DIAS_CORTOS : DIAS_CORTOS.slice(0, 6);
 
   return (
@@ -55,29 +49,7 @@ export function SelectorHorarioSemanal({
         </div>
       </fieldset>
 
-      <div className="grid max-w-md grid-cols-2 gap-3">
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          Desde
-          <select name="horaInicio" defaultValue={horaInicio} required className={CAMPO}>
-            {opcionesHora.map((opcion) => (
-              <option key={opcion.valor} value={opcion.valor}>
-                {opcion.etiqueta}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          Hasta
-          <select name="horaFin" defaultValue={horaFin} required className={CAMPO}>
-            {opcionesHora.map((opcion) => (
-              <option key={opcion.valor} value={opcion.valor}>
-                {opcion.etiqueta}
-              </option>
-            ))}
-          </select>
-          <span className="text-xs font-normal text-text-muted">Posterior a la hora de inicio</span>
-        </label>
-      </div>
+      <RangoHoras horaInicio={horaInicio} horaFin={horaFin} permitirExcepcional={permitirExcepcional} excepcional={excepcional} />
     </div>
   );
 }

@@ -24,12 +24,15 @@ function instanteLima(fechaISO: string, minutos: number) {
   return new Date(`${fechaISO}T${dosDigitos(Math.floor(minutos / 60))}:${dosDigitos(minutos % 60)}:00-05:00`);
 }
 
-/** Patrón semanal como evento recurrente (la librería lo proyecta a cada semana visible). */
+/**
+ * Patrón semanal como evento recurrente (la librería lo proyecta a cada semana visible). Un horario
+ * excepcional (fin <= inicio) termina al día siguiente.
+ */
 function semanal(diaSemana: number, inicioMin: number, finMin: number) {
   const fecha = sumarDiasISO(LUNES_ANCLA, diaSemana - 1);
   return {
     start: instanteLima(fecha, inicioMin),
-    end: instanteLima(fecha, finMin),
+    end: finMin > inicioMin ? instanteLima(fecha, finMin) : instanteLima(sumarDiasISO(fecha, 1), finMin),
     recurrence: { freq: "weekly" as const },
   };
 }
@@ -135,7 +138,7 @@ export function construirEventos(datos: DatosCalendario, consulta: string): Even
 
   for (const evaluacion of datos.evaluaciones) {
     entrega(`e-${evaluacion.idEvaluacion}`, evaluacion.nombre, evaluacion.fechaCierre, "evaluaciones", "var(--cal-evaluacion)",
-      aOracion(evaluacion.curso.nombre), `/cursos/${evaluacion.idCurso}`, "Ver curso");
+      aOracion(evaluacion.curso.nombre), `/cursos/${evaluacion.idCurso}?evaluacion=${evaluacion.idEvaluacion}`, "Ver evaluación");
   }
   for (const tarea of datos.tareas) {
     if (!tarea.fechaLimite) continue;
@@ -168,13 +171,74 @@ export function construirEventos(datos: DatosCalendario, consulta: string): Even
   return eventos;
 }
 
+/** Minutos de una ventana semanal; si cruza la medianoche, suma hasta el día siguiente. */
+export function duracionVentana(ventana: { inicioMin: number; finMin: number }) {
+  return ventana.finMin > ventana.inicioMin ? ventana.finMin - ventana.inicioMin : 1440 - ventana.inicioMin + ventana.finMin;
+}
+
 /** Minutos por semana de cada categoría del horario fijo (lo que el grupo ve como "ocupado"). */
 export function minutosPorFiltro(eventos: EventoCalendario[]): Partial<Record<FiltroCalendario, number>> {
   const totales: Partial<Record<FiltroCalendario, number>> = {};
   for (const evento of eventos) {
     const ventana = evento.data?.semanal;
     if (!ventana || !evento.data) continue;
-    totales[evento.data.filtro] = (totales[evento.data.filtro] ?? 0) + ventana.finMin - ventana.inicioMin;
+    totales[evento.data.filtro] = (totales[evento.data.filtro] ?? 0) + duracionVentana(ventana);
   }
   return totales;
+}
+
+/**
+ * Horario semanal de un compañero (AGENTS.md 8.2): clases con el nombre del curso y bloques solo
+ * con su categoría (Laboral / Familiar-Personal). Nunca el detalle de un bloque ni las entregas.
+ */
+export function construirEventosCompanero(horario: {
+  horarios: { idHorario: number; diaSemana: number; horaInicio: Date; horaFin: Date; curso: string; idCurso: number }[];
+  bloques: { idBloqueOcupado: number; diaSemana: number; horaInicio: Date; horaFin: Date; categoria: "laboral" | "fam" }[];
+}): EventoCalendario[] {
+  const eventos: EventoCalendario[] = [];
+  for (const sesion of horario.horarios) {
+    const inicioMin = minutosDeTime(sesion.horaInicio);
+    const finMin = minutosDeTime(sesion.horaFin);
+    eventos.push({
+      id: `h-${sesion.idHorario}`,
+      title: aOracion(sesion.curso),
+      ...semanal(sesion.diaSemana, inicioMin, finMin),
+      color: colorCurso(sesion.idCurso),
+      readOnly: true,
+      data: {
+        filtro: "clases",
+        subtitulo: rango(inicioMin, finMin),
+        lineas: [
+          { icono: "hora", texto: `${DIAS_LARGOS[sesion.diaSemana - 1]} · ${rango(inicioMin, finMin)}` },
+          { icono: "repite", texto: "Clase · cada semana del ciclo" },
+        ],
+        acciones: [],
+        semanal: { diaSemana: sesion.diaSemana, inicioMin, finMin },
+      },
+    });
+  }
+  for (const bloque of horario.bloques) {
+    const inicioMin = minutosDeTime(bloque.horaInicio);
+    const finMin = minutosDeTime(bloque.horaFin);
+    const laboral = bloque.categoria === "laboral";
+    const categoria = laboral ? "Laboral" : "Familiar / Personal";
+    eventos.push({
+      id: `b-${bloque.idBloqueOcupado}`,
+      title: categoria,
+      ...semanal(bloque.diaSemana, inicioMin, finMin),
+      color: laboral ? COLOR_BLOQUE.laboral : COLOR_BLOQUE.familiar,
+      readOnly: true,
+      data: {
+        filtro: laboral ? "laboral" : "familiar",
+        subtitulo: rango(inicioMin, finMin),
+        lineas: [
+          { icono: "hora", texto: `${DIAS_LARGOS[bloque.diaSemana - 1]} · ${rango(inicioMin, finMin)}` },
+          { icono: "estado", texto: `Ocupado · ${categoria}` },
+        ],
+        acciones: [],
+        semanal: { diaSemana: bloque.diaSemana, inicioMin, finMin },
+      },
+    });
+  }
+  return eventos;
 }
