@@ -9,7 +9,7 @@ import { horaLima, timeAHora } from "@/lib/dates";
 import { diaMesCorto, diaSemanaISO, diasHasta, etiquetaFechaLarga, fechaEnZonaLimaISO, sumarDiasISO } from "@/lib/calendario";
 import { aOracion, colorCurso } from "@/lib/presentacion";
 import { nombreCorto } from "@/lib/nombres";
-import { PaginaCompleta, PageHeader } from "@/components/ui-app/page-header";
+import { EncabezadoMovil, PaginaCompleta, PageHeader } from "@/components/ui-app/page-header";
 import { TaskRow, type FilaTarea } from "@/components/ui-app/task-row";
 import { CourseDot } from "@/components/ui-app/course-dot";
 import { Toast } from "@/components/toast";
@@ -38,7 +38,7 @@ interface ItemAgenda {
 function Seccion({ titulo, cantidad, children }: { titulo: string; cantidad: number; children: React.ReactNode }) {
   return (
     <section aria-label={titulo}>
-      <h2 className="flex h-10 items-center gap-2 border-b bg-muted px-4 text-[13px] font-medium sm:px-8">
+      <h2 className="flex items-center gap-2 border-b border-border-subtle px-4 pt-5 pb-2 text-[13px] font-semibold text-muted-foreground sm:px-8 md:h-10 md:border-border md:bg-muted md:py-0 md:font-medium md:text-foreground">
         {titulo}
         <span className="font-normal text-subtle-foreground">{cantidad}</span>
       </h2>
@@ -175,14 +175,13 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
   };
   const guiaPendiente = !datosBienvenida.perfilCompleto || !datosBienvenida.cursosConHorario || !datosBienvenida.tieneGrupo;
   const mostrarBienvenida = guiaPendiente && galletas.get(COOKIE_BIENVENIDA)?.value !== "1";
+  const contextoInicio = `${etiquetaFechaLarga(hoyISO)}${resumen.length ? ` · ${resumen.join(" y ")}` : " · nada urgente por ahora"}`;
 
   return (
     <PaginaCompleta>
       <Toast mensaje={toast} />
-      <PageHeader
-        titulo="Tu trabajo"
-        contexto={<span>{etiquetaFechaLarga(hoyISO)}{resumen.length ? ` · ${resumen.join(" y ")}` : " · nada urgente por ahora"}</span>}
-      />
+      <EncabezadoMovil titulo="Tu trabajo" contexto={contextoInicio} />
+      <PageHeader titulo="Tu trabajo" contexto={<span>{contextoInicio}</span>} ocultarEnMovil />
       {mostrarBienvenida ? <Bienvenida datos={datosBienvenida} fechaTexto="Primeros pasos" /> : null}
       <div className="flex flex-1 flex-wrap">
         <div className="min-w-0 flex-[999_1_480px]">
@@ -206,17 +205,17 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
                   <li key={tarea.idTarea}>
                     <Link
                       href={`/grupos/${tarea.grupo.idGrupo}?tarea=${tarea.idTarea}`}
-                      className="flex min-h-[52px] items-center gap-3 border-b border-border-subtle px-4 py-2 text-[13px] hover:bg-muted sm:px-8"
+                      className="flex min-h-[60px] items-center gap-3 border-b border-border-subtle px-4 py-2.5 text-[15px] hover:bg-muted sm:px-8 md:min-h-[52px] md:py-2 md:text-[13px]"
                     >
                       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                         <span className="truncate">{tarea.titulo}</span>
-                        <span className="flex items-center gap-1.5 truncate text-xs text-subtle-foreground">
+                        <span className="flex items-center gap-1.5 truncate text-[13px] text-subtle-foreground md:text-xs">
                           {detalleGrupo(tarea.grupo)}
                           {tarea.asignado ? ` · ${nombreCorto(tarea.asignado.nombre, tarea.asignado.apellidos)} la terminó` : ""}
                           {tarea.fechaTerminada ? ` el ${diaMesCorto(fechaEnZonaLimaISO(tarea.fechaTerminada))}` : ""}
                         </span>
                       </span>
-                      <span className="inline-flex h-7 shrink-0 items-center rounded-md border border-input px-2.5 text-[13px]">Revisar</span>
+                      <span className="inline-flex h-8 shrink-0 items-center rounded-full border border-input px-3 text-[13px] md:h-7 md:rounded-md md:px-2.5">Revisar</span>
                     </Link>
                   </li>
                 ))}
@@ -239,7 +238,7 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
           </Seccion>
         </div>
 
-        <aside aria-label="Próximas fechas" className="flex-[1_1_300px] border-l px-4 py-5 sm:px-6 lg:max-w-[380px]">
+        <aside aria-label="Próximas fechas" className="flex-[1_1_300px] border-t px-4 py-5 sm:px-6 lg:max-w-[380px] lg:border-t-0 lg:border-l">
           <h2 className="mb-3 text-[13px] font-medium">Próximas fechas</h2>
           {proximas.length ? (
             <ul>

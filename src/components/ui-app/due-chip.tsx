@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import { diaYMes, fechaCorta, fechaCompleta } from "@/lib/formato-fecha";
 import { diasHasta } from "@/lib/calendario";
 
-/** Fecha limite en lenguaje natural (America/Lima): "Hoy, 11:59 pm", "Vencida hace 3 días", "Mar 17". */
+/** Fecha limite en lenguaje natural (America/Lima): "Hoy, 11:59pm", "Vencida hace 3 días", "Mar 17". */
 export function textoVencimiento(fecha: Date, ahora: Date, cerrada: boolean): { texto: string; tono: "normal" | "hoy" | "vencida" | "apagado" } {
   if (cerrada) return { texto: diaYMes(fecha, ahora), tono: "apagado" };
   const dias = diasHasta(fecha, ahora);

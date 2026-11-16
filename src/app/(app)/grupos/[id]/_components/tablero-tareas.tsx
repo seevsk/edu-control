@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -9,7 +9,8 @@ import {
   DndContext,
   DragOverlay,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useDraggable,
   useDroppable,
   useSensor,
@@ -38,7 +39,7 @@ function ContenidoTarjeta({ fila, ahora }: { fila: FilaTarea; ahora: Date }) {
   return (
     <>
       <div className="flex items-start justify-between gap-2">
-        <span className={cn("text-[13px] leading-[1.45]", cerrada && "text-muted-foreground")}>{fila.titulo}</span>
+        <span className={cn("text-[15px] leading-[1.45] md:text-[13px]", cerrada && "text-muted-foreground")}>{fila.titulo}</span>
         <UserAvatar usuario={fila.asignado} />
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
@@ -59,11 +60,11 @@ function Tarjeta({ fila, ahora, arrastrable, href }: { fila: FilaTarea; ahora: D
       {...listeners}
       className={cn(
         "rounded-lg border bg-card text-card-foreground shadow-card",
-        arrastrable && "cursor-grab touch-none active:cursor-grabbing",
+        arrastrable && "cursor-grab touch-manipulation select-none active:cursor-grabbing",
         isDragging && "opacity-40",
       )}
     >
-      <Link href={href} scroll={false} className="flex flex-col gap-2.5 p-3" draggable={false}>
+      <Link href={href} scroll={false} className="flex flex-col gap-2.5 p-3.5 md:p-3" draggable={false}>
         <ContenidoTarjeta fila={fila} ahora={ahora} />
       </Link>
     </article>
@@ -76,9 +77,10 @@ function Columna({ estado, cantidad, hrefNueva, children }: { estado: EstadoTare
     <section
       ref={setNodeRef}
       aria-label={ETIQUETA_ESTADO_TAREA[estado]}
-      className={cn("flex min-w-0 flex-col gap-2 rounded-[10px] bg-sidebar p-2 transition-colors dark:bg-transparent dark:p-1", isOver && "bg-accent dark:bg-accent")}
+      id={`columna-${estado}`}
+      className={cn("flex min-w-0 snap-start flex-col gap-2 rounded-[10px] bg-sidebar p-2 transition-colors dark:bg-transparent dark:p-1", isOver && "bg-accent dark:bg-accent")}
     >
-      <h2 className="flex h-8 items-center gap-2 px-1 text-[13px]">
+      <h2 className="flex h-8 items-center gap-2 px-1 text-[13px] max-md:hidden">
         <StatusIcon estado={estado} />
         <span className="font-medium">{ETIQUETA_ESTADO_TAREA[estado]}</span>
         <span className="text-subtle-foreground">{cantidad}</span>
@@ -89,6 +91,12 @@ function Columna({ estado, cantidad, hrefNueva, children }: { estado: EstadoTare
         ) : null}
       </h2>
       {children}
+      {hrefNueva ? (
+        <Link href={hrefNueva} scroll={false} className="flex h-12 items-center justify-center gap-1.5 rounded-[14px] border border-dashed border-input text-sm text-muted-foreground hover:text-foreground md:hidden">
+          <Plus className="size-4" aria-hidden />
+          Agregar tarea
+        </Link>
+      ) : null}
     </section>
   );
 }
@@ -119,9 +127,17 @@ export function TableroTareas({
   const router = useRouter();
   const [, iniciarTransicion] = useTransition();
   const [movidas, setMovidas] = useState<Record<number, EstadoTarea>>({});
+  const carril = useRef<HTMLDivElement>(null);
+  const [columnaVisible, setColumnaVisible] = useState(0);
+  function irAColumna(indice: number) {
+    const contenedor = carril.current;
+    const columna = contenedor?.querySelectorAll<HTMLElement>("[id^=columna-]")[indice];
+    if (contenedor && columna) contenedor.scrollTo({ left: columna.offsetLeft - contenedor.offsetLeft - 16, behavior: "smooth" });
+  }
   const [arrastrando, setArrastrando] = useState<number | null>(null);
   const sensores = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
     useSensor(KeyboardSensor),
   );
 
@@ -166,8 +182,35 @@ export function TableroTareas({
       onDragCancel={() => setArrastrando(null)}
       onDragEnd={alSoltar}
     >
-      <div className="overflow-x-auto px-4 py-4 sm:px-6">
-        <div className="grid grid-cols-[repeat(4,minmax(240px,1fr))] gap-4">
+      <div className="flex gap-2 overflow-x-auto px-4 pt-3 [scrollbar-width:none] md:hidden" role="tablist" aria-label="Columnas del tablero">
+        {ESTADOS_TAREA_ORDEN.map((estado, indice) => (
+          <button
+            key={estado}
+            type="button"
+            role="tab"
+            aria-selected={columnaVisible === indice}
+            onClick={() => irAColumna(indice)}
+            className={cn(
+              "flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium text-muted-foreground",
+              columnaVisible === indice && "bg-secondary text-foreground",
+            )}
+          >
+            <StatusIcon estado={estado} />
+            {ETIQUETA_ESTADO_TAREA[estado]}
+            <span className="text-subtle-foreground">{actuales.filter((fila) => fila.estado === estado && !ocultas.includes(fila)).length}</span>
+          </button>
+        ))}
+      </div>
+      <div
+        ref={carril}
+        onScroll={(evento) => {
+          const contenedor = evento.currentTarget;
+          const ancho = contenedor.querySelector<HTMLElement>("[id^=columna-]")?.offsetWidth ?? 1;
+          setColumnaVisible(Math.min(3, Math.round(contenedor.scrollLeft / (ancho + 12))));
+        }}
+        className="snap-x snap-mandatory overflow-x-auto scroll-px-4 px-4 py-4 [scrollbar-width:none] sm:px-6 md:snap-none"
+      >
+        <div className="grid grid-cols-[repeat(4,calc(100vw-3rem))] gap-3 md:grid-cols-[repeat(4,minmax(240px,1fr))] md:gap-4">
           {ESTADOS_TAREA_ORDEN.map((estado) => {
             const delEstado = actuales.filter((fila) => fila.estado === estado && !ocultas.includes(fila));
             return (

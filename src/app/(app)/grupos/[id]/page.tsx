@@ -1,7 +1,7 @@
 import { metadataDeGrupo } from "./_components/metadata";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronDown, Plus, X } from "lucide-react";
+import { ChevronDown, Plus, SlidersHorizontal, X } from "lucide-react";
 import { requerirSesion } from "@/server/auth/session";
 import { obtenerGrupoDelUsuario } from "@/server/services/grupo";
 import { listarTareasDelGrupo, obtenerTareaDelGrupo } from "@/server/services/tarea";
@@ -26,6 +26,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { EncabezadoGrupo } from "./_components/encabezado-grupo";
@@ -111,7 +113,7 @@ export default async function GrupoTareasPage({
   const responsableFiltrado = asignables.find((integrante) => integrante.idUsuario === asignado);
 
   return (
-    <PaginaCompleta>
+    <PaginaCompleta className={puedeGestionar ? "max-md:pb-20" : undefined}>
       <Toast mensaje={toast} />
       <EncabezadoGrupo
         datos={datos}
@@ -132,6 +134,7 @@ export default async function GrupoTareasPage({
       <div className="flex flex-wrap items-center gap-2 border-b px-4 py-2.5 sm:px-6">
         <ViewSwitcher vista={vista} hrefLista={href({ vista: undefined })} hrefTablero={href({ vista: "tablero" })} />
 
+        <div className="hidden items-center gap-2 md:flex">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className={estado ? "h-7" : "h-7 border-dashed text-muted-foreground"}>
@@ -183,12 +186,13 @@ export default async function GrupoTareasPage({
             <X className="size-3.5" aria-hidden />
           </Link>
         ) : null}
+        </div>
 
         {todas.length > 0 ? (
           <div className="ml-auto flex items-center gap-2.5 text-[13px] text-muted-foreground">
-            <span className="tabular-nums">{completadas} de {todas.length} completadas</span>
+            <span className="tabular-nums">{completadas} de {todas.length}<span className="max-md:hidden"> completadas</span></span>
             <div
-              className="h-1 w-28 overflow-hidden rounded-full bg-secondary"
+              className="h-1 w-14 overflow-hidden rounded-full bg-secondary md:w-28"
               role="progressbar"
               aria-label="Avance del grupo según el peso de las tareas"
               aria-valuenow={Math.round((avance ?? 0) * 100)}
@@ -200,7 +204,54 @@ export default async function GrupoTareasPage({
             </div>
           </div>
         ) : null}
+
+        {/* Móvil: un solo botón con los dos filtros. */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className={`-mr-2 size-10 md:hidden ${estado || asignado ? "text-foreground" : "text-muted-foreground"}`} aria-label={estado || asignado ? "Filtrar (hay filtros activos)" : "Filtrar"}>
+              <SlidersHorizontal aria-hidden />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-60">
+            <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Estado</DropdownMenuLabel>
+            {[...ESTADOS_TAREA_ORDEN, "descartada" as const].map((opcion) => (
+              <DropdownMenuItem key={opcion} asChild className="min-h-10">
+                <Link href={href({ estado: opcion })} scroll={false}><StatusIcon estado={opcion} conTexto /></Link>
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Responsable</DropdownMenuLabel>
+            {asignables.map((integrante) => (
+              <DropdownMenuItem key={integrante.idUsuario} asChild className="min-h-10">
+                <Link href={href({ asignado: String(integrante.idUsuario) })} scroll={false}>
+                  <UserAvatar usuario={integrante.usuario} tamano="xs" />
+                  {nombreCorto(integrante.usuario.nombre, integrante.usuario.apellidos)}
+                </Link>
+              </DropdownMenuItem>
+            ))}
+            {estado || asignado ? (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild className="min-h-10">
+                  <Link href={href({ estado: undefined, asignado: undefined })} scroll={false}><X aria-hidden />Quitar filtros</Link>
+                </DropdownMenuItem>
+              </>
+            ) : null}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
+
+      {puedeGestionar ? (
+        <Link
+          // El espacio para que el botón no tape la última fila lo deja <PaginaCompleta> (pb-20 en móvil).
+          href={href({ nueva: "1" })}
+          scroll={false}
+          aria-label="Nueva tarea"
+          className="fixed right-4 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-30 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-pop md:hidden"
+        >
+          <Plus className="size-6" aria-hidden />
+        </Link>
+      ) : null}
 
       {error && !abrirNueva && !tareaAbierta ? (
         <p role="alert" className="mx-4 mt-3 rounded-md bg-destructive/10 px-3 py-2 text-[13px] text-destructive sm:mx-6">{error}</p>

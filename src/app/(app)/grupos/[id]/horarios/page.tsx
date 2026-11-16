@@ -15,9 +15,10 @@ import { Toast } from "@/components/toast";
 import { Button } from "@/components/ui/button";
 import { MarcoGrupo } from "../_components/marco-grupo";
 import { MapaCalor } from "./_components/mapa-calor";
+import { HorariosMovil } from "./_components/horarios-movil";
 
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "set", "oct", "nov", "dic"];
-/** Las mejores ventanas se buscan en un horario razonable: 8 am – 8 pm, de lunes a sábado. */
+/** Las mejores ventanas se buscan en un horario razonable: 8:00am - 8:00pm, de lunes a sábado. */
 const VENTANA_REUNION = { desdeMin: 8 * 60, hastaMin: 20 * 60, pasoMin: 30 };
 const MAX_SUGERENCIAS = 3;
 
@@ -141,10 +142,10 @@ export default async function HorariosGrupoPage({
               </Button>
             ) : null}
             <span className="flex">
-              <Button variant="ghost" size="icon" className="size-8" asChild>
+              <Button variant="ghost" size="icon" className="size-11 md:size-8" asChild>
                 <Link href={hrefSemana(sumarDiasISO(lunesISO, -7))} aria-label="Semana anterior"><ChevronLeft aria-hidden /></Link>
               </Button>
-              <Button variant="ghost" size="icon" className="size-8" asChild>
+              <Button variant="ghost" size="icon" className="size-11 md:size-8" asChild>
                 <Link href={hrefSemana(sumarDiasISO(lunesISO, 7))} aria-label="Semana siguiente"><ChevronRight aria-hidden /></Link>
               </Button>
             </span>
@@ -152,7 +153,7 @@ export default async function HorariosGrupoPage({
 
           <section aria-labelledby="titulo-mejores">
             <h3 id="titulo-mejores" className="mb-2.5 text-[13px] font-medium">
-              Mejores horarios para reunirse <span className="font-normal text-subtle-foreground">· de 8 am a 8 pm, de lunes a sábado</span>
+              Mejores horarios para reunirse <span className="font-normal text-subtle-foreground">· de 8:00am a 8:00pm, de lunes a sábado</span>
             </h3>
             {sugerencias.length ? (
               <div className="flex flex-wrap gap-3">
@@ -186,7 +187,18 @@ export default async function HorariosGrupoPage({
             )}
           </section>
 
-          <section aria-labelledby="titulo-mapa">
+          <section aria-label="Disponibilidad del grupo por día" className="md:hidden">
+            <HorariosMovil
+              dias={mapa.map((franjas, indice) => ({ fechaISO: fechaDe(indice + 1), corto: DIAS_CORTOS[indice], numero: Number(fechaDe(indice + 1).slice(8)), ocupados: franjas.map((franja) => franja.ocupados) }))}
+              franjas={mapa[0].map((franja) => ({ inicioMin: franja.inicioMin, finMin: franja.finMin }))}
+              personas={personas.map((persona) => ({ idUsuario: persona.idUsuario, corto: persona.idUsuario === sesion.idUsuario ? "Tú" : persona.corto }))}
+              idGrupo={idGrupo}
+              puedeProgramar={puedeProgramar}
+              hoyISO={hoyISO}
+            />
+          </section>
+
+          <section aria-labelledby="titulo-mapa" className="max-md:hidden">
             <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
               <h3 id="titulo-mapa" className="flex-1 text-[13px] font-medium">Disponibilidad del grupo</h3>
               <Leyenda clase="bg-estado-completada/50 dark:bg-estado-completada/55" texto="Todos libres" />

@@ -28,15 +28,17 @@ export function TaskRow({ tarea, href, ahora, alta = false, conAvatar = true }: 
         href={href}
         scroll={false}
         className={cn(
-          "flex items-center gap-3 border-b border-border-subtle px-4 text-[13px] hover:bg-muted focus-visible:bg-muted sm:px-6",
-          alta ? "min-h-[52px] py-2" : "min-h-10 py-1.5",
+          "flex items-center gap-3 border-b border-border-subtle px-4 text-[15px] hover:bg-muted focus-visible:bg-muted sm:px-6 md:text-[13px]",
+          // Móvil: filas de 60 px (objetivo táctil holgado); desde md, densas como en escritorio.
+          alta ? "min-h-[60px] py-2.5 md:min-h-[52px] md:py-2" : "min-h-[60px] py-2.5 md:min-h-10 md:py-1.5",
           cerrada && "text-muted-foreground",
         )}
       >
         <StatusIcon estado={tarea.estado} />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className={cn("truncate", tarea.estado === "descartada" && "line-through")}>{tarea.titulo}</span>
-          {tarea.detalle ? <span className="flex items-center gap-1.5 truncate text-xs text-subtle-foreground">{tarea.detalle}</span> : null}
+          {tarea.detalle ? <span className="flex items-center gap-1.5 truncate text-[13px] text-subtle-foreground md:text-xs">{tarea.detalle}</span> : null}
+          {tarea.nota ? <span className="text-[13px] text-estado-en-revision sm:hidden">{tarea.nota}</span> : null}
         </span>
         {tarea.nota ? <span className="hidden shrink-0 text-xs text-estado-en-revision sm:inline">{tarea.nota}</span> : null}
         <DueChip fecha={tarea.fechaLimite} cerrada={cerrada} ahora={ahora} />
@@ -62,7 +64,7 @@ export function StatusGroup({
 }) {
   return (
     <section aria-label={ETIQUETA_ESTADO_TAREA[estado]}>
-      <h2 className="flex h-9 items-center gap-2 border-b bg-muted px-4 text-[13px] sm:px-6">
+      <h2 className="flex h-10 items-center gap-2 border-b bg-muted px-4 text-[13px] sm:px-6 md:h-9">
         <StatusIcon estado={estado} />
         <span className="font-medium">{ETIQUETA_ESTADO_TAREA[estado]}</span>
         <span className="text-subtle-foreground">{cantidad}</span>
@@ -71,7 +73,7 @@ export function StatusGroup({
             href={hrefNueva}
             scroll={false}
             aria-label={`Nueva tarea en ${ETIQUETA_ESTADO_TAREA[estado]}`}
-            className="ml-auto flex size-6 items-center justify-center rounded-md text-subtle-foreground hover:bg-accent hover:text-foreground"
+            className="-mr-2.5 ml-auto flex size-10 items-center justify-center rounded-md text-subtle-foreground hover:bg-accent hover:text-foreground md:mr-0 md:size-6"
           >
             <Plus className="size-4" aria-hidden />
           </Link>

@@ -26,8 +26,9 @@ Nació como proyecto del curso *Proyecto Tecnológico* (NRC 3708, ISIL, metodolo
 ## 2. Estado actual
 
 - Repositorio: `seevsk/edu-control` (GitHub). Ramas: `main` y `develop`.
-- Solo existe el scaffold de `create-next-app` (Next.js App Router, TypeScript, ESLint, Tailwind CSS, carpeta `src/`, alias `@/*`).
-- **Aún no existe:** base de datos, esquema Prisma, autenticación ni ninguna funcionalidad.
+- Next.js (App Router, TypeScript, carpeta `src/`, alias `@/*`) con PostgreSQL + Prisma, login con Google y sesión propia.
+- **Implementado (develop, 2026-11-16):** cursos con horario y evaluaciones (con estados e historial), grupos con invitaciones y salida voluntaria, tareas con tablero, lista, detalle, historial y tiempos, métricas del grupo, Bandeja (notificaciones e invitaciones) con correo por Resend, calendario, tiempo ocupado (incluido horario excepcional), disponibilidad y horarios del grupo, reuniones, perfil y perfiles de otros, buscador de personas, guía de bienvenida, SEO y demo en Render.
+- **Pendiente:** ver sección 13.
 - El backlog vive en Azure DevOps, pero **puede estar desactualizado**. La referencia de historias de usuario es el Excel del equipo (PBIs v1.3) más lo definido en este archivo. Si hay conflicto, **gana este archivo**, porque refleja decisiones posteriores.
 
 ## 3. Alcance del MVP
@@ -74,6 +75,7 @@ Nació como proyecto del curso *Proyecto Tecnológico* (NRC 3708, ISIL, metodolo
 | Capa | Tecnología |
 |---|---|
 | Frontend | Next.js (App Router) + React + Tailwind CSS |
+| Componentes e íconos | shadcn/ui (sobre Radix), lucide-react, calendario ReUI (`src/components/reui`), dnd-kit (tablero), cmdk, sonner, date-fns |
 | Backend | TypeScript dentro del mismo proyecto Next.js (Route Handlers y Server Actions). **No hay backend separado ni CORS** |
 | Base de datos | PostgreSQL |
 | ORM y migraciones | Prisma |
@@ -126,19 +128,24 @@ Estructura sugerida (adáptala si hay una razón, y actualiza este archivo):
 src/
   app/                    # Rutas (App Router)
     (auth)/login/
-    (app)/                # Área autenticada: inicio, cursos, calendario, grupos, invitaciones, perfil
+    (app)/                # Área autenticada: inicio, bandeja, calendario, reuniones, cursos, grupos, usuarios, perfil
     api/                  # Route Handlers, solo si hacen falta
   server/
-    auth/                 # Sesión y helpers de usuario autenticado
+    auth/                 # Sesión, helpers de usuario autenticado y acceso por recurso (acceso-rutas.ts, usado en src/proxy.ts)
     db/                   # Cliente de Prisma
     services/             # Reglas de negocio (grupos, tareas, notificaciones, disponibilidad, métricas)
     email/                # Interfaz EmailSender + implementaciones (consola, Resend)
     notifications/        # Plantillas por tipo de notificación
   lib/
     validation/           # Esquemas Zod compartidos
-    dates/                # Conversión UTC <-> America/Lima y utilidades de horario
+    dates.ts              # Conversión UTC <-> America/Lima
+    formato-fecha.ts      # Cómo se muestran fechas y horas (ver 9)
+    calendario.ts, disponibilidad.ts, metricas.ts, estado-tarea.ts, estado-evaluacion.ts, bandeja.ts  # Reglas puras
     env.ts
   components/
+    ui/                   # Componentes de shadcn/ui (no editar a mano salvo ajustes de estilo)
+    ui-app/               # Componentes propios de EduControl
+    marca/                # Monograma y logotipo
 prisma/
   schema.prisma
   migrations/
@@ -182,7 +189,7 @@ Reglas de arquitectura:
 
 ### Convenciones para Prisma
 
-- Modelos en PascalCase y en español: `Usuario`, `Perfil`, `BloqueOcupado`, `Curso`, `HorarioCurso`, `Evaluacion`, `Grupo`, `GrupoIntegrante`, `Tarea`, `TareaHistorial`, `Notificacion`.
+- Modelos en PascalCase y en español: `Usuario`, `Perfil`, `BloqueOcupado`, `Curso`, `HorarioCurso`, `Evaluacion`, `EvaluacionHistorial`, `Grupo`, `GrupoIntegrante`, `Tarea`, `TareaHistorial`, `Notificacion`, `Reunion`, `ReunionAsistente`.
 - Campos en camelCase (`idUsuario`, `googleId`), mapeados al esquema del `.dbml` con `@map` / `@@map` (columnas y tablas en snake_case).
 - **Sin tildes ni ñ en ningún identificador** (Prisma no las acepta).
 - Los conjuntos cerrados (estado de tarea, rol, estado de invitación, tipo de bloque, tipo de cuenta, modalidad, estado del grupo, estado del correo) se pueden modelar como `enum` de Prisma conservando exactamente los valores del `.dbml`.
@@ -350,31 +357,33 @@ Usa **Azure DevOps** como referencia visual: se siente profesional, densa en inf
 
 **Estructura general**
 
-- Barra superior: nombre del producto, búsqueda, campana de notificaciones y avatar.
+- Barra superior: migas de pan y buscador de personas (Ctrl K). El nombre del producto y el usuario (menú con tema y cerrar sesión) están en la barra lateral, que se puede colapsar.
+- **Móvil y tablet (rama `feature/ui-mobile`, Claude Design):** la barra lateral completa solo desde `lg` (1024 px). En tablet (`md`) hay un riel de 80 px (Menú, Inicio, Grupos, Calendario, Bandeja, Cursos y avatar) y la búsqueda es un ícono. En móvil (<768 px, `useEsMovil`) hay una barra inferior con Inicio, Grupos, Calendario, Bandeja y Tú (`/tu`: perfil, cursos, reuniones y cuenta), títulos de 30 px con acciones de 44 px arriba a la derecha (`EncabezadoMovil`), filtros como chips, formularios y detalles en hojas inferiores, tablero de una columna por vez y FAB solo en el grupo. Calendario y Horarios del grupo se ven como franja de días más la agenda o los tramos del día elegido. Objetivos táctiles de 44 px como mínimo.
 - Barra lateral izquierda con íconos: Inicio, Bandeja (con contador), Calendario, Reuniones, Cursos, Grupos y Perfil. **No hay módulo Invitaciones**: `/invitaciones` redirige a la Bandeja, filtro Invitaciones (pendientes con Aceptar/Rechazar e historial).
 - **Bandeja (2026-11-16):** cada aviso se lista con un título corto (qué pasó) y su objeto (sobre qué); el detalle va al panel derecho: quién lo hizo, cuándo, el motivo, y los datos de la tarea, invitación, reunión o evaluación (`src/lib/bandeja.ts`).
 - **Marca:** monograma "e" de Claude Design (`src/components/marca/monograma.tsx`, `src/app/icon.svg`). El tema arranca en claro.
 - **SEO:** cada página define su título (`%s · EduControl`). Solo `/login` se indexa; el resto lleva `noindex` y `robots.txt` lo bloquea. Hay `sitemap.xml`, `manifest`, imagen Open Graph e ícono de Apple generados con `next/og`.
-- Migas de pan (*breadcrumbs*) y pestañas dentro de cada página. Ejemplo, página de un grupo: **Resumen · Tareas · Integrantes · Actividad**.
-- Franjas informativas en azul claro para avisos (por ejemplo, "Tienes 2 invitaciones pendientes").
+- Migas de pan (*breadcrumbs*) y pestañas dentro de cada página. Página de un grupo: **Tareas · Integrantes · Horarios · Reuniones · Actividad · Configuración**.
+- Detalles y ediciones en paneles laterales o diálogos controlados por la URL (`?tarea=`, `?evaluacion=`, `?editar=1`), para que se puedan compartir y cerrar con "atrás".
+- Sin textos de ayuda ni avisos explicativos de relleno: la interfaz debe entenderse sola.
 
-**Tarjetas de curso** (como las tarjetas de proyecto de Azure DevOps): cuadrado de color con las **iniciales** del curso, nombre, código, docente, chip de modalidad, próxima clase y próximas evaluaciones, y un menú `⋯`. El color se **deriva de un hash del nombre o código**; no hay columna de color en la base de datos.
+**Cursos:** tabla con filtro en vivo (curso, docente, modalidad, horario, próxima evaluación, grupos) y alta en panel lateral. Cada curso tiene un color propio que **se deriva de su id** (`src/lib/color-curso.ts`); no hay columna de color en la base de datos.
 
 **Tareas**
 
 - Vista de **tablero** tipo Azure Boards con cuatro columnas (Pendiente, En progreso, En revisión, Completada) y vista de **lista/tabla** con columnas Título, Asignado a (avatar y nombre), Estado, Peso y Fecha límite.
 - Para que el tablero no se acumule (como Jira): la columna Completada muestra solo lo completado en los últimos 14 días, con un enlace a las anteriores en la lista. Las `descartada` no aparecen en el tablero ni en la lista por defecto; se ven filtrando por estado "Descartada".
 - Etiquetas calculadas en tarjetas y lista: "Vencida" (abierta con fecha pasada) y "Entregada con atraso" (completada después de su fecha vigente).
-- Barra de filtros con búsqueda por palabra y filtros desplegables (asignado, estado).
-- Estado con **punto de color + texto**, como en Azure DevOps: pendiente gris, en progreso azul, en revisión ámbar, completada verde, descartada gris atenuado.
+- Barra de filtros con desplegables (estado y responsable). El tablero se mueve arrastrando; las acciones que piden motivo se hacen en el detalle.
+- Estado con **ícono de forma + color** (`StatusIcon`): pendiente gris (círculo vacío), en progreso ámbar (mitad), en revisión violeta (tres cuartos), completada verde (check), descartada gris atenuado (tachado). Las evaluaciones usan los mismos íconos.
 
 **Avance:** barra de progreso o dona para el avance del grupo; carga y cumplimiento por integrante lado a lado, sin ranking.
 
 **Estilo visual** (valores orientativos, defínelos como variables CSS o tokens de Tailwind para poder ajustarlos):
 
-- Tema claro primero; deja preparados los tokens para un tema oscuro futuro.
-- Color primario azul cercano a `#0078D4`; superficies blancas; neutros muy claros para el fondo; bordes finos y sombras sutiles.
-- Radios pequeños (2–4 px), texto base de 14 px, tipografía **Poppins** (via `next/font/google`, self-hosted) con fallback a `"Segoe UI", system-ui, sans-serif`.
+- Paleta **"Tinta"** (estructura tipo Plane/Jira, diseñada en Claude Design): tema claro por defecto y tema oscuro completo, elegibles por el usuario. Tokens en `src/app/globals.css`.
+- Primario tinta (`#18181b` en claro, `#ededed` en oscuro); el único azul es el anillo de foco. Superficies blancas, barra lateral gris muy claro, bordes finos y sombras suaves solo en el tema claro.
+- Radio base de 8 px, texto base de 13–14 px, tipografía **Geist** y **Geist Mono** (via `next/font/google`).
 - Componentes densos y compactos, con estados de carga (*skeletons*), estados vacíos y mensajes de error claros.
 
 **Reglas transversales**
@@ -382,7 +391,7 @@ Usa **Azure DevOps** como referencia visual: se siente profesional, densa en inf
 - **Responsivo y móvil primero:** los estudiantes consultarán desde el celular.
 - Textos de la interfaz **en español (Perú)**. Fechas en lenguaje natural y relativas a hoy, siempre en America/Lima: "Hoy", "Mañana", "Mar 24", "Mar 24 nov" (de otro año: "Lun 5 nov 2025"); la fecha completa ("martes 24 de noviembre de 2026, 11:59pm") va en el `title` y en los correos (`src/lib/formato-fecha.ts#fechaCorta` y `#fechaCompleta`). Horas en 12 h, siempre con minutos y sin espacio: `7:00pm`, rangos `7:00pm - 9:30pm` (`src/lib/formato-fecha.ts#formatoHora` y `#rangoHoras`, pedido del usuario 2026-11-16).
 - Accesibilidad básica: contraste suficiente, navegación por teclado y foco visible.
-- No agregues una librería de componentes ni de íconos sin consultarlo.
+- Usa los componentes de shadcn/ui y los íconos de lucide-react ya instalados; no agregues otra librería de componentes, íconos o animaciones sin consultarlo.
 
 ## 10. Convenciones de código y de trabajo
 
@@ -394,7 +403,7 @@ Usa **Azure DevOps** como referencia visual: se siente profesional, densa en inf
 - **Seguridad:** no registres secretos en logs; no confíes en el navegador para saber quién es el usuario; sanea y valida cualquier URL que un usuario pueda ingresar.
 - **Git:** ramas `main` (producción futura), `develop` (integración y staging futuro) y `feature/<nombre>`. Commits con *Conventional Commits*, descripción en español. **No hagas commit ni push sin que el usuario lo pida.**
 - **Dependencias:** no agregues ninguna sin consultar; prefiere lo que ya está (Next.js, Prisma, Zod, Tailwind).
-- **Pruebas:** no hay framework de pruebas definido; pregunta antes de agregar uno. Mantén las reglas de negocio en funciones puras para que puedan probarse.
+- **Pruebas:** no hay framework de pruebas; pregunta antes de agregar uno. Hay dos verificaciones con `node:assert` que usan una base temporal: `npm run verificar:tareas-grupos` (reglas de servicio) y `npm run verificar:acciones-tarea-http` (la app compilada por HTTP; requiere `npm run build`). Ver `docs/verificacion-tareas-grupos.md`. Mantén las reglas de negocio en funciones puras para que puedan probarse.
 - Trabaja en **pasos pequeños y verificables**. Antes de dar algo por terminado, corre `npx tsc --noEmit` y `npm run lint`.
 
 ## 11. Entorno local y comandos
@@ -459,7 +468,7 @@ Datos de ejemplo (`prisma/seed.ts`, **solo desarrollo**): varios usuarios de pru
 ## 13. Decisiones pendientes (pregunta antes de implementar)
 
 - **Dominio definitivo de producción:** la demo ya puede usar un dominio temporal verificado mediante `EMAIL_FROM`; antes de producción se debe elegir y verificar el dominio definitivo del equipo.
-- **Framework de pruebas**, librería de formularios, librería de componentes e íconos, y React Compiler.
+- **Framework de pruebas**, librería de formularios y React Compiler (los componentes e íconos ya se decidieron: ver sección 4).
 - **Recordatorios de evaluaciones (pendiente, 2026-11-16):** avisos en la Bandeja y por correo a 7 y 3 días del cierre (no si ya está terminada). Falta decidir cómo se disparan: ruta protegida llamada por GitHub Actions, revisión al entrar a la app, o ambas. El correo de "evaluación creada" ya funciona.
 - **Privacidad:** con usuarios reales aplica la Ley 29733 de Protección de Datos Personales (Perú). Antes de abrir la app hacen falta política de privacidad, términos y consentimiento; lo decide el equipo, no lo improvises.
 
@@ -475,7 +484,7 @@ Datos de ejemplo (`prisma/seed.ts`, **solo desarrollo**): varios usuarios de pru
 - No guardes cifras derivadas (avance, carga, cumplimiento, tiempo libre) en la base de datos.
 - No hardcodees URLs, dominios ni secretos; no subas `.env` a Git.
 - No agregues dependencias, columnas o tablas fuera de lo definido sin preguntar.
-- No hagas commit ni push sin que el usuario lo pida. tomate tu tiempo en leer todo el plan, si necesitas dudas en algo avisame.
+- No hagas commit ni push sin que el usuario lo pida.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

@@ -38,6 +38,7 @@ import { cn } from "@/lib/utils";
 import type { EventoCalendario } from "./eventos";
 import { FILTROS_FECHAS, FILTROS_HORARIO, type DatoEvento, type FiltroCalendario, type IconoLinea, type ModoCalendario } from "./tipos-calendario";
 import { NuevoTiempoOcupado, type BorradorTiempo } from "./nuevo-tiempo-ocupado";
+import { CalendarioMovil } from "./calendario-movil";
 
 const ZONA = "America/Lima";
 const DIAS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
@@ -180,7 +181,18 @@ export function CalendarioVista({
     apiRef.current?.clearSelection();
   }
 
+  const filtrosChips = soloLectura ? FILTROS_COMPANERO : [...FILTROS_HORARIO, ...FILTROS_FECHAS];
+
   return (
+    <>
+    <div className="-mx-4 -mt-5 md:hidden">
+      <CalendarioMovil
+        eventos={visibles}
+        fecha={fecha}
+        hoyISO={hoyISO}
+        hrefAgregar={soloLectura ? undefined : `${rutaBase}?modo=${modo}&fecha=${fecha}&nuevoBloque=1`}
+      />
+    </div>
     <EventCalendar<DatoEvento>
       apiRef={apiRef}
       events={visibles}
@@ -223,14 +235,35 @@ export function CalendarioVista({
         monthCell: "border-border",
       }}
       todayClassName="bg-foreground/[0.02] data-today:text-foreground"
-      className="flex-row flex-wrap items-start gap-6 text-xs"
+      className="flex-row flex-wrap items-start gap-6 text-xs max-md:hidden"
       onPointerUpCapture={(evento: ReactPointerEvent<HTMLDivElement>) => {
         ultimoPuntero.current = { x: evento.clientX, y: evento.clientY };
       }}
     >
-      {panelVisible ? <Lateral hoyISO={hoyISO} minutos={minutos} ocultos={ocultos} setOcultos={setOcultos} soloLectura={soloLectura} /> : null}
+      {/* Tablet (md–lg): sin panel izquierdo; sus filtros van como chips sobre la grilla. */}
+      {panelVisible ? <div className="contents max-lg:hidden"><Lateral hoyISO={hoyISO} minutos={minutos} ocultos={ocultos} setOcultos={setOcultos} soloLectura={soloLectura} /></div> : null}
       <div className="flex min-w-0 flex-[999_1_640px] flex-col">
         <BarraCalendario fecha={fecha} panelVisible={panelVisible} onAlternarPanel={() => setPanelVisible((visible) => !visible)} soloLectura={soloLectura} />
+        <div role="group" aria-label="Filtros" className="-mt-1 mb-3 flex gap-1.5 overflow-x-auto [scrollbar-width:none] lg:hidden">
+          {filtrosChips.map((filtro) => {
+            const activo = !ocultos.includes(filtro.clave);
+            return (
+              <button
+                key={filtro.clave}
+                type="button"
+                aria-pressed={activo}
+                onClick={() => setOcultos(activo ? [...ocultos, filtro.clave] : ocultos.filter((otro) => otro !== filtro.clave))}
+                className={cn(
+                  "flex h-9 shrink-0 items-center gap-2 rounded-full border px-3 text-[13px] whitespace-nowrap transition-colors",
+                  activo ? "border-input text-foreground" : "border-dashed border-input text-subtle-foreground",
+                )}
+              >
+                <span className="size-2 rounded-[2px]" style={activo ? { background: filtro.color } : { boxShadow: `inset 0 0 0 1.5px ${filtro.color}` }} aria-hidden />
+                {filtro.texto}
+              </button>
+            );
+          })}
+        </div>
         <div className="overflow-hidden rounded-[10px] border bg-background">
           <EventCalendarContent />
         </div>
@@ -248,6 +281,7 @@ export function CalendarioVista({
         />
       ) : null}
     </EventCalendar>
+    </>
   );
 }
 
@@ -308,7 +342,7 @@ function BarraCalendario({ fecha, panelVisible, onAlternarPanel, soloLectura }: 
       <Button
         variant="ghost"
         size="icon"
-        className="size-[30px] text-muted-foreground"
+        className="size-[30px] text-muted-foreground max-lg:hidden"
         aria-label={panelVisible ? "Ocultar panel de fechas y filtros" : "Mostrar panel de fechas y filtros"}
         title={panelVisible ? "Ocultar panel" : "Mostrar panel"}
         aria-expanded={panelVisible}

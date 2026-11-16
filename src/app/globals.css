@@ -277,9 +277,12 @@
   outline-offset: 2px;
 }
 
-* {
-  scrollbar-color: var(--input) transparent;
-  scrollbar-width: thin;
+/* En la capa base para que utilidades como [scrollbar-width:none] (pestañas y chips deslizables) puedan anularlo. */
+@layer base {
+  * {
+    scrollbar-color: var(--input) transparent;
+    scrollbar-width: thin;
+  }
 }
 
 @media (prefers-reduced-motion: no-preference) {

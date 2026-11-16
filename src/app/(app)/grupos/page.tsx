@@ -8,7 +8,7 @@ import { crearGrupoAction } from "./actions";
 import { SubmitButton } from "@/components/submit-button";
 import { CampoSelect } from "@/components/ui-app/campo-select";
 import { Toast } from "@/components/toast";
-import { PaginaCompleta, PageHeader } from "@/components/ui-app/page-header";
+import { ACCION_MOVIL, ChipsFiltro, EncabezadoMovil, PaginaCompleta, PageHeader } from "@/components/ui-app/page-header";
 import { PanelLateral } from "@/components/ui-app/panel-lateral";
 import { CourseDot } from "@/components/ui-app/course-dot";
 import { UserAvatar } from "@/components/ui-app/user-avatar";
@@ -45,7 +45,25 @@ export default async function GruposPage({
   return (
     <PaginaCompleta>
       <Toast mensaje={toast} />
+      <EncabezadoMovil
+        titulo="Grupos"
+        contexto={`${activos.length} ${activos.length === 1 ? "activo" : "activos"}`}
+        acciones={
+          <Link href="/grupos?nuevo=1" scroll={false} aria-label="Crear grupo" className={ACCION_MOVIL}>
+            <Plus aria-hidden />
+          </Link>
+        }
+      />
+      <ChipsFiltro
+        etiqueta="Estado de los grupos"
+        className="border-b pb-3 md:hidden"
+        opciones={[
+          { href: "/grupos", texto: `Activos · ${activos.length}`, activa: !verFinalizados },
+          { href: "/grupos?vista=finalizados", texto: `Finalizados · ${finalizados.length}`, activa: verFinalizados },
+        ]}
+      />
       <PageHeader
+        ocultarEnMovil
         titulo="Grupos"
         contexto={<span>{activos.length} {activos.length === 1 ? "trabajo grupal activo" : "trabajos grupales activos"}</span>}
         acciones={
@@ -71,7 +89,28 @@ export default async function GruposPage({
             const curso = grupo.evaluacion?.curso ?? null;
             return (
               <li key={grupo.idGrupo}>
-                <Link href={`/grupos/${grupo.idGrupo}`} className="flex min-h-[52px] items-center gap-4 border-b border-border-subtle px-4 py-2 text-[13px] hover:bg-muted sm:px-8">
+                <Link href={`/grupos/${grupo.idGrupo}`} className="block border-b border-border-subtle px-4 py-3.5 hover:bg-muted md:hidden">
+                  <span className="flex items-start gap-2">
+                    <span className="min-w-0 flex-1 truncate text-base font-semibold">{aOracion(grupo.nombre)}</span>
+                    <DueChip fecha={grupo.fechaLimite} cerrada={grupo.estado === "finalizado"} ahora={ahora} />
+                  </span>
+                  <span className="mt-1 flex items-center gap-1.5 truncate text-[13px] text-subtle-foreground">
+                    {curso ? <><CourseDot idCurso={curso.idCurso} />{aOracion(curso.nombre)} · </> : null}
+                    {rol ? ETIQUETAS_ROL[rol] : null}
+                  </span>
+                  <span className="mt-3 flex items-center gap-3">
+                    <span className="h-1 flex-1 overflow-hidden rounded-full bg-secondary" aria-hidden>
+                      <span className="block h-full rounded-full bg-estado-completada" style={{ width: `${vigentes.length ? Math.round((completadas / vigentes.length) * 100) : 0}%` }} />
+                    </span>
+                    <span className="text-xs text-muted-foreground tabular-nums">{vigentes.length ? `${completadas} de ${vigentes.length}` : "Sin tareas"}</span>
+                    <span className="flex">
+                      {integrantes.slice(0, MAX_AVATARES).map((integrante, indice) => (
+                        <UserAvatar key={integrante.idUsuario} usuario={integrante.usuario} className={indice > 0 ? "-ml-1.5 ring-2 ring-background" : "ring-2 ring-background"} />
+                      ))}
+                    </span>
+                  </span>
+                </Link>
+                <Link href={`/grupos/${grupo.idGrupo}`} className="hidden min-h-[52px] items-center gap-4 border-b border-border-subtle px-4 py-2 text-[13px] hover:bg-muted sm:px-8 md:flex">
                   <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <span className="truncate font-medium">{aOracion(grupo.nombre)}</span>
                     <span className="flex items-center gap-1.5 truncate text-xs text-subtle-foreground">

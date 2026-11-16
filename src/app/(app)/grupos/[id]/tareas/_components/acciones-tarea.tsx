@@ -12,7 +12,10 @@ const TEXTOS_MOTIVO: Record<AccionConMotivo, { confirmar: string; enviando: stri
 };
 
 const BOTON_SECUNDARIO =
-  "rounded-md border border-border-strong px-3 py-1.5 text-xs font-medium text-text hover:bg-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
+  "rounded-md border border-border-strong px-3 py-1.5 text-xs font-medium text-text hover:bg-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary max-md:h-11 max-md:px-4 max-md:text-sm";
+/** Móvil: la acción principal ocupa todo el ancho, como en Claude Design ("Móvil · Tarea"). */
+const PRINCIPAL_MOVIL =
+  "max-md:h-12 max-md:w-full max-md:justify-center max-md:rounded-xl max-md:border-transparent max-md:bg-primary max-md:text-[15px] max-md:font-semibold max-md:text-primary-foreground";
 
 export function AccionesTarea({
   idGrupo,
@@ -52,7 +55,7 @@ export function AccionesTarea({
               <summary
                 className={`w-fit cursor-pointer list-none group-open:hidden [&::-webkit-details-marker]:hidden ${
                   destructiva
-                    ? "rounded-md px-3 py-1.5 text-xs font-medium text-danger hover:bg-danger/10"
+                    ? "rounded-md px-3 py-1.5 text-xs font-medium text-danger hover:bg-danger/10 max-md:flex max-md:h-11 max-md:items-center max-md:text-sm"
                     : BOTON_SECUNDARIO
                 }`}
               >
@@ -84,15 +87,16 @@ export function AccionesTarea({
             </details>
           );
         }
+        const principal = accion === acciones.find((candidata) => !candidata.motivo);
         return (
-          <form key={`${accion.estado}-${accion.etiqueta}`} action={accionCambio}>
+          <form key={`${accion.estado}-${accion.etiqueta}`} action={accionCambio} className={principal ? "max-md:w-full" : undefined}>
             <SubmitButton
               pendingText={accion.estado === "completada" ? "Completando..." : "Actualizando..."}
-              className={
+              className={`${
                 accion.estado === "completada"
                   ? "rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                   : BOTON_SECUNDARIO
-              }
+              } ${principal ? PRINCIPAL_MOVIL : ""}`}
             >
               {accion.etiqueta}
             </SubmitButton>
@@ -102,7 +106,7 @@ export function AccionesTarea({
       {esperaRevision ? <p className="text-xs text-text-muted">Esperando revisión</p> : null}
       {puedeReasignar ? (
         <details className="ml-auto">
-          <summary className="cursor-pointer list-none rounded-md px-2.5 py-1.5 text-xs font-medium text-text-muted hover:bg-bg hover:text-text [&::-webkit-details-marker]:hidden">
+          <summary className="cursor-pointer list-none rounded-md px-2.5 py-1.5 text-xs font-medium text-text-muted hover:bg-bg hover:text-text max-md:flex max-md:h-11 max-md:items-center max-md:text-sm [&::-webkit-details-marker]:hidden">
             Cambiar responsable
           </summary>
           <form
