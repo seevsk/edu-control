@@ -76,9 +76,68 @@ export async function EncabezadoGrupo({
 
   const hayMenu = Boolean(grupo.enlaceTrabajo) || puedeParticipar || puedeImportarCurso;
 
+  const menu = (claseBoton: string) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className={claseBoton} aria-label="Más acciones del grupo">
+          <MoreHorizontal aria-hidden />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        {grupo.enlaceTrabajo ? (
+          <DropdownMenuItem asChild>
+            <a href={grupo.enlaceTrabajo} target="_blank" rel="noreferrer noopener">
+              <ExternalLink aria-hidden />
+              Abrir documento del grupo
+            </a>
+          </DropdownMenuItem>
+        ) : null}
+        {puedeParticipar ? (
+          <DropdownMenuItem asChild>
+            <Link href={`/reuniones/nueva?grupo=${idGrupo}`}>
+              <CalendarPlus aria-hidden />
+              Programar reunión
+            </Link>
+          </DropdownMenuItem>
+        ) : null}
+        {esLider && grupo.estado === "activo" ? (
+          <DropdownMenuItem asChild>
+            <Link href={`/grupos/${idGrupo}/integrantes#invitar`}>
+              <UserPlus aria-hidden />
+              Invitar integrante
+            </Link>
+          </DropdownMenuItem>
+        ) : null}
+        {puedeImportarCurso ? (
+          <form action={importarCursoAction.bind(null, idGrupo, `/grupos/${idGrupo}`)}>
+            <DropdownMenuItem asChild>
+              <button type="submit" className="w-full">
+                <BookPlus aria-hidden />
+                Añadir el curso a los míos
+              </button>
+            </DropdownMenuItem>
+          </form>
+        ) : null}
+        {esLider ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href={`/grupos/${idGrupo}/configuracion`}>
+                <Settings aria-hidden />
+                Configuración
+              </Link>
+            </DropdownMenuItem>
+          </>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
   return (
     <PageHeader
       migas={[{ href: "/grupos", texto: "Grupos" }, { texto: aOracion(grupo.nombre) }]}
+      volver={{ href: "/grupos", texto: "Grupos" }}
+      accionesMovil={hayMenu ? menu("size-11 [&_svg]:size-5") : null}
       titulo={aOracion(grupo.nombre)}
       contexto={contexto}
       pestanas={pestanas}
@@ -100,62 +159,7 @@ export async function EncabezadoGrupo({
               </span>
             ) : null}
           </Link>
-          {hayMenu ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="size-8" aria-label="Más acciones del grupo">
-                  <MoreHorizontal aria-hidden />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                {grupo.enlaceTrabajo ? (
-                  <DropdownMenuItem asChild>
-                    <a href={grupo.enlaceTrabajo} target="_blank" rel="noreferrer noopener">
-                      <ExternalLink aria-hidden />
-                      Abrir documento del grupo
-                    </a>
-                  </DropdownMenuItem>
-                ) : null}
-                {puedeParticipar ? (
-                  <DropdownMenuItem asChild>
-                    <Link href={`/reuniones/nueva?grupo=${idGrupo}`}>
-                      <CalendarPlus aria-hidden />
-                      Programar reunión
-                    </Link>
-                  </DropdownMenuItem>
-                ) : null}
-                {esLider && grupo.estado === "activo" ? (
-                  <DropdownMenuItem asChild>
-                    <Link href={`/grupos/${idGrupo}/integrantes#invitar`}>
-                      <UserPlus aria-hidden />
-                      Invitar integrante
-                    </Link>
-                  </DropdownMenuItem>
-                ) : null}
-                {puedeImportarCurso ? (
-                  <form action={importarCursoAction.bind(null, idGrupo, `/grupos/${idGrupo}`)}>
-                    <DropdownMenuItem asChild>
-                      <button type="submit" className="w-full">
-                        <BookPlus aria-hidden />
-                        Añadir el curso a los míos
-                      </button>
-                    </DropdownMenuItem>
-                  </form>
-                ) : null}
-                {esLider ? (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild>
-                      <Link href={`/grupos/${idGrupo}/configuracion`}>
-                        <Settings aria-hidden />
-                        Configuración
-                      </Link>
-                    </DropdownMenuItem>
-                  </>
-                ) : null}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : null}
+          {hayMenu ? menu("size-8") : null}
           {accionPrincipal}
         </>
       }

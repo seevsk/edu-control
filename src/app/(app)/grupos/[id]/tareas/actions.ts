@@ -41,7 +41,7 @@ function redirigirErrorTarea(ruta: string, mensaje: string): never {
   redirect(conParametro(ruta, "error", mensaje));
 }
 
-function revalidarTarea(idGrupo: number, idTarea: number) {
+function revalidarTarea(idGrupo: number) {
   revalidatePath(`/grupos/${idGrupo}`);
   revalidatePath(`/grupos/${idGrupo}/tareas`);
   revalidatePath(`/grupos/${idGrupo}/actividad`);
@@ -95,7 +95,7 @@ export async function reasignarTareaAction(
     redirigirErrorTarea(ruta, mensajeParaUsuario(error, "No se pudo reasignar"));
   }
 
-  revalidarTarea(idGrupo, idTarea);
+  revalidarTarea(idGrupo);
   redirect(ruta);
 }
 
@@ -130,7 +130,7 @@ export async function cambiarEstadoTareaAction(
     redirigirErrorTarea(ruta, mensajeParaUsuario(error, "No se pudo cambiar el estado"));
   }
 
-  revalidarTarea(idGrupo, idTarea);
+  revalidarTarea(idGrupo);
   redirect(ruta);
 }
 
@@ -148,7 +148,7 @@ export async function moverTareaAction(
   } catch (error) {
     return { ok: false, error: mensajeParaUsuario(error, "No se pudo mover la tarea") };
   }
-  revalidarTarea(contexto.data.idGrupo, contexto.data.idTarea);
+  revalidarTarea(contexto.data.idGrupo);
   return { ok: true };
 }
 
@@ -166,7 +166,7 @@ export async function editarTareaAction(idGrupo: number, idTarea: number, formDa
     redirigirErrorTarea(conParametro(ruta, "editar", "1"), mensajeParaUsuario(error, "No se pudo guardar la tarea"));
   }
 
-  revalidarTarea(idGrupo, idTarea);
+  revalidarTarea(idGrupo);
   redirect(conParametro(ruta, "toast", "Tarea actualizada"));
 }
 
