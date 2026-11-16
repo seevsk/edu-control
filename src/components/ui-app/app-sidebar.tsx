@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, ChevronsUpDown, House, Inbox, LogOut, Mail, Plus, User, Users } from "lucide-react";
+import { CalendarDays, ChevronsUpDown, House, Inbox, LogOut, Plus, User, Users } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -26,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Monograma } from "@/components/marca/monograma";
 import { CourseDot } from "./course-dot";
 import { UserAvatar } from "./user-avatar";
 
@@ -43,7 +44,6 @@ const NAVEGACION = [
   { href: "/notificaciones", texto: "Bandeja", Icono: Inbox, contador: "bandeja" },
   { href: "/calendario", texto: "Calendario", Icono: CalendarDays },
   { href: "/reuniones", texto: "Reuniones", Icono: Users },
-  { href: "/invitaciones", texto: "Invitaciones", Icono: Mail, contador: "invitaciones" },
 ] as const;
 
 /** Claro: item activo blanco en relieve; oscuro: fondo apenas mas claro. */
@@ -65,9 +65,7 @@ export function AppSidebar({ datos }: { datos: DatosSidebar }) {
           <SidebarMenuItem>
             <SidebarMenuButton asChild className="font-semibold">
               <Link href="/">
-                <span className="flex size-[22px] shrink-0 items-center justify-center rounded-md bg-primary text-xs text-primary-foreground">
-                  E
-                </span>
+                <Monograma titulo={null} />
                 <span className="text-sm">EduControl</span>
               </Link>
             </SidebarMenuButton>

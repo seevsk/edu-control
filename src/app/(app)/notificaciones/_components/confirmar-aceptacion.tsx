@@ -6,9 +6,11 @@ import { SubmitButton } from "@/components/submit-button";
 export function ConfirmarAceptacion({
   nombreGrupo,
   action,
+  claseBoton = "rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary-hover",
 }: {
   nombreGrupo: string;
   action: (formData: FormData) => Promise<void>;
+  claseBoton?: string;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const tituloId = useId();
@@ -19,7 +21,7 @@ export function ConfirmarAceptacion({
       <button
         type="button"
         onClick={() => dialogRef.current?.showModal()}
-        className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary-hover"
+        className={claseBoton}
       >
         Aceptar
       </button>
