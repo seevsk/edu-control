@@ -8,6 +8,7 @@ import { contarNotificacionesNoLeidas } from "@/server/services/notificacion";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { BarraSuperior, MigasProvider } from "@/components/ui-app/barra-superior";
 import { AppSidebar } from "@/components/ui-app/app-sidebar";
+import { NavegacionCompacta } from "@/components/ui-app/navegacion-compacta";
 import { aOracion } from "@/lib/presentacion";
 import { nombreCorto } from "@/lib/nombres";
 
@@ -41,7 +42,9 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       className="h-dvh"
     >
       <AppSidebar datos={datos} />
-      <SidebarInset className="min-w-0 overflow-y-auto">
+      {/* Móvil: barra inferior de 5 destinos. Tablet: riel de 80 px. Escritorio (lg): menú lateral completo. */}
+      <NavegacionCompacta datos={datos} />
+      <SidebarInset className="min-w-0 overflow-y-auto pb-[calc(4.75rem+env(safe-area-inset-bottom))] md:pb-0 md:pl-20 lg:pl-0">
         <BarraSuperior />
         {/* Las paginas aun no migradas conservan su padding; las nuevas usan <PaginaCompleta>. */}
         <main className="min-w-0 flex-1 p-4 sm:p-6">{children}</main>
