@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { requerirSesion } from "@/server/auth/session";
@@ -16,6 +17,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { aOracion } from "@/lib/presentacion";
+
+export const metadata: Metadata = { title: "Grupos" };
 
 const CAMPO = "flex flex-col gap-1.5 text-[13px] font-medium";
 const ETIQUETAS_ROL = { lider: "Líder", miembro: "Miembro", observador: "Observador" } as const;

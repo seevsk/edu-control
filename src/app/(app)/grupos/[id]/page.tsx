@@ -1,3 +1,4 @@
+import { metadataDeGrupo } from "./_components/metadata";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronDown, Plus, X } from "lucide-react";
@@ -39,6 +40,8 @@ const CAMPO = "flex flex-col gap-1.5 text-[13px] font-medium";
 function texto(valor: string | string[] | undefined) {
   return typeof valor === "string" ? valor : undefined;
 }
+
+export const generateMetadata = metadataDeGrupo(null);
 
 export default async function GrupoTareasPage({
   params,

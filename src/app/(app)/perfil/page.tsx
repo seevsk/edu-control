@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { BookOpen, Briefcase, Clock, Lock, Pencil } from "lucide-react";
 import { requerirSesion } from "@/server/auth/session";
@@ -20,6 +21,8 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { actualizarPerfilAction } from "./actions";
 import { BiografiaConContador, EliminarCuenta, SwitchVisibilidad } from "./_components/interactivos";
+
+export const metadata: Metadata = { title: "Perfil" };
 
 const ROLES = { lider: "Líder", miembro: "Miembro", observador: "Observador" } as const;
 const CAMPO = "flex flex-col gap-1.5 text-[13px] font-medium";

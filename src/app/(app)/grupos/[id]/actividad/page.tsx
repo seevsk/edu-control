@@ -1,3 +1,4 @@
+import { metadataDeGrupo } from "../_components/metadata";
 import { notFound } from "next/navigation";
 import { requerirSesion } from "@/server/auth/session";
 import { obtenerFeedActividad } from "@/server/services/metricas";
@@ -5,6 +6,8 @@ import { obtenerGrupoDelUsuario } from "@/server/services/grupo";
 import { MarcoGrupo } from "../_components/marco-grupo";
 import { HistorialTareas } from "../_components/historial-tareas";
 import { nombreCorto } from "@/lib/nombres";
+
+export const generateMetadata = metadataDeGrupo("Actividad");
 
 export default async function ActividadGrupoPage({
   params,

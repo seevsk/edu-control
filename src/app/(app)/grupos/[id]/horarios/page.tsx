@@ -1,3 +1,4 @@
+import { metadataDeGrupo } from "../_components/metadata";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -38,6 +39,8 @@ function etiquetaSemana(lunesISO: string) {
     ? `Semana del ${diaA} al ${diaB} ${MESES[mesB - 1]}`
     : `Semana del ${diaA} ${MESES[mesA - 1]} al ${diaB} ${MESES[mesB - 1]}`;
 }
+
+export const generateMetadata = metadataDeGrupo("Horarios");
 
 export default async function HorariosGrupoPage({
   params,

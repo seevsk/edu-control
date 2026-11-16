@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { requerirSesion } from "@/server/auth/session";
 import { listarTareasAsignadasAlUsuario, listarTareasPorRevisar } from "@/server/services/tarea";
@@ -12,7 +13,12 @@ import { PaginaCompleta, PageHeader } from "@/components/ui-app/page-header";
 import { TaskRow, type FilaTarea } from "@/components/ui-app/task-row";
 import { CourseDot } from "@/components/ui-app/course-dot";
 import { Toast } from "@/components/toast";
-import { Button } from "@/components/ui/button";
+import { cookies } from "next/headers";
+import { obtenerPerfilCompleto } from "@/server/services/perfil";
+import { Bienvenida } from "./_components/bienvenida";
+import { COOKIE_BIENVENIDA } from "./_components/bienvenida-cookie";
+
+export const metadata: Metadata = { title: "Tu trabajo" };
 
 const DIAS_AGENDA = 7;
 const MAX_AGENDA = 8;
@@ -50,13 +56,15 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
   const { toast } = await searchParams;
   const ahora = new Date();
   const hoyISO = fechaEnZonaLimaISO(ahora);
-  const [mias, porRevisar, cursos, grupos, invitaciones, agenda] = await Promise.all([
+  const [mias, porRevisar, cursos, grupos, invitaciones, agenda, usuario, galletas] = await Promise.all([
     listarTareasAsignadasAlUsuario(sesion.idUsuario, 50),
     listarTareasPorRevisar(sesion.idUsuario),
     listarCursos(sesion.idUsuario),
     listarMisGrupos(sesion.idUsuario),
     listarInvitacionesPendientes(sesion.idUsuario),
     obtenerCalendarioEntre(sesion.idUsuario, hoyISO, sumarDiasISO(hoyISO, DIAS_AGENDA)),
+    obtenerPerfilCompleto(sesion.idUsuario),
+    cookies(),
   ]);
 
   const detalleGrupo = (grupo: { nombre: string; evaluacion: { curso: { idCurso: number; nombre: string } } | null }) => (
@@ -111,7 +119,7 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
     }
   }
   for (const evaluacion of agenda.evaluaciones) {
-    if (evaluacion.fechaCierre < ahora) continue;
+    if (evaluacion.fechaCierre < ahora || evaluacion.estado === "completada") continue;
     items.push({
       clave: `evaluacion-${evaluacion.idEvaluacion}`,
       orden: evaluacion.fechaCierre.getTime(),
@@ -120,7 +128,7 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
       titulo: evaluacion.nombre,
       tipo: `Evaluación · ${aOracion(evaluacion.curso.nombre)}`,
       color: colorCurso(evaluacion.curso.idCurso),
-      href: `/cursos/${evaluacion.curso.idCurso}`,
+      href: `/cursos/${evaluacion.curso.idCurso}?evaluacion=${evaluacion.idEvaluacion}`,
     });
   }
   for (const tarea of agenda.tareas) {
@@ -150,8 +158,23 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
     });
   }
   const proximas = items.sort((a, b) => a.orden - b.orden).slice(0, MAX_AGENDA);
-  const sinCursos = cursos.length === 0;
-  const sinGrupos = grupos.length === 0;
+  // Guía de primer ingreso: visible hasta completar los tres pasos o hasta que el usuario la oculte.
+  const perfil = usuario.perfil;
+  const datosBienvenida = {
+    nombre: usuario.nombre.split(" ")[0] || usuario.nombre,
+    perfilCompleto: Boolean(perfil?.institucion && perfil.carrera && perfil.ciclo),
+    visibleEnBusqueda: perfil?.visibleEnBusqueda ?? true,
+    cursosConHorario: cursos.filter((curso) => curso.horarios.length > 0).length,
+    tieneGrupo: grupos.length > 0,
+    invitacionesPendientes: invitaciones.length,
+    sesiones: cursos.flatMap((curso) =>
+      curso.horarios
+        .filter((horario) => horario.diaSemana <= 5)
+        .map((horario) => ({ idCurso: curso.idCurso, diaSemana: horario.diaSemana, inicioMin: minutos(horario.horaInicio), finMin: minutos(horario.horaFin) })),
+    ),
+  };
+  const guiaPendiente = !datosBienvenida.perfilCompleto || !datosBienvenida.cursosConHorario || !datosBienvenida.tieneGrupo;
+  const mostrarBienvenida = guiaPendiente && galletas.get(COOKIE_BIENVENIDA)?.value !== "1";
 
   return (
     <PaginaCompleta>
@@ -160,28 +183,9 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
         titulo="Tu trabajo"
         contexto={<span>{etiquetaFechaLarga(hoyISO)}{resumen.length ? ` · ${resumen.join(" y ")}` : " · nada urgente por ahora"}</span>}
       />
+      {mostrarBienvenida ? <Bienvenida datos={datosBienvenida} fechaTexto="Primeros pasos" /> : null}
       <div className="flex flex-1 flex-wrap">
         <div className="min-w-0 flex-[999_1_480px]">
-          {sinCursos || sinGrupos ? (
-            <Seccion titulo="Para empezar" cantidad={Number(sinCursos) + Number(sinGrupos)}>
-              <ul>
-                {sinCursos ? (
-                  <li className="flex min-h-[52px] items-center justify-between gap-3 border-b px-4 text-[13px] sm:px-8">
-                    Registra tus cursos con su horario para ver tus clases y evaluaciones aquí.
-                    <Button variant="outline" size="sm" asChild><Link href="/cursos?nuevo=1">Agregar curso</Link></Button>
-                  </li>
-                ) : null}
-                {sinGrupos ? (
-                  <li className="flex min-h-[52px] items-center justify-between gap-3 border-b px-4 text-[13px] sm:px-8">
-                    {invitaciones.length ? "Te invitaron a un grupo: acéptalo para ver sus tareas." : "Crea un grupo para tu trabajo en equipo e invita a tus compañeros."}
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href={invitaciones.length ? "/invitaciones" : "/grupos?nuevo=1"}>{invitaciones.length ? "Ver invitación" : "Crear grupo"}</Link>
-                    </Button>
-                  </li>
-                ) : null}
-              </ul>
-            </Seccion>
-          ) : null}
 
           <Seccion titulo="Te toca" cantidad={teToca.length}>
             {teToca.length ? (

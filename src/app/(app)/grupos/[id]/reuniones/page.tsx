@@ -1,3 +1,4 @@
+import { metadataDeGrupo } from "../_components/metadata";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalendarPlus } from "lucide-react";
@@ -40,6 +41,8 @@ function FilaReunion({ reunion, idGrupo, pasada = false }: { reunion: Reunion; i
     </li>
   );
 }
+
+export const generateMetadata = metadataDeGrupo("Reuniones");
 
 export default async function ReunionesGrupoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

@@ -1,3 +1,4 @@
+import { metadataDeGrupo } from "../_components/metadata";
 import { notFound } from "next/navigation";
 import { requerirSesion } from "@/server/auth/session";
 import { obtenerGrupoDelUsuario } from "@/server/services/grupo";
@@ -10,6 +11,8 @@ import { actualizarGrupoAction } from "../../actions";
 import { MarcoGrupo } from "../_components/marco-grupo";
 
 const CAMPO = "flex flex-col gap-1.5 text-[13px] font-medium";
+
+export const generateMetadata = metadataDeGrupo("Configuración");
 
 export default async function ConfiguracionGrupoPage({
   params,
