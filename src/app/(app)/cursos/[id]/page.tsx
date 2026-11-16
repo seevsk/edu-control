@@ -20,7 +20,7 @@ import {
   marcarEvaluacionEntregadaAction,
   sincronizarCursoAction,
 } from "../actions";
-import { PaginaCompleta } from "@/components/ui-app/page-header";
+import { PaginaCompleta, VolverMovil } from "@/components/ui-app/page-header";
 import { Migas } from "@/components/ui-app/barra-superior";
 import { PanelLateral } from "@/components/ui-app/panel-lateral";
 import { DialogoUrl } from "@/components/ui-app/dialogo-url";
@@ -158,7 +158,9 @@ export default async function CursoDetallePage({
     <PaginaCompleta>
       <Migas items={[{ href: "/cursos", texto: "Cursos" }, { texto: nombre }]} />
       <Toast mensaje={consulta.toast} />
-      <div className="mx-auto w-full max-w-[1080px] px-4 py-7 sm:px-8">
+      <div className="mx-auto w-full max-w-[1080px] px-4 pt-1 pb-7 sm:px-8 md:pt-7">
+        {/* Móvil: en el celular se llega a los cursos desde "Tú". */}
+        <VolverMovil href="/tu" texto="Tú" />
         <header className="flex flex-wrap items-start gap-4 border-b pb-5">
           <div className="min-w-[280px] flex-1">
             <div className="flex flex-wrap items-center gap-2.5">
@@ -230,11 +232,11 @@ export default async function CursoDetallePage({
                     return (
                       <li key={horario.idHorario} className="flex min-h-12 flex-wrap items-center gap-3.5 border-b border-border-subtle px-2 py-2 text-sm hover:bg-muted">
                         <span className="w-11 font-medium">{DIAS_CURSO[horario.diaSemana - 1]}</span>
-                        <span className="flex-1">
+                        <span className="min-w-0 flex-1">
                           {rangoHoras(horas(horario.horaInicio), horas(horario.horaFin))}
-                          <span className="ml-2 text-subtle-foreground">{duracionMinutos(minutos)}</span>
+                          <span className="ml-2 text-subtle-foreground max-md:mt-0.5 max-md:ml-0 max-md:block max-md:text-[13px]">{duracionMinutos(minutos)}<span className="md:hidden"> · cada semana</span></span>
                         </span>
-                        {modalidad ? <span className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground">{curso.modalidad === "remoto" ? <Monitor className="size-3.5" aria-hidden /> : <Users className="size-3.5" aria-hidden />}{modalidad}</span> : null}
+                        {modalidad ? <span className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground max-md:hidden">{curso.modalidad === "remoto" ? <Monitor className="size-3.5" aria-hidden /> : <Users className="size-3.5" aria-hidden />}{modalidad}</span> : null}
                         <Button variant="ghost" size="sm" asChild>
                           <Link href={`${ruta}?sesion=${horario.idHorario}`} scroll={false}>Editar sesión</Link>
                         </Button>

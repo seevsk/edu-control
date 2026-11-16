@@ -7,7 +7,7 @@ import { listarMisGrupos } from "@/server/services/grupo";
 import { mesAnio } from "@/lib/formato-fecha";
 import { aOracion } from "@/lib/presentacion";
 import { formatoTitulo } from "@/lib/nombres";
-import { PaginaCompleta } from "@/components/ui-app/page-header";
+import { PaginaCompleta, VolverMovil } from "@/components/ui-app/page-header";
 import { Migas } from "@/components/ui-app/barra-superior";
 import { PanelLateral } from "@/components/ui-app/panel-lateral";
 import { UserAvatar } from "@/components/ui-app/user-avatar";
@@ -51,7 +51,8 @@ export default async function PerfilPage({ searchParams }: { searchParams: Promi
     <PaginaCompleta>
       <Migas items={[{ texto: "Perfil" }]} />
       <Toast mensaje={toast} />
-      <div className="mx-auto flex w-full max-w-[1040px] flex-col gap-8 px-4 py-8 sm:px-8">
+      <div className="mx-auto flex w-full max-w-[1040px] flex-col gap-8 px-4 pt-1 pb-8 sm:px-8 md:pt-8">
+        <VolverMovil href="/tu" texto="Tú" className="-mb-6" />
         <section className="flex flex-wrap items-start gap-5">
           <UserAvatar usuario={usuario} className="size-[72px] text-3xl" />
           <div className="min-w-[260px] flex-1">

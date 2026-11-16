@@ -34,7 +34,7 @@ export function TablaCursos({ filas, vacio }: { filas: FilaCurso[]; vacio: React
   return (
     <>
       <div className="flex justify-end px-4 pt-3 sm:px-8">
-        <label className="flex h-[30px] w-full max-w-64 items-center gap-2 rounded-md border border-input px-2.5 text-subtle-foreground focus-within:border-ring">
+        <label className="flex h-11 w-full items-center gap-2 rounded-lg border border-input px-3 text-subtle-foreground focus-within:border-ring md:h-[30px] md:max-w-64 md:rounded-md md:px-2.5">
           <Search className="size-3.5 shrink-0" aria-hidden />
           <span className="sr-only">Filtrar cursos</span>
           <input
@@ -46,7 +46,25 @@ export function TablaCursos({ filas, vacio }: { filas: FilaCurso[]; vacio: React
           />
         </label>
       </div>
-      <div className="mt-3 overflow-x-auto">
+      {/* Móvil: lista (Claude Design, "Móvil · Tú / Cursos"); desde md, la tabla completa. */}
+      <ul className="mt-3 border-t border-border-subtle md:hidden">
+        {visibles.map((fila) => (
+          <li key={fila.idCurso} className="flex items-center border-b border-border-subtle">
+            <Link href={`/cursos/${fila.idCurso}`} className="flex min-h-[64px] min-w-0 flex-1 items-center gap-3 py-2.5 pl-4">
+              <span className="flex size-[34px] shrink-0 items-center justify-center rounded-[10px] bg-secondary">
+                <CourseDot idCurso={fila.idCurso} className="size-2.5 rounded-[3px]" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[15px]">{fila.nombre}</span>
+                <span className="block truncate text-[13px] text-subtle-foreground">{[fila.horario, fila.modalidad].filter((valor) => valor && valor !== "—").join(" · ")}</span>
+                {fila.evaluacion.destacada ? <span className="block truncate text-[13px] text-muted-foreground">{fila.evaluacion.texto}</span> : null}
+              </span>
+            </Link>
+            <span className="pr-2">{fila.menu}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-3 overflow-x-auto max-md:hidden">
         <table className="w-full border-collapse">
           <thead>
             <tr>
@@ -87,12 +105,12 @@ export function TablaCursos({ filas, vacio }: { filas: FilaCurso[]; vacio: React
             ))}
           </tbody>
         </table>
-        {visibles.length === 0 ? (
-          <div className="px-4 py-10 text-center text-[13px] text-subtle-foreground sm:px-8">
-            {texto ? "Ningún curso coincide con el filtro." : vacio}
-          </div>
-        ) : null}
       </div>
+      {visibles.length === 0 ? (
+        <div className="px-4 py-10 text-center text-[13px] text-subtle-foreground sm:px-8">
+          {texto ? "Ningún curso coincide con el filtro." : vacio}
+        </div>
+      ) : null}
     </>
   );
 }

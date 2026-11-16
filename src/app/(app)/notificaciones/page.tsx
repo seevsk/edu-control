@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, Bell, BookOpen, CalendarDays, CheckCheck, CheckCircle2, Clock, LogOut, Mail, UserMinus, XCircle } from "lucide-react";
+import { Bell, BookOpen, CalendarDays, CheckCheck, CheckCircle2, ChevronLeft, Clock, LogOut, Mail, Search, UserMinus, XCircle } from "lucide-react";
 import { requerirSesion } from "@/server/auth/session";
 import { obtenerBandeja, obtenerDetalleInvitacion, obtenerReunionParaBandeja } from "@/server/services/notificacion";
 import { obtenerTareaDelGrupo } from "@/server/services/tarea";
@@ -11,7 +11,9 @@ import { aOracion } from "@/lib/presentacion";
 import { nombreCorto } from "@/lib/nombres";
 import { resumirNotificacion } from "@/lib/bandeja";
 import { describirCambioTarea, leerValorEstadoHistorial } from "@/lib/tarea-historial";
-import { PaginaCompleta } from "@/components/ui-app/page-header";
+import { ACCION_MOVIL, ChipsFiltro, PaginaCompleta } from "@/components/ui-app/page-header";
+import { responderInvitacionAction } from "../grupos/actions";
+import { ConfirmarAceptacion } from "./_components/confirmar-aceptacion";
 import { Migas } from "@/components/ui-app/barra-superior";
 import { CourseDot } from "@/components/ui-app/course-dot";
 import { StatusIcon } from "@/components/ui-app/status-icon";
@@ -160,24 +162,47 @@ export default async function BandejaPage({ searchParams }: { searchParams: Prom
     { valor: "sin-leer", texto: `Sin leer · ${sinLeer}` },
     { valor: "invitaciones", texto: `Invitaciones · ${invitacionesPendientes.length}` },
   ];
-  const claseFila = (activa: boolean) => cn("mx-1.5 flex items-start gap-2.5 rounded-md px-2.5 py-2.5 hover:bg-muted", activa && "bg-secondary hover:bg-secondary");
+  // Móvil: filas a todo el ancho con separador (Claude Design, "Móvil · Bandeja"); desde md, compactas.
+  const claseFila = (activa: boolean) =>
+    cn(
+      "flex items-start gap-3 border-b border-border-subtle px-4 py-3.5 hover:bg-muted md:mx-1.5 md:gap-2.5 md:rounded-md md:border-b-0 md:px-2.5 md:py-2.5",
+      activa && "bg-secondary hover:bg-secondary",
+    );
+  const ETIQUETA_SECCION = "px-4 pt-5 pb-2 text-[13px] font-semibold text-muted-foreground md:pt-3.5 md:pb-1.5 md:text-xs md:font-medium";
 
   return (
     <PaginaCompleta className="sm:min-h-[calc(100%+3rem)]">
       <Migas items={[{ texto: "Bandeja" }]} />
-      <div className="flex min-h-0 flex-1 flex-wrap">
-        <section aria-label="Notificaciones" className={cn("flex-[1_1_380px] pb-4 md:max-w-[460px] md:border-r", haySeleccion && "max-md:hidden")}>
-          <div className="flex items-center gap-2 px-4 pt-4 pb-2">
-            <h1 className="flex-1 text-lg font-semibold">Bandeja</h1>
+      <div className="flex min-h-0 flex-1 flex-wrap md:flex-nowrap">
+        <section aria-label="Notificaciones" className={cn("min-w-0 flex-[1_1_380px] pb-4 md:w-[320px] md:flex-none md:border-r lg:w-[380px] xl:w-[460px]", haySeleccion && "max-md:hidden")}>
+          <div className="flex h-11 items-center justify-end gap-1 px-2 pt-3 md:hidden">
             {sinLeer ? (
               <form action={marcarTodasLeidasAction}>
+                <button type="submit" aria-label="Marcar todo como leído" className={ACCION_MOVIL}><CheckCheck aria-hidden /></button>
+              </form>
+            ) : null}
+            <Link href="/usuarios" aria-label="Buscar personas" className={ACCION_MOVIL}><Search aria-hidden /></Link>
+          </div>
+          <div className="flex items-center gap-2 px-4 pt-1 pb-2 md:pt-4">
+            <h1 className="flex-1 text-[30px] leading-tight font-bold tracking-[-0.03em] md:text-lg md:font-semibold md:tracking-normal">Bandeja</h1>
+            {sinLeer ? (
+              <form action={marcarTodasLeidasAction} className="max-md:hidden">
                 <Button type="submit" variant="ghost" size="icon" className="size-8" aria-label="Marcar todo como leído" title="Marcar todo como leído">
                   <CheckCheck aria-hidden />
                 </Button>
               </form>
             ) : null}
           </div>
-          <div className="px-4 pb-2">
+          <ChipsFiltro
+            etiqueta="Filtro"
+            className="md:hidden"
+            opciones={pestanas.map((pestana) => ({
+              href: href({ filtro: pestana.valor === "todo" ? undefined : pestana.valor, sel: undefined }),
+              texto: pestana.texto,
+              activa: filtro === pestana.valor,
+            }))}
+          />
+          <div className="px-4 pb-2 max-md:hidden">
             <div role="group" aria-label="Filtro" className="inline-flex gap-0.5 rounded-[7px] bg-secondary p-0.5">
               {pestanas.map((pestana) => (
                 <Link
@@ -194,27 +219,42 @@ export default async function BandejaPage({ searchParams }: { searchParams: Prom
 
           {filtro === "invitaciones" || (filtro === "todo" && invitacionesPendientes.length) ? (
             <>
-              <p className="px-4 pt-3.5 pb-1.5 text-xs font-medium text-muted-foreground">Por responder</p>
+              <p className={ETIQUETA_SECCION}>Por responder</p>
               {invitacionesPendientes.length ? invitacionesPendientes.map((pendiente) => (
-                <Link key={pendiente.idGrupo} href={href({ sel: `inv-${pendiente.idGrupo}` })} scroll={false} className={claseFila(idInvitacion === pendiente.idGrupo)}>
+                <div key={pendiente.idGrupo} className="max-md:border-b max-md:border-border-subtle">
+                <Link href={href({ sel: `inv-${pendiente.idGrupo}` })} scroll={false} className={cn(claseFila(idInvitacion === pendiente.idGrupo), "max-md:border-b-0")}>
                   <span className="flex h-7 items-center"><span className="size-1.5 rounded-full bg-foreground" aria-label="Sin responder" /></span>
                   <UserAvatar usuario={pendiente.invitador} tamano="lg" className="size-7" />
                   <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
-                    <span className="truncate text-[13px] font-medium">Invitación a {aOracion(pendiente.nombre)}</span>
-                    <span className="flex items-center gap-1.5 truncate text-xs text-subtle-foreground">
+                    <span className="truncate text-[15px] font-semibold md:text-[13px] md:font-medium">Invitación a {aOracion(pendiente.nombre)}</span>
+                    <span className="flex items-center gap-1.5 truncate text-[13px] text-subtle-foreground md:text-xs">
                       {pendiente.curso ? <><CourseDot idCurso={pendiente.curso.idCurso} className="size-[7px]" /><span className="truncate">{aOracion(pendiente.curso.nombre)} ·</span></> : null}
                       <span className="truncate">{nombreCorto(pendiente.invitador.nombre, pendiente.invitador.apellidos)}</span>
                     </span>
                   </span>
                   <time dateTime={pendiente.fecha.toISOString()} className="text-xs leading-5 whitespace-nowrap text-subtle-foreground">{marcaActividad(pendiente.fecha, ahora)}</time>
                 </Link>
+                {/* Móvil: responder sin abrir el detalle (la aceptación sigue pidiendo el consentimiento). */}
+                {pendiente.finalizado ? null : (
+                  <div className="-mt-1 flex gap-2 pr-4 pb-3.5 pl-[60px] md:hidden">
+                    <ConfirmarAceptacion
+                      nombreGrupo={pendiente.nombre}
+                      action={responderInvitacionAction.bind(null, pendiente.idGrupo, "aceptada")}
+                      claseBoton="flex h-9 items-center rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground"
+                    />
+                    <form action={responderInvitacionAction.bind(null, pendiente.idGrupo, "rechazada")}>
+                      <button type="submit" className="flex h-9 items-center rounded-full border border-input px-4 text-sm">Rechazar</button>
+                    </form>
+                  </div>
+                )}
+                </div>
               )) : <p className="px-4 py-3 text-[13px] text-subtle-foreground">Nada por responder.</p>}
             </>
           ) : null}
 
           {filtro === "invitaciones" ? (
             <>
-              <p className="px-4 pt-5 pb-1.5 text-xs font-medium text-muted-foreground">Historial</p>
+              <p className={cn(ETIQUETA_SECCION, "md:pt-5")}>Historial</p>
               {historialInvitaciones.length ? historialInvitaciones.map((registro) => {
                 const estado = registro.estado === "retirado" && registro.voluntario
                   ? { ...ESTADO_HISTORIAL.retirado, texto: "Saliste de" }
@@ -224,8 +264,8 @@ export default async function BandejaPage({ searchParams }: { searchParams: Prom
                     <span className="flex h-7 w-1.5 items-center" aria-hidden />
                     <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary"><estado.Icono className={cn("size-3.5", estado.color)} aria-hidden /></span>
                     <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
-                      <span className="truncate text-[13px]">{estado.texto} <span className="font-medium">{aOracion(registro.nombre)}</span></span>
-                      <span className="flex items-center gap-1.5 truncate text-xs text-subtle-foreground">
+                      <span className="truncate text-[15px] md:text-[13px]">{estado.texto} <span className="font-medium">{aOracion(registro.nombre)}</span></span>
+                      <span className="flex items-center gap-1.5 truncate text-[13px] text-subtle-foreground md:text-xs">
                         {registro.curso ? <><CourseDot idCurso={registro.curso.idCurso} className="size-[7px]" /><span className="truncate">{aOracion(registro.curso.nombre)}</span></> : null}
                         {registro.invitador ? <span className="truncate">{registro.curso ? "· " : ""}{nombreCorto(registro.invitador.nombre, registro.invitador.apellidos)}</span> : null}
                       </span>
@@ -237,7 +277,7 @@ export default async function BandejaPage({ searchParams }: { searchParams: Prom
             </>
           ) : grupos.length ? grupos.map((grupo) => (
             <div key={grupo.titulo}>
-              <p className="px-4 pt-3.5 pb-1.5 text-xs font-medium text-muted-foreground">{grupo.titulo}</p>
+              <p className={ETIQUETA_SECCION}>{grupo.titulo}</p>
               {grupo.items.map((elemento) => {
                 const corto = resumirNotificacion(elemento.tipo, elemento.mensaje);
                 const contexto = [corto.objeto && corto.objeto !== elemento.grupo?.nombre ? corto.objeto : null, elemento.grupo ? aOracion(elemento.grupo.nombre) : null].filter(Boolean).join(" · ");
@@ -246,12 +286,12 @@ export default async function BandejaPage({ searchParams }: { searchParams: Prom
                     <span className="flex h-7 items-center"><span className={cn("size-1.5 rounded-full", elemento.leida ? "bg-transparent" : "bg-foreground")} aria-label={elemento.leida ? undefined : "Sin leer"} /></span>
                     <IconoTipo tipo={elemento.tipo} />
                     <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
-                      <span className={cn("truncate text-[13px]", !elemento.leida && "font-medium")}>
+                      <span className={cn("truncate text-[15px] md:text-[13px]", !elemento.leida && "font-semibold md:font-medium")}>
                         {corto.titulo}
                         {elemento.cantidad > 1 ? <span className="font-normal text-subtle-foreground"> · {elemento.cantidad} novedades</span> : null}
                       </span>
                       {contexto ? (
-                        <span className="flex items-center gap-1.5 truncate text-xs text-subtle-foreground">
+                        <span className="flex items-center gap-1.5 truncate text-[13px] text-subtle-foreground md:text-xs">
                           {elemento.grupo?.curso ? <CourseDot idCurso={elemento.grupo.curso.idCurso} className="size-[7px]" /> : null}
                           <span className="truncate">{contexto}</span>
                         </span>
@@ -269,12 +309,12 @@ export default async function BandejaPage({ searchParams }: { searchParams: Prom
           )}
         </section>
 
-        <section aria-label="Detalle" className={cn("min-w-0 flex-[999_1_420px]", !haySeleccion && "max-md:hidden")}>
+        <section aria-label="Detalle" className={cn("min-w-0 flex-[999_1_420px] md:flex-1", !haySeleccion && "max-md:hidden")}>
           {haySeleccion ? (
             <div className="flex max-w-[720px] flex-col gap-6 px-4 py-6 sm:px-8">
               {seleccionado ? <MarcarLeido ids={seleccionado.leida ? [] : seleccionado.ids} /> : null}
               {pendienteSeleccionada && !pendienteSeleccionada.avisoLeido ? <MarcarLeido ids={pendienteSeleccionada.idsAviso} /> : null}
-              <Link href={href({ sel: undefined })} className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground md:hidden"><ArrowLeft className="size-3.5" aria-hidden />Bandeja</Link>
+              <Link href={href({ sel: undefined })} className="-my-2 -ml-2 inline-flex h-11 w-fit items-center gap-0.5 pr-2 text-[15px] text-muted-foreground md:hidden"><ChevronLeft className="size-6" aria-hidden />Bandeja</Link>
               {consulta.error ? <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-[13px] text-destructive">{consulta.error}</p> : null}
 
               {invitacion ? (

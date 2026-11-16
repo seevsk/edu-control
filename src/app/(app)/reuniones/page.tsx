@@ -13,6 +13,7 @@ import {
 import { Avatar } from "@/components/avatar";
 import { IconAgregar } from "@/components/icons";
 import { Toast } from "@/components/toast";
+import { VolverMovil } from "@/components/ui-app/page-header";
 import { BotonConfirmacion } from "@/components/boton-confirmacion";
 import { cancelarReunionAction, responderReunionAction } from "./actions";
 
@@ -43,6 +44,7 @@ export default async function ReunionesPage({
   return (
     <div className="animate-page-in mx-auto flex max-w-3xl flex-col gap-5">
       <Toast mensaje={toast} />
+      <VolverMovil href="/tu" texto="Tú" className="-mt-3 -mb-4" />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold">Reuniones</h1>

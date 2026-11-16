@@ -14,7 +14,7 @@ import { CampoSelect } from "@/components/ui-app/campo-select";
 import { Toast } from "@/components/toast";
 import { BotonConfirmacion } from "@/components/boton-confirmacion";
 import { SelectorHorarioSemanal } from "@/components/selector-horario-semanal";
-import { PaginaCompleta, PageHeader } from "@/components/ui-app/page-header";
+import { ACCION_MOVIL, ChipsFiltro, EncabezadoMovil, PaginaCompleta, PageHeader } from "@/components/ui-app/page-header";
 import { PanelLateral } from "@/components/ui-app/panel-lateral";
 import { CourseDot } from "@/components/ui-app/course-dot";
 import { Button } from "@/components/ui/button";
@@ -102,7 +102,21 @@ export default async function CursosPage({
   return (
     <PaginaCompleta>
       <Toast mensaje={toast} />
+      <EncabezadoMovil
+        titulo="Cursos"
+        contexto={`${cursosActivos.length} ${cursosActivos.length === 1 ? "activo" : "activos"}`}
+        acciones={<Link href="/cursos?nuevo=1" scroll={false} aria-label="Agregar curso" className={ACCION_MOVIL}><Plus aria-hidden /></Link>}
+      />
+      <ChipsFiltro
+        etiqueta="Estado de los cursos"
+        className="md:hidden"
+        opciones={[
+          { href: "/cursos", texto: `Activos · ${cursosActivos.length}`, activa: !verInactivos },
+          { href: "/cursos?vista=inactivos", texto: `Inactivos · ${cursosInactivos.length}`, activa: verInactivos },
+        ]}
+      />
       <PageHeader
+        ocultarEnMovil
         titulo="Cursos"
         contexto={<span>{cursosActivos.length} {cursosActivos.length === 1 ? "curso activo" : "cursos activos"}</span>}
         acciones={

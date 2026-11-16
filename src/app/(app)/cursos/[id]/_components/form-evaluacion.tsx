@@ -10,7 +10,7 @@ import { CampoFecha } from "@/components/ui-app/campo-fecha";
 
 const CAMPO = "flex flex-col gap-1.5 text-[13px] font-medium";
 
-/** Nueva evaluación: si solo se indica el día, cierra a las 11:59 pm de Lima (AGENTS.md 8.2). */
+/** Nueva evaluación: si solo se indica el día, cierra a las 11:59pm de Lima (AGENTS.md 8.2). */
 export function FormEvaluacion({ action, cerrarEn }: { action: (formData: FormData) => Promise<void>; cerrarEn: string }) {
   const [conApertura, setConApertura] = useState(false);
   return (
@@ -22,7 +22,7 @@ export function FormEvaluacion({ action, cerrarEn }: { action: (formData: FormDa
       <div className={CAMPO}>
         <span id="cierra-el">Cierra el</span>
         <CampoFecha name="fechaCierre" placeholder="Elegir día" />
-        <span className="text-xs font-normal text-subtle-foreground">Cierra a las 11:59 pm de ese día.</span>
+        <span className="text-xs font-normal text-subtle-foreground">Cierra a las 11:59pm de ese día.</span>
       </div>
       <label className="flex items-center justify-between gap-3 text-[13px] font-medium">
         Tiene fecha de apertura

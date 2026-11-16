@@ -58,7 +58,7 @@ function Paso({
         </p>
         <p className="mt-0.5 text-[13px] text-subtle-foreground">{descripcion}</p>
       </div>
-      {hecho ? <span className="text-[13px] text-subtle-foreground">Hecho</span> : children}
+      {hecho ? <span className="text-[13px] text-subtle-foreground">Hecho</span> : <div className="max-md:w-full max-md:pl-11 max-md:[&_a]:h-12 max-md:[&_a]:rounded-xl max-md:[&_a]:text-[15px] max-md:[&>a]:w-full max-md:[&>span]:w-full max-md:[&>span]:flex-col max-md:[&>span]:items-stretch max-md:[&>span>a:first-child]:w-full">{children}</div>}
     </li>
   );
 }
@@ -134,7 +134,7 @@ export function Bienvenida({ datos, fechaTexto }: { datos: DatosBienvenida; fech
           </form>
         </div>
 
-        <aside className="min-w-0 flex-[1_1_280px] rounded-[14px] border p-5" aria-label="Vista previa de tu semana">
+        <aside className="min-w-0 flex-[1_1_280px] rounded-[14px] border p-5 max-md:hidden" aria-label="Vista previa de tu semana">
           <p className="text-sm font-medium">Así se verá tu semana</p>
           <p className="mt-1.5 mb-4 text-[13px] leading-normal text-subtle-foreground">
             {datos.sesiones.length ? "Tus clases de lunes a viernes. El resto lo ves en el Calendario." : "Cuando agregues tus cursos, aquí aparecerán tus clases."}
