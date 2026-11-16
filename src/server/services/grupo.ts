@@ -3,6 +3,7 @@ import { crearNotificacion } from "@/server/notifications/crear-notificacion";
 import { plantillasNotificacion } from "@/server/notifications/templates";
 import { ErrorDeNegocio } from "@/lib/errores";
 import { ESTADOS_TAREA_ABIERTOS } from "@/lib/estado-tarea";
+import { nombreCorto } from "@/lib/nombres";
 import type { Prisma } from "../../../generated/prisma/client";
 import { ejecutarCambioDeGrupo } from "./cambio-grupo";
 import type { crearGrupoSchema, actualizarGrupoSchema } from "@/lib/validation/grupo";
@@ -233,10 +234,11 @@ export async function invitarIntegrante(idActor: number, idGrupo: number, idUsua
     return { grupo, integrante };
   });
 
+  const invitador = await prisma.usuario.findUnique({ where: { idUsuario: idActor }, select: { nombre: true, apellidos: true } });
   await crearNotificacion({
     idUsuario: idUsuarioInvitado,
     tipo: "invitacion_grupo",
-    ...plantillasNotificacion.invitacionGrupo(grupo.nombre),
+    ...plantillasNotificacion.invitacionGrupo(grupo.nombre, idGrupo, invitador ? nombreCorto(invitador.nombre, invitador.apellidos) : null),
   });
 
   return integrante;
@@ -266,10 +268,14 @@ export async function responderInvitacion(
     return integrante;
   });
 
+  // Avisa a quien envió la invitación (los registros antiguos asumen al creador del grupo).
+  const idInvitador = integrante.idInvitador ?? integrante.grupo.idCreador;
+  if (idInvitador === idUsuario) return;
+  const persona = await prisma.usuario.findUnique({ where: { idUsuario }, select: { nombre: true, apellidos: true } });
   await crearNotificacion({
-    idUsuario: integrante.grupo.idCreador,
+    idUsuario: idInvitador,
     tipo: "invitacion_respondida",
-    ...plantillasNotificacion.invitacionRespondida(integrante.grupo.nombre, idGrupo, respuesta),
+    ...plantillasNotificacion.invitacionRespondida(integrante.grupo.nombre, idGrupo, respuesta, persona ? nombreCorto(persona.nombre, persona.apellidos) : null),
   });
 }
 
@@ -305,6 +311,28 @@ export async function actualizarPreferenciaCorreoActividad(
   });
 }
 
+/** Desasigna las tareas abiertas de quien deja el grupo y lo deja en el historial (AGENTS.md 8.3). */
+async function desasignarTareasAbiertas(tx: Prisma.TransactionClient, idGrupo: number, idUsuarioObjetivo: number, idActor: number) {
+  const tareasAbiertas = await tx.tarea.findMany({
+    where: { idGrupo, idAsignado: idUsuarioObjetivo, estado: { in: [...ESTADOS_TAREA_ABIERTOS] } },
+    select: { idTarea: true, idAsignado: true },
+  });
+  if (tareasAbiertas.length === 0) return;
+  await tx.tarea.updateMany({
+    where: { idTarea: { in: tareasAbiertas.map((tarea) => tarea.idTarea) } },
+    data: { idAsignado: null },
+  });
+  await tx.tareaHistorial.createMany({
+    data: tareasAbiertas.map((tarea) => ({
+      idTarea: tarea.idTarea,
+      idUsuario: idActor,
+      accion: "reasignada",
+      valorAnterior: String(tarea.idAsignado),
+      valorNuevo: null,
+    })),
+  });
+}
+
 export async function retirarIntegrante(idActor: number, idGrupo: number, idUsuarioObjetivo: number) {
   await ejecutarCambioDeGrupo(async (tx) => {
     await requerirLiderDelGrupo(idActor, idGrupo, tx);
@@ -317,30 +345,64 @@ export async function retirarIntegrante(idActor: number, idGrupo: number, idUsua
     }
     if (objetivo.rol === "lider") throw new ErrorDeNegocio("El lider no se puede retirar a si mismo");
 
-    const tareasAbiertas = await tx.tarea.findMany({
-      where: { idGrupo, idAsignado: idUsuarioObjetivo, estado: { in: [...ESTADOS_TAREA_ABIERTOS] } },
-      select: { idTarea: true, idAsignado: true },
-    });
-
     await tx.grupoIntegrante.update({
       where: { idGrupo_idUsuario: { idGrupo, idUsuario: idUsuarioObjetivo } },
-      data: { estadoInvitacion: "retirado", fechaRetiro: new Date() },
+      data: { estadoInvitacion: "retirado", fechaRetiro: new Date(), retiroVoluntario: false },
     });
-
-    if (tareasAbiertas.length > 0) {
-      await tx.tarea.updateMany({
-        where: { idTarea: { in: tareasAbiertas.map((tarea) => tarea.idTarea) } },
-        data: { idAsignado: null },
-      });
-      await tx.tareaHistorial.createMany({
-        data: tareasAbiertas.map((tarea) => ({
-          idTarea: tarea.idTarea,
-          idUsuario: idActor,
-          accion: "reasignada",
-          valorAnterior: String(tarea.idAsignado),
-          valorNuevo: null,
-        })),
-      });
-    }
+    await desasignarTareasAbiertas(tx, idGrupo, idUsuarioObjetivo, idActor);
   });
+}
+
+/**
+ * Salir del grupo por cuenta propia (decisión del usuario, 2026-11-16). Queda igual que un retiro
+ * (estado `retirado`, fila conservada, tareas abiertas desasignadas) pero marcado como voluntario.
+ * El líder primero cede el liderazgo a un miembro aceptado; si no hay ninguno, no puede salir.
+ */
+export async function salirDelGrupo(idUsuario: number, idGrupo: number, idNuevoLider?: number) {
+  const { grupo, idLider } = await ejecutarCambioDeGrupo(async (tx) => {
+    const propio = await tx.grupoIntegrante.findUnique({
+      where: { idGrupo_idUsuario: { idGrupo, idUsuario } },
+      include: { grupo: true },
+    });
+    if (!propio || propio.estadoInvitacion !== "aceptada") throw new ErrorDeNegocio("No eres integrante de este grupo");
+    if (propio.grupo.estado !== "activo") throw new ErrorDeNegocio("El grupo está finalizado y es de solo lectura");
+
+    let idLider: number | null = null;
+    if (propio.rol === "lider") {
+      if (!idNuevoLider || idNuevoLider === idUsuario) throw new ErrorDeNegocio("Elige quién será el nuevo líder antes de salir");
+      const nuevo = await tx.grupoIntegrante.findUnique({
+        where: { idGrupo_idUsuario: { idGrupo, idUsuario: idNuevoLider } },
+      });
+      if (!nuevo || nuevo.estadoInvitacion !== "aceptada" || nuevo.rol !== "miembro") {
+        throw new ErrorDeNegocio("El nuevo líder debe ser un miembro aceptado del grupo");
+      }
+      await tx.grupoIntegrante.update({ where: { idGrupo_idUsuario: { idGrupo, idUsuario: idNuevoLider } }, data: { rol: "lider" } });
+      idLider = idNuevoLider;
+    } else {
+      const lider = await tx.grupoIntegrante.findFirst({ where: { idGrupo, rol: "lider", estadoInvitacion: "aceptada" } });
+      idLider = lider?.idUsuario ?? null;
+    }
+
+    await tx.grupoIntegrante.update({
+      where: { idGrupo_idUsuario: { idGrupo, idUsuario } },
+      data: {
+        estadoInvitacion: "retirado",
+        fechaRetiro: new Date(),
+        retiroVoluntario: true,
+        ...(propio.rol === "lider" ? { rol: "miembro" as const } : {}),
+      },
+    });
+    await desasignarTareasAbiertas(tx, idGrupo, idUsuario, idUsuario);
+    return { grupo: propio.grupo, idLider };
+  });
+
+  if (idLider && idLider !== idUsuario) {
+    const usuario = await prisma.usuario.findUnique({ where: { idUsuario }, select: { nombre: true, apellidos: true } });
+    await crearNotificacion({
+      idUsuario: idLider,
+      tipo: "integrante_salio",
+      idGrupo,
+      ...plantillasNotificacion.integranteSalio(usuario ? nombreCorto(usuario.nombre, usuario.apellidos) : "Alguien", grupo.nombre, idGrupo, idNuevoLider === idLider),
+    });
+  }
 }

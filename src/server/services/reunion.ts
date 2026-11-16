@@ -114,7 +114,7 @@ export async function crearReunion(idUsuario: number, idGrupo: number, datos: z.
       idUsuario: participante.idUsuario,
       tipo: "reunion_programada",
       idGrupo,
-      ...plantillasNotificacion.reunionProgramada(datos.titulo, grupo.nombre, idGrupo, cuando),
+      ...plantillasNotificacion.reunionProgramada(datos.titulo, grupo.nombre, idGrupo, reunion.idReunion, cuando),
     });
   }
 

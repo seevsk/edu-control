@@ -35,7 +35,10 @@ export function FormEvaluacion({ action, cerrarEn }: { action: (formData: FormDa
         </div>
       ) : null}
       <label className="flex items-center justify-between gap-3 text-[13px] font-medium">
-        Requiere entrega
+        <span>
+          Hay que entregar un trabajo
+          <span className="block text-xs font-normal text-subtle-foreground">Informe, archivo o proyecto. Apágalo si es un examen o una exposición.</span>
+        </span>
         <Switch name="requiereEntrega" defaultChecked />
       </label>
       <div className="flex items-center justify-end gap-2 border-t pt-4">

@@ -12,6 +12,8 @@ import {
 } from "@/lib/validation/curso";
 import * as cursoService from "@/server/services/curso";
 import { mensajeParaUsuario } from "@/lib/errores";
+import { ESTADOS_EVALUACION } from "@/lib/estado-evaluacion";
+import { z } from "zod";
 
 function leerFormData(formData: FormData) {
   return Object.fromEntries(formData.entries());
@@ -187,9 +189,49 @@ export async function eliminarEvaluacionAction(idCurso: number, idEvaluacion: nu
   redirect(`/cursos/${idCurso}`);
 }
 
-export async function marcarEvaluacionEntregadaAction(idCurso: number, idEvaluacion: number) {
+function rutaEvaluacion(idCurso: number, idEvaluacion: number) {
+  return `/cursos/${idCurso}?evaluacion=${idEvaluacion}`;
+}
+
+export async function marcarEvaluacionEntregadaAction(idCurso: number, idEvaluacion: number, entregada: boolean) {
   const sesion = await requerirSesion();
-  await cursoService.marcarEvaluacionEntregada(sesion.idUsuario, idCurso, idEvaluacion);
+  try {
+    await cursoService.marcarEvaluacionEntregada(sesion.idUsuario, idCurso, idEvaluacion, entregada);
+  } catch (error) {
+    redirect(`${rutaEvaluacion(idCurso, idEvaluacion)}&error=${encodeURIComponent(mensajeParaUsuario(error, "No se pudo guardar"))}`);
+  }
   revalidatePath(`/cursos/${idCurso}`);
-  redirect(`/cursos/${idCurso}`);
+  revalidatePath("/");
+  redirect(rutaEvaluacion(idCurso, idEvaluacion));
+}
+
+const cambioEstadoEvaluacionSchema = z.object({
+  destino: z.enum(ESTADOS_EVALUACION),
+  motivo: z.string().trim().max(500, "El motivo admite hasta 500 caracteres").optional(),
+});
+
+export async function cambiarEstadoEvaluacionAction(idCurso: number, idEvaluacion: number, formData: FormData) {
+  const sesion = await requerirSesion();
+  const parseo = cambioEstadoEvaluacionSchema.safeParse({
+    destino: formData.get("destino"),
+    motivo: formData.get("motivo") ?? undefined,
+  });
+  if (!parseo.success) {
+    redirect(`${rutaEvaluacion(idCurso, idEvaluacion)}&error=${encodeURIComponent(parseo.error.issues[0].message)}`);
+  }
+  try {
+    await cursoService.cambiarEstadoEvaluacion(sesion.idUsuario, idEvaluacion, parseo.data.destino, parseo.data.motivo);
+  } catch (error) {
+    redirect(`${rutaEvaluacion(idCurso, idEvaluacion)}&error=${encodeURIComponent(mensajeParaUsuario(error, "No se pudo cambiar el estado"))}`);
+  }
+  revalidatePath(`/cursos/${idCurso}`);
+  revalidatePath("/");
+  revalidatePath("/calendario");
+  redirect(rutaEvaluacion(idCurso, idEvaluacion));
+}
+
+/** Se llama al abrir el detalle: registra la primera vista sin redirigir. */
+export async function registrarVistaEvaluacionAction(idEvaluacion: number) {
+  const sesion = await requerirSesion();
+  await cursoService.registrarVistaEvaluacion(sesion.idUsuario, idEvaluacion).catch(() => undefined);
 }

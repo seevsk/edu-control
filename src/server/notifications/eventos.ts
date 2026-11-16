@@ -14,6 +14,9 @@ export const EVENTOS_NOTIFICACION = {
   tarea_descartada: { correo: false, actividad: false },
   // Requiere que los invitados confirmen asistencia, por eso se considera importante.
   reunion_programada: { correo: true, actividad: false },
+  integrante_salio: { correo: false, actividad: false },
+  // Aprobado por el usuario (2026-11-16): aviso y correo al registrar una evaluación propia.
+  evaluacion_creada: { correo: true, actividad: false },
 } as const;
 
 export type TipoNotificacionConfigurado = keyof typeof EVENTOS_NOTIFICACION;

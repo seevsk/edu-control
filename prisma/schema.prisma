@@ -72,6 +72,22 @@ enum TipoNotificacion {
   tarea_reprogramada
   tarea_descartada
   reunion_programada
+  integrante_salio
+  evaluacion_creada
+}
+
+enum EstadoEvaluacion {
+  pendiente
+  en_progreso
+  completada
+  descartada
+}
+
+enum AccionEvaluacion {
+  creada
+  vista
+  estado
+  entrega
 }
 
 enum RespuestaReunion {
@@ -205,14 +221,34 @@ model Evaluacion {
   fechaCreacion           DateTime  @default(now()) @map("fecha_creacion")
   /// Si esta evaluacion se trajo de un curso importado, la evaluacion original.
   importadoDeIdEvaluacion Int?      @map("importado_de_id_evaluacion")
+  /// Avance personal del dueno. No se sincroniza al importar ni al traer actualizaciones.
+  estado                  EstadoEvaluacion @default(pendiente)
+  /// Primera vez que el dueno abrio el detalle.
+  fechaVista              DateTime? @map("fecha_vista")
 
-  curso  Curso   @relation(fields: [idCurso], references: [idCurso], onDelete: Cascade)
-  grupos Grupo[]
+  curso     Curso                 @relation(fields: [idCurso], references: [idCurso], onDelete: Cascade)
+  grupos    Grupo[]
+  historial EvaluacionHistorial[]
 
   importadoDe   Evaluacion?  @relation("ImportacionEvaluacion", fields: [importadoDeIdEvaluacion], references: [idEvaluacion], onDelete: SetNull)
   importaciones Evaluacion[] @relation("ImportacionEvaluacion")
 
   @@map("evaluacion")
+}
+
+/// Registro inmutable del avance personal de una evaluacion (como tarea_historial; el autor es siempre el dueno del curso).
+model EvaluacionHistorial {
+  idHistorial   Int              @id @default(autoincrement()) @map("id_historial")
+  idEvaluacion  Int              @map("id_evaluacion")
+  accion        AccionEvaluacion
+  valorAnterior String?          @map("valor_anterior")
+  valorNuevo    String?          @map("valor_nuevo")
+  fecha         DateTime         @default(now())
+
+  evaluacion Evaluacion @relation(fields: [idEvaluacion], references: [idEvaluacion], onDelete: Cascade)
+
+  @@index([idEvaluacion])
+  @@map("evaluacion_historial")
 }
 
 /// Trabajo grupal, con su propia fecha limite y enlace del trabajo.
@@ -248,8 +284,10 @@ model GrupoIntegrante {
   fechaRespuesta   DateTime?        @map("fecha_respuesta")
   /// Quién envió la invitación (NULL para el creador del grupo).
   idInvitador      Int?             @map("id_invitador")
-  /// Cuándo el líder lo retiró del grupo.
+  /// Cuándo dejó el grupo (lo retiró el líder o salió por su cuenta).
   fechaRetiro      DateTime?        @map("fecha_retiro")
+  /// true = salió por su cuenta; false = lo retiró el líder.
+  retiroVoluntario Boolean          @default(false) @map("retiro_voluntario")
 
   grupo     Grupo    @relation(fields: [idGrupo], references: [idGrupo], onDelete: Cascade)
   usuario   Usuario  @relation(fields: [idUsuario], references: [idUsuario])

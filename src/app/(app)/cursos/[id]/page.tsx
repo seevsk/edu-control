@@ -1,8 +1,9 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CheckCircle2, Circle, Monitor, MoreHorizontal, Pencil, Plus, Repeat, Users } from "lucide-react";
+import { Monitor, MoreHorizontal, Pencil, Plus, Repeat, Users } from "lucide-react";
 import { requerirSesion } from "@/server/auth/session";
-import { obtenerCursoDelUsuario, hayActualizacionesDeCursoImportado } from "@/server/services/curso";
+import { obtenerCursoDelUsuario, obtenerEvaluacionDelUsuario, hayActualizacionesDeCursoImportado } from "@/server/services/curso";
 import { listarMisGrupos } from "@/server/services/grupo";
 import { DIAS_SEMANA } from "@/lib/dates";
 import { distancia, duracionMinutos, fechaCorta, rangoHoras } from "@/lib/formato-fecha";
@@ -35,6 +36,20 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { FormEvaluacion } from "./_components/form-evaluacion";
+import { DetalleEvaluacion } from "./_components/detalle-evaluacion";
+import { StatusIcon } from "@/components/ui-app/status-icon";
+import { ETIQUETA_ESTADO_EVALUACION, evaluacionAbierta } from "@/lib/estado-evaluacion";
+
+// "Origen" (creado por ti / importado) queda oculto por ahora (pedido del usuario, 2026-11-16).
+const MOSTRAR_ORIGEN = false;
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const sesion = await requerirSesion();
+  const curso = Number.isInteger(Number(id)) ? await obtenerCursoDelUsuario(sesion.idUsuario, Number(id)).catch(() => null) : null;
+  if (!curso) notFound();
+  return { title: aOracion(curso.nombre) };
+}
 
 const CAMPO = "flex flex-col gap-1.5 text-[13px] font-medium";
 const DIAS_CURSO = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
@@ -53,7 +68,7 @@ export default async function CursoDetallePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; toast?: string; editar?: string; nuevaEvaluacion?: string; sesion?: string; horario?: string; nuevo?: string }>;
+  searchParams: Promise<{ error?: string; toast?: string; editar?: string; nuevaEvaluacion?: string; sesion?: string; horario?: string; nuevo?: string; evaluacion?: string }>;
 }) {
   const { id } = await params;
   const idCurso = Number(id);
@@ -63,9 +78,13 @@ export default async function CursoDetallePage({
 
   const curso = await obtenerCursoDelUsuario(sesion.idUsuario, idCurso).catch(() => null);
   if (!curso) notFound();
-  const [hayActualizaciones, grupos] = await Promise.all([
+  const idEvaluacionAbierta = Number(consulta.evaluacion);
+  const [hayActualizaciones, grupos, evaluacionAbiertaDetalle] = await Promise.all([
     curso.importadoDeIdCurso ? hayActualizacionesDeCursoImportado(idCurso) : Promise.resolve(false),
     listarMisGrupos(sesion.idUsuario),
+    Number.isInteger(idEvaluacionAbierta) && curso.evaluaciones.some((evaluacion) => evaluacion.idEvaluacion === idEvaluacionAbierta)
+      ? obtenerEvaluacionDelUsuario(sesion.idUsuario, idEvaluacionAbierta).catch(() => null)
+      : Promise.resolve(null),
   ]);
 
   const ahora = new Date();
@@ -80,8 +99,9 @@ export default async function CursoDetallePage({
   const resumenHorario = primera
     ? `${DIAS_SEMANA.find((dia) => dia.valor === primera.diaSemana)?.nombre} ${rangoHoras(horas(primera.horaInicio), horas(primera.horaFin))}${curso.horarios.length > 1 ? ` +${curso.horarios.length - 1}` : ""}`
     : null;
-  const proximas = curso.evaluaciones.filter((evaluacion) => evaluacion.fechaCierre >= ahora);
-  const cerradas = curso.evaluaciones.filter((evaluacion) => evaluacion.fechaCierre < ahora).reverse();
+  // Próximas = abiertas que no cierran; el resto (terminadas, descartadas o ya cerradas) va abajo.
+  const proximas = curso.evaluaciones.filter((evaluacion) => evaluacionAbierta(evaluacion.estado) && evaluacion.fechaCierre >= ahora);
+  const cerradas = curso.evaluaciones.filter((evaluacion) => !proximas.includes(evaluacion)).reverse();
   const idsRelacionados = new Set([curso.idCurso, curso.importadoDeIdCurso].filter((valor): valor is number => valor !== null));
   const gruposDelCurso = grupos.filter((grupo) => grupo.estado === "activo" && grupo.evaluacion && idsRelacionados.has(grupo.evaluacion.curso.idCurso));
   const sesionEditada = curso.horarios.find((horario) => String(horario.idHorario) === consulta.sesion);
@@ -89,33 +109,37 @@ export default async function CursoDetallePage({
 
   function FilaEvaluacion({ evaluacion }: { evaluacion: NonNullable<typeof curso>["evaluaciones"][number] }) {
     const entrega = !evaluacion.requiereEntrega
-      ? { texto: "No aplica", clase: "text-subtle-foreground" }
+      ? { texto: "Sin entrega", clase: "text-subtle-foreground" }
       : evaluacion.fechaEntrega
-        ? { texto: "Entregado", clase: "text-estado-completada" }
-        : { texto: "Pendiente", clase: "text-hoy" };
-    const cerrada = evaluacion.fechaCierre < ahora;
+        ? { texto: "Entregada", clase: "text-estado-completada" }
+        : { texto: "Por entregar", clase: "text-hoy" };
+    const vencida = evaluacionAbierta(evaluacion.estado) && evaluacion.fechaCierre < ahora;
     return (
-      <li className="flex min-h-[52px] items-center gap-3 border-b border-border-subtle px-2 text-sm hover:bg-muted">
-        {evaluacion.fechaEntrega || cerrada ? (
-          <CheckCircle2 className={`size-4 shrink-0 ${evaluacion.fechaEntrega ? "text-estado-completada" : "text-subtle-foreground"}`} aria-hidden />
-        ) : (
-          <Circle className="size-4 shrink-0 text-estado-pendiente" aria-hidden />
-        )}
-        <span className="min-w-0 flex-1 truncate">{evaluacion.nombre}</span>
+      <li className="relative flex min-h-[52px] items-center gap-3 border-b border-border-subtle px-2 text-sm hover:bg-muted">
+        <StatusIcon estado={evaluacion.estado} />
+        <Link
+          href={`${ruta}?evaluacion=${evaluacion.idEvaluacion}`}
+          scroll={false}
+          className="min-w-0 flex-1 truncate after:absolute after:inset-0 focus-visible:underline focus-visible:outline-none"
+        >
+          <span className={evaluacion.estado === "descartada" ? "text-subtle-foreground line-through" : undefined}>{evaluacion.nombre}</span>
+          <span className="sr-only"> · {ETIQUETA_ESTADO_EVALUACION[evaluacion.estado]}</span>
+          {vencida ? <span className="ml-2 text-xs text-destructive">Vencida</span> : null}
+        </Link>
         <span className="hidden w-[190px] flex-col sm:flex">
           <time dateTime={evaluacion.fechaCierre.toISOString()}>{fechaCorta(evaluacion.fechaCierre, { ahora, conHora: true })}</time>
-          <span className="text-xs text-subtle-foreground">{evaluacion.requiereEntrega ? distancia(evaluacion.fechaCierre, ahora) : "sin entrega"}</span>
+          <span className="text-xs text-subtle-foreground">{evaluacion.requiereEntrega ? distancia(evaluacion.fechaCierre, ahora) : "examen o exposición"}</span>
         </span>
         <span className="w-[100px]">
           <span className={`rounded-full border px-2 py-0.5 text-xs whitespace-nowrap ${entrega.clase}`}>{entrega.texto}</span>
         </span>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="size-8" aria-label={`Acciones de ${evaluacion.nombre}`}><MoreHorizontal aria-hidden /></Button>
+            <Button variant="ghost" size="icon" className="relative z-10 size-8" aria-label={`Acciones de ${evaluacion.nombre}`}><MoreHorizontal aria-hidden /></Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             {evaluacion.requiereEntrega && !evaluacion.fechaEntrega ? (
-              <form action={marcarEvaluacionEntregadaAction.bind(null, idCurso, evaluacion.idEvaluacion)}>
+              <form action={marcarEvaluacionEntregadaAction.bind(null, idCurso, evaluacion.idEvaluacion, true)}>
                 <DropdownMenuItem asChild><button type="submit" className="w-full">Marcar entregada</button></DropdownMenuItem>
               </form>
             ) : null}
@@ -171,7 +195,7 @@ export default async function CursoDetallePage({
           </div>
         </header>
 
-        {error && !consulta.editar && !consulta.nuevaEvaluacion && !consulta.sesion && !consulta.horario ? (
+        {error && !consulta.editar && !consulta.nuevaEvaluacion && !consulta.sesion && !consulta.horario && !evaluacionAbiertaDetalle ? (
           <p role="alert" className="mt-4 rounded-md bg-destructive/10 px-3 py-2 text-[13px] text-destructive">{error}</p>
         ) : null}
 
@@ -265,7 +289,7 @@ export default async function CursoDetallePage({
                   ["Docente", docente ?? "Sin registrar"],
                   ["Modalidad", modalidad ?? "Sin especificar"],
                   ["Estado", curso.activo ? "Activo este ciclo" : "Inactivo"],
-                  ["Origen", importado ? `Importado${dueno ? ` de ${dueno}` : ""}` : "Creado por ti"],
+                  ...(MOSTRAR_ORIGEN ? [["Origen", importado ? `Importado${dueno ? ` de ${dueno}` : ""}` : "Creado por ti"]] : []),
                 ].map(([etiqueta, valor]) => (
                   <div key={etiqueta} className="flex flex-col gap-0.5 border-b border-border-subtle py-2.5">
                     <dt className="text-xs text-subtle-foreground">{etiqueta}</dt>
@@ -347,6 +371,12 @@ export default async function CursoDetallePage({
           {error ? <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-[13px] text-destructive">{error}</p> : null}
           <FormEvaluacion action={agregarEvaluacionAction.bind(null, idCurso)} cerrarEn={ruta} />
         </DialogoUrl>
+      ) : null}
+
+      {evaluacionAbiertaDetalle ? (
+        <PanelLateral titulo={evaluacionAbiertaDetalle.nombre} descripcion={nombre} cerrarEn={ruta}>
+          <DetalleEvaluacion idCurso={idCurso} evaluacion={evaluacionAbiertaDetalle} error={error} />
+        </PanelLateral>
       ) : null}
 
       {sesionEditada ? (

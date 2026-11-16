@@ -1,3 +1,4 @@
+import { metadataDeGrupo } from "../_components/metadata";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requerirSesion } from "@/server/auth/session";
@@ -10,7 +11,7 @@ import { Toast } from "@/components/toast";
 import { UserAvatar } from "@/components/ui-app/user-avatar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { actualizarPreferenciaCorreoActividadAction, invitarIntegranteAction, retirarIntegranteAction } from "../../actions";
+import { actualizarPreferenciaCorreoActividadAction, invitarIntegranteAction, retirarIntegranteAction, salirDelGrupoAction } from "../../actions";
 import { MarcoGrupo } from "../_components/marco-grupo";
 
 const ETIQUETAS_INVITACION: Record<string, string> = {
@@ -28,6 +29,8 @@ const ETIQUETAS_ROL: Record<string, string> = {
 function porcentaje(valor: number | null) {
   return valor === null ? "—" : `${Math.round(valor * 100)} %`;
 }
+
+export const generateMetadata = metadataDeGrupo("Integrantes");
 
 export default async function IntegrantesGrupoPage({
   params,
@@ -55,6 +58,10 @@ export default async function IntegrantesGrupoPage({
   const metricaDe = new Map(metricas.porIntegrante.map((metrica) => [metrica.idUsuario, metrica]));
   const idsYaEnGrupo = new Set(grupo.integrantes.map((integrante) => integrante.idUsuario));
   const integranteActual = grupo.integrantes.find((integrante) => integrante.idUsuario === sesion.idUsuario)!;
+  // El líder solo puede salir cediendo el liderazgo a un miembro aceptado (decisión del usuario, 2026-11-16).
+  const candidatosLider = grupo.integrantes.filter(
+    (integrante) => integrante.estadoInvitacion === "aceptada" && integrante.rol === "miembro" && integrante.idUsuario !== sesion.idUsuario,
+  );
 
   return (
     <MarcoGrupo datos={resultado} idUsuario={sesion.idUsuario} activa="integrantes">
@@ -81,7 +88,7 @@ export default async function IntegrantesGrupoPage({
               {grupo.integrantes.map((integrante) => {
                 const metrica = metricaDe.get(integrante.idUsuario);
                 const nombre = nombreCorto(integrante.usuario.nombre, integrante.usuario.apellidos);
-                const estado = ETIQUETAS_INVITACION[integrante.estadoInvitacion];
+                const estado = integrante.estadoInvitacion === "retirado" && integrante.retiroVoluntario ? "salió del grupo" : ETIQUETAS_INVITACION[integrante.estadoInvitacion];
                 return (
                   <tr key={integrante.idIntegrante} className="border-t">
                     <td className="h-12 px-4">
@@ -178,6 +185,44 @@ export default async function IntegrantesGrupoPage({
             </p>
           )}
           <p className="mt-2 text-xs text-subtle-foreground">Invitaciones, asignaciones, devoluciones y reuniones siempre llegan.</p>
+        </section>
+      ) : null}
+
+      {grupo.estado === "activo" ? (
+        <section aria-labelledby="titulo-salir" className="flex flex-wrap items-center gap-4 rounded-lg border border-destructive/30 p-4">
+          <div className="min-w-[240px] flex-1">
+            <h2 id="titulo-salir" className="text-[13px] font-medium">Salir del grupo</h2>
+            <p className="mt-0.5 text-[13px] text-muted-foreground">
+              {esLider
+                ? candidatosLider.length
+                  ? "Elige quién queda como líder. Tus tareas abiertas quedarán sin asignar."
+                  : "Para salir necesitas otro miembro aceptado que quede como líder."
+                : "Dejarás de ver el grupo. Tus tareas abiertas quedarán sin asignar y tu aporte se conserva."}
+            </p>
+          </div>
+          {!esLider || candidatosLider.length ? (
+            <form action={salirDelGrupoAction.bind(null, idGrupo)} className="flex flex-wrap items-center gap-2">
+              {esLider ? (
+                <label className="flex items-center gap-2 text-[13px]">
+                  <span className="sr-only">Nuevo líder</span>
+                  <select name="nuevoLider" required defaultValue="" className="h-8 rounded-md border border-input bg-background px-2 text-[13px]">
+                    <option value="" disabled>Nuevo líder…</option>
+                    {candidatosLider.map((candidato) => (
+                      <option key={candidato.idUsuario} value={candidato.idUsuario}>
+                        {nombreCorto(candidato.usuario.nombre, candidato.usuario.apellidos)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+              <BotonConfirmacion
+                mensaje={`¿Salir de ${grupo.nombre}? No podrás volver a entrar a este grupo.`}
+                className="inline-flex h-8 items-center rounded-md border border-input px-3 text-[13px] font-medium text-destructive hover:bg-destructive/10"
+              >
+                Salir del grupo
+              </BotonConfirmacion>
+            </form>
+          ) : null}
         </section>
       ) : null}
     </MarcoGrupo>

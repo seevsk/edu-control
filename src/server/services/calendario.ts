@@ -12,7 +12,7 @@ export async function obtenerCalendarioEntre(idUsuario: number, desdeISO: string
       include: {
         horarios: true,
         evaluaciones: {
-          where: { fechaCierre: { gte: new Date() } },
+          where: { fechaCierre: { gte: new Date() }, estado: { in: ["pendiente", "en_progreso"] } },
           orderBy: { fechaCierre: "asc" },
           take: 1,
           select: { nombre: true, fechaCierre: true },
@@ -24,7 +24,7 @@ export async function obtenerCalendarioEntre(idUsuario: number, desdeISO: string
       orderBy: [{ diaSemana: "asc" }, { horaInicio: "asc" }],
     }),
     prisma.evaluacion.findMany({
-      where: { curso: { idUsuario }, fechaCierre: { gte: desde, lt: hasta } },
+      where: { curso: { idUsuario }, estado: { not: "descartada" }, fechaCierre: { gte: desde, lt: hasta } },
       include: { curso: true },
       orderBy: { fechaCierre: "asc" },
     }),

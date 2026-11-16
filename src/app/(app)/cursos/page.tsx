@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { MoreHorizontal, Plus } from "lucide-react";
 import { requerirSesion } from "@/server/auth/session";
@@ -20,6 +21,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { TablaCursos, type FilaCurso } from "./_components/tabla-cursos";
+
+export const metadata: Metadata = { title: "Cursos" };
 
 const CAMPO = "flex flex-col gap-1.5 text-[13px] font-medium";
 
