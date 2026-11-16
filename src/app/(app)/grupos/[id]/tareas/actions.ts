@@ -22,26 +22,28 @@ function leerFormData(formData: FormData) {
   return Object.fromEntries(formData.entries());
 }
 
+/** Vuelve directo a la vista actual (/grupos/[id], con el detalle en ?tarea=), sin pasar por las rutas antiguas. */
 function rutaTarea(idGrupo: number, idTarea: number, destino: DestinoTarea, filtros: FiltrosTarea = {}) {
-  if (destino === "detalle") return `/grupos/${idGrupo}/tareas/${idTarea}`;
   const parametros = new URLSearchParams();
-  if (destino === "tabla") parametros.set("vista", "lista");
-  if (filtros.q) parametros.set("q", filtros.q);
+  if (destino === "detalle") parametros.set("tarea", String(idTarea));
   if (filtros.estado) parametros.set("estado", filtros.estado);
   if (filtros.asignado) parametros.set("asignado", String(filtros.asignado));
-  if (filtros.foco) parametros.set("foco", filtros.foco);
   const consulta = parametros.toString();
-  return `/grupos/${idGrupo}/tareas${consulta ? `?${consulta}` : ""}`;
+  return `/grupos/${idGrupo}${consulta ? `?${consulta}` : ""}`;
+}
+
+/** Agrega un parámetro respetando si la ruta ya tiene consulta. */
+function conParametro(ruta: string, clave: string, valor: string) {
+  return `${ruta}${ruta.includes("?") ? "&" : "?"}${clave}=${encodeURIComponent(valor)}`;
 }
 
 function redirigirErrorTarea(ruta: string, mensaje: string): never {
-  redirect(`${ruta}${ruta.includes("?") ? "&" : "?"}error=${encodeURIComponent(mensaje)}`);
+  redirect(conParametro(ruta, "error", mensaje));
 }
 
 function revalidarTarea(idGrupo: number, idTarea: number) {
   revalidatePath(`/grupos/${idGrupo}`);
   revalidatePath(`/grupos/${idGrupo}/tareas`);
-  revalidatePath(`/grupos/${idGrupo}/tareas/${idTarea}`);
   revalidatePath(`/grupos/${idGrupo}/actividad`);
   revalidatePath("/calendario");
   revalidatePath("/");
@@ -54,17 +56,17 @@ export async function crearTareaAction(idGrupo: number, formData: FormData) {
   const parseo = crearTareaSchema.safeParse(leerFormData(formData));
 
   if (!parseo.success) {
-    redirect(`/grupos/${idGrupo}/tareas?nueva=1&error=${encodeURIComponent(parseo.error.issues[0].message)}`);
+    redirect(`/grupos/${idGrupo}?nueva=1&error=${encodeURIComponent(parseo.error.issues[0].message)}`);
   }
 
   try {
     await tareaService.crearTarea(sesion.idUsuario, grupoId.data, parseo.data);
   } catch (error) {
-    redirect(`/grupos/${idGrupo}/tareas?nueva=1&error=${encodeURIComponent(mensajeParaUsuario(error, "No se pudo crear la tarea"))}`);
+    redirect(`/grupos/${idGrupo}?nueva=1&error=${encodeURIComponent(mensajeParaUsuario(error, "No se pudo crear la tarea"))}`);
   }
 
-  revalidatePath(`/grupos/${idGrupo}/tareas`);
-  redirect(`/grupos/${idGrupo}/tareas?toast=${encodeURIComponent("Tarea creada")}`);
+  revalidatePath(`/grupos/${idGrupo}`);
+  redirect(`/grupos/${idGrupo}?toast=${encodeURIComponent("Tarea creada")}`);
 }
 
 export async function reasignarTareaAction(
@@ -156,16 +158,16 @@ export async function editarTareaAction(idGrupo: number, idTarea: number, formDa
   if (!contexto.success) redirect("/grupos");
   const ruta = rutaTarea(contexto.data.idGrupo, contexto.data.idTarea, "detalle");
   const parseo = editarTareaSchema.safeParse(leerFormData(formData));
-  if (!parseo.success) redirigirErrorTarea(`${ruta}?editar=1`, parseo.error.issues[0].message);
+  if (!parseo.success) redirigirErrorTarea(conParametro(ruta, "editar", "1"), parseo.error.issues[0].message);
 
   try {
     await tareaService.editarTarea(sesion.idUsuario, contexto.data.idGrupo, contexto.data.idTarea, parseo.data);
   } catch (error) {
-    redirigirErrorTarea(`${ruta}?editar=1`, mensajeParaUsuario(error, "No se pudo guardar la tarea"));
+    redirigirErrorTarea(conParametro(ruta, "editar", "1"), mensajeParaUsuario(error, "No se pudo guardar la tarea"));
   }
 
   revalidarTarea(idGrupo, idTarea);
-  redirect(`${ruta}?toast=${encodeURIComponent("Tarea actualizada")}`);
+  redirect(conParametro(ruta, "toast", "Tarea actualizada"));
 }
 
 /** Se llama al abrir el detalle; nunca muestra errores porque es solo un registro de seguimiento. */
@@ -178,5 +180,5 @@ export async function registrarVistaTareaAction(idGrupo: number, idTarea: number
   } catch {
     return;
   }
-  revalidatePath(`/grupos/${idGrupo}/tareas/${idTarea}`);
+  revalidatePath(`/grupos/${idGrupo}`);
 }
