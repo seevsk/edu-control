@@ -53,7 +53,7 @@ export function Modal({
       onClick={(evento) => {
         if (evento.target === evento.currentTarget) cerrar();
       }}
-      className={`m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] overflow-hidden rounded-lg border border-border bg-surface p-0 text-text shadow-xl backdrop:bg-slate-950/50 ${ANCHOS[tamano]}`}
+      className={`m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] overflow-hidden rounded-lg border border-border bg-surface p-0 text-text shadow-xl backdrop:bg-overlay ${ANCHOS[tamano]}`}
     >
       <div className="flex max-h-[calc(100dvh-2rem)] flex-col">
         <header className="flex shrink-0 items-start justify-between gap-4 border-b border-border px-4 py-3 sm:px-6 sm:py-4">

@@ -37,6 +37,8 @@ enum EstadoInvitacion {
   aceptada
   rechazada
   retirado
+  /// El lider retiro la invitacion antes de que respondiera: nunca fue integrante, se puede volver a invitar.
+  cancelada
 }
 
 enum EstadoGrupo {

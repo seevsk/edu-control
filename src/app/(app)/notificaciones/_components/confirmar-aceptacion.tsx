@@ -33,7 +33,7 @@ export function ConfirmarAceptacion({
         onClick={(evento) => {
           if (evento.target === evento.currentTarget) evento.currentTarget.close();
         }}
-        className="m-auto w-[calc(100%-2rem)] max-w-lg rounded-md border border-border bg-surface p-0 text-text shadow-xl backdrop:bg-slate-950/50"
+        className="m-auto w-[calc(100%-2rem)] max-w-lg rounded-md border border-border bg-surface p-0 text-text shadow-xl backdrop:bg-overlay"
       >
         <div className="border-b border-border px-5 py-4">
           <h2 id={tituloId} className="text-base font-semibold">

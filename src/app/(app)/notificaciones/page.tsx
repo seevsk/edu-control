@@ -68,6 +68,7 @@ const ESTADO_HISTORIAL = {
   aceptada: { Icono: CheckCircle2, color: "text-estado-completada", texto: "Aceptaste" },
   rechazada: { Icono: XCircle, color: "text-subtle-foreground", texto: "Rechazaste" },
   retirado: { Icono: LogOut, color: "text-destructive", texto: "Te retiraron" },
+  cancelada: { Icono: XCircle, color: "text-subtle-foreground", texto: "Cancelaron" },
   pendiente: { Icono: Clock, color: "text-hoy", texto: "Por responder" },
 } as const;
 
