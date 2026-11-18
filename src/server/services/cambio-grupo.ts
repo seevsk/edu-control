@@ -14,10 +14,14 @@ function esConflictoDeEscritura(error: unknown): boolean {
 }
 
 /** Permisos, valores anteriores y escrituras deben ver el mismo estado del grupo. */
-export async function ejecutarCambioDeGrupo<T>(cambio: (tx: Prisma.TransactionClient) => Promise<T>) {
+export async function ejecutarCambioDeGrupo<T>(
+  cambio: (tx: Prisma.TransactionClient) => Promise<T>,
+  opciones: { timeout?: number } = {},
+) {
   try {
     return await prisma.$transaction(cambio, {
       isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      ...opciones,
     });
   } catch (error) {
     if (esConflictoDeEscritura(error)) {

@@ -11,12 +11,11 @@ import { Toast } from "@/components/toast";
 import { UserAvatar } from "@/components/ui-app/user-avatar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { actualizarPreferenciaCorreoActividadAction, invitarIntegranteAction, retirarIntegranteAction, salirDelGrupoAction } from "../../actions";
+import { actualizarPreferenciaCorreoActividadAction, cancelarInvitacionAction, invitarIntegranteAction, retirarIntegranteAction, salirDelGrupoAction } from "../../actions";
 import { MarcoGrupo } from "../_components/marco-grupo";
 
 const ETIQUETAS_INVITACION: Record<string, string> = {
   pendiente: "invitación pendiente",
-  rechazada: "rechazó la invitación",
   retirado: "retirado",
 };
 
@@ -56,7 +55,11 @@ export default async function IntegrantesGrupoPage({
     obtenerMetricasGrupo(sesion.idUsuario, idGrupo),
   ]);
   const metricaDe = new Map(metricas.porIntegrante.map((metrica) => [metrica.idUsuario, metrica]));
-  const idsYaEnGrupo = new Set(grupo.integrantes.map((integrante) => integrante.idUsuario));
+  // Quien rechazó o cuya invitación se canceló no figura como integrante y se puede volver a invitar.
+  const integrantesVisibles = grupo.integrantes.filter(
+    (integrante) => integrante.estadoInvitacion !== "rechazada" && integrante.estadoInvitacion !== "cancelada",
+  );
+  const idsYaEnGrupo = new Set(integrantesVisibles.map((integrante) => integrante.idUsuario));
   const integranteActual = grupo.integrantes.find((integrante) => integrante.idUsuario === sesion.idUsuario)!;
   // El líder solo puede salir cediendo el liderazgo a un miembro aceptado (decisión del usuario, 2026-11-16).
   const candidatosLider = grupo.integrantes.filter(
@@ -85,7 +88,7 @@ export default async function IntegrantesGrupoPage({
               </tr>
             </thead>
             <tbody>
-              {grupo.integrantes.map((integrante) => {
+              {integrantesVisibles.map((integrante) => {
                 const metrica = metricaDe.get(integrante.idUsuario);
                 const nombre = nombreCorto(integrante.usuario.nombre, integrante.usuario.apellidos);
                 const estado = integrante.estadoInvitacion === "retirado" && integrante.retiroVoluntario ? "salió del grupo" : ETIQUETAS_INVITACION[integrante.estadoInvitacion];
@@ -111,7 +114,16 @@ export default async function IntegrantesGrupoPage({
                     <td className="px-4 tabular-nums">{metrica ? porcentaje(metrica.puntualidad) : "—"}</td>
                     {puedeAdministrar ? (
                       <td className="px-4 text-right">
-                        {integrante.rol !== "lider" && integrante.estadoInvitacion !== "retirado" ? (
+                        {integrante.estadoInvitacion === "pendiente" ? (
+                          <form action={cancelarInvitacionAction.bind(null, idGrupo, integrante.idUsuario)}>
+                            <BotonConfirmacion
+                              mensaje={`¿Cancelar la invitación a ${nombre}? Podrás volver a invitarla.`}
+                              className="rounded-md px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/10"
+                            >
+                              Cancelar invitación
+                            </BotonConfirmacion>
+                          </form>
+                        ) : integrante.rol !== "lider" && integrante.estadoInvitacion === "aceptada" ? (
                           <form action={retirarIntegranteAction.bind(null, idGrupo, integrante.idUsuario)}>
                             <BotonConfirmacion
                               mensaje={`¿Retirar a ${nombre} del grupo? Sus tareas abiertas quedarán sin asignar.`}

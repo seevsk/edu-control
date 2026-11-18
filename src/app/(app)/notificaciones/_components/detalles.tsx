@@ -100,6 +100,7 @@ const ESTADO_INVITACION = {
   aceptada: { Icono: CheckCircle2, color: "text-estado-completada", texto: "Aceptada" },
   rechazada: { Icono: XCircle, color: "text-subtle-foreground", texto: "Rechazada" },
   retirado: { Icono: LogOut, color: "text-destructive", texto: "Fuera del grupo" },
+  cancelada: { Icono: XCircle, color: "text-subtle-foreground", texto: "Cancelada" },
 } as const;
 
 export interface InvitacionDetalle {

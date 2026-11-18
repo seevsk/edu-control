@@ -154,6 +154,27 @@ export async function salirDelGrupoAction(idGrupo: number, formData: FormData) {
   redirect(`/grupos?toast=${encodeURIComponent("Saliste del grupo")}`);
 }
 
+export async function cancelarInvitacionAction(idGrupo: number, idUsuarioObjetivo: number) {
+  const sesion = await requerirSesion();
+  const grupoId = idRegistroSchema.safeParse(idGrupo);
+  const usuarioId = idRegistroSchema.safeParse(idUsuarioObjetivo);
+  if (!grupoId.success || !usuarioId.success) {
+    redirect("/grupos");
+  }
+
+  try {
+    await grupoService.cancelarInvitacion(sesion.idUsuario, grupoId.data, usuarioId.data);
+  } catch (error) {
+    const mensaje = mensajeParaUsuario(error, "No se pudo cancelar la invitación");
+    redirect(`/grupos/${idGrupo}/integrantes?error=${encodeURIComponent(mensaje)}`);
+  }
+
+  revalidatePath(`/grupos/${idGrupo}`);
+  revalidatePath(`/grupos/${idGrupo}/integrantes`);
+  revalidatePath("/notificaciones");
+  redirect(`/grupos/${idGrupo}/integrantes?toast=${encodeURIComponent("Invitación cancelada")}`);
+}
+
 export async function retirarIntegranteAction(idGrupo: number, idUsuarioObjetivo: number) {
   const sesion = await requerirSesion();
   const grupoId = idRegistroSchema.safeParse(idGrupo);

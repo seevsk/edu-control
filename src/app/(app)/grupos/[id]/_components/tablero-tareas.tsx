@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
+import { Paperclip, Plus } from "lucide-react";
 import { toast } from "sonner";
 import {
   DndContext,
@@ -44,6 +44,12 @@ function ContenidoTarjeta({ fila, ahora }: { fila: FilaTarea; ahora: Date }) {
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
         <DueChip fecha={fila.fechaLimite} cerrada={cerrada} ahora={ahora} />
+        {fila.adjuntos ? (
+          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground" title={`${fila.adjuntos} ${fila.adjuntos === 1 ? "archivo" : "archivos"} en la entrega`}>
+            <Paperclip className="size-3.5" aria-hidden />
+            {fila.adjuntos}
+          </span>
+        ) : null}
         {fila.nota ? <span className="text-xs text-estado-en-revision">{fila.nota}</span> : null}
       </div>
     </>
@@ -152,6 +158,22 @@ export function TableroTareas({
     const fila = actuales.find((item) => item.idTarea === active.id);
     const destino = over?.id as EstadoTarea | undefined;
     if (!fila || !destino || destino === fila.estado) return;
+
+    // Pasar a revisión exige una entrega: en vez de mover la tarjeta se abre el formulario.
+    if (destino === "en_revision" && fila.estado === "en_progreso") {
+      if (fila.asignado?.idUsuario === idUsuario) {
+        router.push(`${hrefTarea[fila.idTarea]}&entregar=1`, { scroll: false });
+      } else {
+        toast("Solo el responsable envía la entrega a revisión.");
+      }
+      return;
+    }
+    // Aprobar y devolver se hacen en el detalle, donde está la entrega que se revisa.
+    if (fila.estado === "en_revision") {
+      toast(rol === "lider" ? "Revisa la entrega en el detalle para aprobarla o devolverla." : "Solo el líder aprueba o devuelve una entrega.");
+      router.push(hrefTarea[fila.idTarea], { scroll: false });
+      return;
+    }
 
     const accion = accionesDisponiblesTarea({ estado: fila.estado, idAsignado: fila.asignado?.idUsuario ?? null, idUsuario, rol })
       .find((opcion) => opcion.estado === destino);

@@ -37,6 +37,8 @@ enum EstadoInvitacion {
   aceptada
   rechazada
   retirado
+  /// El lider retiro la invitacion antes de que respondiera: nunca fue integrante, se puede volver a invitar.
+  cancelada
 }
 
 enum EstadoGrupo {
@@ -50,6 +52,12 @@ enum EstadoTarea {
   en_revision
   completada
   descartada
+}
+
+enum ResultadoEntrega {
+  en_revision
+  aprobada
+  devuelta
 }
 
 enum AccionHistorial {
@@ -126,6 +134,8 @@ model Usuario {
   tareasCreadas   Tarea[]           @relation("TareaCreador")
   tareasAsignadas Tarea[]           @relation("TareaAsignado")
   historial       TareaHistorial[]
+  entregasEnviadas  Entrega[]        @relation("EntregaAutor")
+  entregasRevisadas Entrega[]        @relation("EntregaRevisor")
   notificaciones  Notificacion[]
   reunionesCreadas Reunion[]         @relation("ReunionCreador")
   reuniones        ReunionAsistente[]
@@ -315,6 +325,7 @@ model Tarea {
   creador   Usuario          @relation("TareaCreador", fields: [idCreador], references: [idUsuario])
   asignado  Usuario?         @relation("TareaAsignado", fields: [idAsignado], references: [idUsuario])
   historial TareaHistorial[]
+  entregas  Entrega[]
 
   @@index([idGrupo, estado])
   @@map("tarea")
@@ -334,6 +345,55 @@ model TareaHistorial {
   usuario Usuario @relation(fields: [idUsuario], references: [idUsuario])
 
   @@map("tarea_historial")
+}
+
+/// Entrega que el asignado envia al pasar una tarea a revision. El resultado lo da el lider.
+/// "Autoaprobada" no se guarda: es id_revisor = id_autor.
+model Entrega {
+  idEntrega        Int              @id @default(autoincrement()) @map("id_entrega")
+  idTarea          Int              @map("id_tarea")
+  idAutor          Int              @map("id_autor")
+  titulo           String           @db.VarChar(120)
+  descripcion      String?          @db.VarChar(2000)
+  enlace           String?
+  resultado        ResultadoEntrega @default(en_revision)
+  idRevisor        Int?             @map("id_revisor")
+  fechaRevision    DateTime?        @map("fecha_revision")
+  motivoDevolucion String?          @map("motivo_devolucion") @db.VarChar(500)
+  fechaEnvio       DateTime         @default(now()) @map("fecha_envio")
+
+  tarea    Tarea            @relation(fields: [idTarea], references: [idTarea], onDelete: Cascade)
+  autor    Usuario          @relation("EntregaAutor", fields: [idAutor], references: [idUsuario])
+  revisor  Usuario?         @relation("EntregaRevisor", fields: [idRevisor], references: [idUsuario])
+  archivos EntregaArchivo[]
+
+  @@index([idTarea, fechaEnvio])
+  @@map("entrega")
+}
+
+/// Metadatos de un archivo adjunto. El binario vive aparte para no cargarlo al listar entregas.
+model EntregaArchivo {
+  idArchivo Int    @id @default(autoincrement()) @map("id_archivo")
+  idEntrega Int    @map("id_entrega")
+  nombre    String @db.VarChar(200)
+  mime      String @db.VarChar(100)
+  tamano    Int
+
+  entrega   Entrega                  @relation(fields: [idEntrega], references: [idEntrega], onDelete: Cascade)
+  contenido EntregaArchivoContenido?
+
+  @@index([idEntrega])
+  @@map("entrega_archivo")
+}
+
+/// Binario del archivo (demo: se guarda en Postgres con topes de tamano; ver src/server/almacen).
+model EntregaArchivoContenido {
+  idArchivo Int   @id @map("id_archivo")
+  datos     Bytes
+
+  archivo EntregaArchivo @relation(fields: [idArchivo], references: [idArchivo], onDelete: Cascade)
+
+  @@map("entrega_archivo_contenido")
 }
 
 /// Reunion de un grupo (de una sola vez). Las fechas se guardan en UTC.

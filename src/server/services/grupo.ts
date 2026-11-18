@@ -30,7 +30,8 @@ export async function listarMisGrupos(idUsuario: number) {
 /** Historial de invitaciones respondidas y retiros del usuario (no incluye los grupos que creó). */
 export async function listarHistorialInvitaciones(idUsuario: number) {
   return prisma.grupoIntegrante.findMany({
-    where: { idUsuario, estadoInvitacion: { not: "pendiente" }, grupo: { NOT: { idCreador: idUsuario } } },
+    // Una invitación cancelada antes de responderla no entra al historial de quien la recibió.
+    where: { idUsuario, estadoInvitacion: { notIn: ["pendiente", "cancelada"] }, grupo: { NOT: { idCreador: idUsuario } } },
     include: {
       invitador: { select: { idUsuario: true, nombre: true, apellidos: true, fotoUrl: true } },
       grupo: { select: { idGrupo: true, nombre: true, estado: true, evaluacion: { select: { nombre: true, curso: { select: { idCurso: true, nombre: true } } } } } },
@@ -223,14 +224,23 @@ export async function invitarIntegrante(idActor: number, idGrupo: number, idUsua
     const invitado = await tx.usuario.findUnique({ where: { idUsuario: idUsuarioInvitado } });
     if (!invitado || invitado.eliminadoEn) throw new ErrorDeNegocio("Usuario no encontrado");
 
-    const yaEsIntegrante = await tx.grupoIntegrante.findUnique({
+    const previa = await tx.grupoIntegrante.findUnique({
       where: { idGrupo_idUsuario: { idGrupo, idUsuario: idUsuarioInvitado } },
     });
-    if (yaEsIntegrante) throw new ErrorDeNegocio("Esa persona ya fue invitada a este grupo antes");
+    // Quien rechazó o cuya invitación se canceló puede ser invitado otra vez (reabre su misma fila);
+    // quien ya está, tiene una pendiente, salió o fue retirado, no.
+    if (previa && previa.estadoInvitacion !== "rechazada" && previa.estadoInvitacion !== "cancelada") {
+      throw new ErrorDeNegocio("Esa persona ya fue invitada a este grupo antes");
+    }
 
-    const integrante = await tx.grupoIntegrante.create({
-      data: { idGrupo, idUsuario: idUsuarioInvitado, rol: "miembro", estadoInvitacion: "pendiente", idInvitador: idActor },
-    });
+    const integrante = previa
+      ? await tx.grupoIntegrante.update({
+          where: { idGrupo_idUsuario: { idGrupo, idUsuario: idUsuarioInvitado } },
+          data: { estadoInvitacion: "pendiente", rol: "miembro", fechaInvitacion: new Date(), fechaRespuesta: null, idInvitador: idActor },
+        })
+      : await tx.grupoIntegrante.create({
+          data: { idGrupo, idUsuario: idUsuarioInvitado, rol: "miembro", estadoInvitacion: "pendiente", idInvitador: idActor },
+        });
     return { grupo, integrante };
   });
 
@@ -333,6 +343,28 @@ async function desasignarTareasAbiertas(tx: Prisma.TransactionClient, idGrupo: n
   });
 }
 
+/**
+ * Retira la invitación de alguien que aún no respondió (por ejemplo, se invitó a la persona equivocada).
+ * Nunca fue integrante: no queda como retirado y se la puede volver a invitar.
+ */
+export async function cancelarInvitacion(idActor: number, idGrupo: number, idUsuarioObjetivo: number) {
+  await ejecutarCambioDeGrupo(async (tx) => {
+    await requerirLiderDelGrupo(idActor, idGrupo, tx);
+    await cancelarInvitacionPendiente(tx, idGrupo, idUsuarioObjetivo);
+  });
+}
+
+async function cancelarInvitacionPendiente(tx: Prisma.TransactionClient, idGrupo: number, idUsuario: number) {
+  const objetivo = await tx.grupoIntegrante.findUnique({ where: { idGrupo_idUsuario: { idGrupo, idUsuario } } });
+  if (!objetivo || objetivo.estadoInvitacion !== "pendiente") {
+    throw new ErrorDeNegocio("Esa persona ya no tiene una invitación pendiente");
+  }
+  await tx.grupoIntegrante.update({
+    where: { idGrupo_idUsuario: { idGrupo, idUsuario } },
+    data: { estadoInvitacion: "cancelada" },
+  });
+}
+
 export async function retirarIntegrante(idActor: number, idGrupo: number, idUsuarioObjetivo: number) {
   await ejecutarCambioDeGrupo(async (tx) => {
     await requerirLiderDelGrupo(idActor, idGrupo, tx);
@@ -340,7 +372,12 @@ export async function retirarIntegrante(idActor: number, idGrupo: number, idUsua
     const objetivo = await tx.grupoIntegrante.findUnique({
       where: { idGrupo_idUsuario: { idGrupo, idUsuario: idUsuarioObjetivo } },
     });
-    if (!objetivo || objetivo.estadoInvitacion === "retirado") {
+    // Una invitación pendiente se cancela, no se "retira": así no queda como ex integrante.
+    if (objetivo?.estadoInvitacion === "pendiente") {
+      await cancelarInvitacionPendiente(tx, idGrupo, idUsuarioObjetivo);
+      return;
+    }
+    if (!objetivo || objetivo.estadoInvitacion !== "aceptada") {
       throw new ErrorDeNegocio("Esa persona no es integrante del grupo");
     }
     if (objetivo.rol === "lider") throw new ErrorDeNegocio("El lider no se puede retirar a si mismo");

@@ -55,13 +55,12 @@ export function accionesDisponiblesTarea({
   if (estado === "pendiente" && idAsignado !== null && (esAsignado || esLider)) {
     acciones.push({ estado: "en_progreso", etiqueta: "Empezar tarea" });
   }
-  if (estado === "en_progreso" && esAsignado) {
-    acciones.push({ estado: "en_revision", etiqueta: "Enviar a revisión" });
-  }
-  if (estado === "en_revision" && !esAsignado) {
+  // Pasar a revision ya no es un cambio de estado suelto: exige una entrega (ver `enviarEntrega`).
+  // Revisar es solo del lider, tambien cuando la tarea es suya.
+  if (estado === "en_revision" && esLider) {
     acciones.push(
-      { estado: "completada", etiqueta: "Aprobar y completar" },
-      { estado: "en_progreso", etiqueta: "Devolver a progreso", motivo: "devolver" },
+      { estado: "completada", etiqueta: "Aprobar" },
+      { estado: "en_progreso", etiqueta: "Devolver", motivo: "devolver" },
     );
   }
   if (esLider && estaAbierta(estado)) {

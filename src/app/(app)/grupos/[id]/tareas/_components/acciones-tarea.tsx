@@ -40,7 +40,8 @@ export function AccionesTarea({
   if (rol === "observador") return null;
   const acciones = accionesDisponiblesTarea({ ...tarea, idUsuario, rol })
     .filter((accion) => destino === "detalle" || !accion.gestion);
-  const esperaRevision = tarea.estado === "en_revision" && tarea.idAsignado === idUsuario;
+  // El líder revisa su propia tarea, así que a él no se le dice que espera.
+  const esperaRevision = tarea.estado === "en_revision" && tarea.idAsignado === idUsuario && rol !== "lider";
   const puedeReasignar = tarea.estado === "pendiente" || (tarea.estado === "en_progreso" && rol === "lider");
   if (acciones.length === 0 && !esperaRevision && !puedeReasignar) return null;
   const contenido = (

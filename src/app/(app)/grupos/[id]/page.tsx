@@ -108,7 +108,8 @@ export default async function GrupoTareasPage({
     estado: tarea.estado,
     fechaLimite: tarea.fechaLimite,
     asignado: tarea.asignado ? { idUsuario: tarea.asignado.idUsuario, nombre: tarea.asignado.nombre, apellidos: tarea.asignado.apellidos, fotoUrl: tarea.asignado.fotoUrl } : null,
-    nota: tarea.estado === "en_revision" && puedeGestionar && tarea.idAsignado !== sesion.idUsuario ? "Te toca revisar" : undefined,
+    nota: tarea.estado === "en_revision" && puedeGestionar && datos.rolActual === "lider" ? "Te toca revisar" : undefined,
+    adjuntos: tarea.entregas[0]?._count.archivos ?? 0,
   }));
   const responsableFiltrado = asignables.find((integrante) => integrante.idUsuario === asignado);
 
@@ -317,6 +318,7 @@ export default async function GrupoTareasPage({
             ahora={ahora}
             hrefBase={hrefTarea(tareaAbierta.idTarea)}
             editar={texto(parametros.editar) === "1"}
+            entregar={texto(parametros.entregar) === "1"}
             error={error}
           />
         </PanelLateral>
