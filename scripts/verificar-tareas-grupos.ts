@@ -41,6 +41,9 @@ async function verificar() {
     db = (await import("../src/server/db/client")).prisma;
     const grupoService = await import("../src/server/services/grupo");
     const tareaService = await import("../src/server/services/tarea");
+    const entregaService = await import("../src/server/services/entrega");
+    const enviar = (actor: number, idTarea: number, archivos: { nombre: string; datos: Uint8Array<ArrayBuffer> }[] = []) =>
+      entregaService.enviarEntrega(actor, { idGrupo, idTarea, titulo: "Entrega", descripcion: "Listo para revisar", enlace: "" }, archivos);
     const { crearNotificacion } = await import("../src/server/notifications/crear-notificacion");
     const { ErrorDeNegocio } = await import("../src/lib/errores");
     const { invitacionGrupoSchema, responderInvitacionSchema } = await import("../src/lib/validation/grupo");
@@ -197,7 +200,7 @@ async function verificar() {
       assert.equal((await db!.tarea.findUniqueOrThrow({ where: { idTarea: sinAsignar.idTarea } })).estado, "pendiente");
       await tareaService.reasignarTarea(lider, idGrupo, sinAsignar.idTarea, String(luis));
       await tareaService.cambiarEstadoTarea(luis, idGrupo, sinAsignar.idTarea, "en_progreso");
-      await tareaService.cambiarEstadoTarea(luis, idGrupo, sinAsignar.idTarea, "en_revision");
+      await enviar(luis, sinAsignar.idTarea);
       await tareaService.cambiarEstadoTarea(lider, idGrupo, sinAsignar.idTarea, "completada");
     });
     await caso("las fechas de tarea no admiten pasado ni superar el límite del grupo", async () => {
@@ -274,7 +277,7 @@ async function verificar() {
         await assert.rejects(tareaService.reasignarTarea(lider, idGrupo, tarea.idTarea, ""));
         assert.deepEqual(await db!.tarea.findUniqueOrThrow({ where: { idTarea: tarea.idTarea } }), antes);
         assert.equal(await db!.notificacion.count(), notificaciones);
-        await assert.rejects(tareaService.cambiarEstadoTarea(antes.idAsignado!, idGrupo, tarea.idTarea, "en_revision"));
+        await assert.rejects(enviar(antes.idAsignado!, tarea.idTarea));
         assert.deepEqual(await db!.tarea.findUniqueOrThrow({ where: { idTarea: tarea.idTarea } }), antes);
         await assert.rejects(tareaService.crearTarea(ana, idGrupo, { titulo: "Creación revertida", peso: 1, idAsignado: String(ana), fechaLimite: fechaLimitePrueba }));
         assert.equal(await db!.tarea.count({ where: { titulo: "Creación revertida" } }), 0);
@@ -283,10 +286,10 @@ async function verificar() {
         await db!.$executeRawUnsafe("DROP FUNCTION rechazar_historial()");
       }
     });
-    await caso("el asignado entrega y otra persona confirma; las fechas se conservan", async () => {
+    await caso("el asignado entrega y el líder confirma; las fechas se conservan", async () => {
       const actual = await db!.tarea.findUniqueOrThrow({ where: { idTarea: tarea.idTarea } });
       await tareaService.cambiarEstadoTarea(actual.idAsignado!, idGrupo, tarea.idTarea, "en_progreso");
-      await tareaService.cambiarEstadoTarea(actual.idAsignado!, idGrupo, tarea.idTarea, "en_revision");
+      await enviar(actual.idAsignado!, tarea.idTarea);
       const revision = await db!.tarea.findUniqueOrThrow({ where: { idTarea: tarea.idTarea } });
       assert.ok(revision.fechaTerminada);
       await assert.rejects(tareaService.cambiarEstadoTarea(actual.idAsignado!, idGrupo, tarea.idTarea, "completada"), ErrorDeNegocio);
@@ -294,31 +297,89 @@ async function verificar() {
       await tareaService.cambiarEstadoTarea(revisor, idGrupo, tarea.idTarea, "completada");
       assert.deepEqual((await db!.tarea.findUniqueOrThrow({ where: { idTarea: tarea.idTarea } })).fechaTerminada, revision.fechaTerminada);
     });
-    await caso("un miembro puede devolver y completar, con historial y aviso al responsable", async () => {
+    await caso("solo el líder devuelve y completa, con historial y aviso al responsable", async () => {
       const revision = await tareaService.crearTarea(ana, idGrupo, { titulo: "Revisión del equipo", peso: 3, idAsignado: String(ana), fechaLimite: fechaLimitePrueba });
       await tareaService.cambiarEstadoTarea(ana, idGrupo, revision.idTarea, "en_progreso");
-      await tareaService.cambiarEstadoTarea(ana, idGrupo, revision.idTarea, "en_revision");
+      await enviar(ana, revision.idTarea);
       await assert.rejects(
         tareaService.cambiarEstadoTarea(luis, idGrupo, revision.idTarea, "en_progreso"),
         ErrorDeNegocio,
       );
-      await tareaService.cambiarEstadoTarea(luis, idGrupo, revision.idTarea, "en_progreso", "Debe corregir las conclusiones");
+      await assert.rejects(tareaService.cambiarEstadoTarea(luis, idGrupo, revision.idTarea, "en_progreso", "Debe corregir las conclusiones"), ErrorDeNegocio);
+      await tareaService.cambiarEstadoTarea(lider, idGrupo, revision.idTarea, "en_progreso", "Debe corregir las conclusiones");
       assert.equal((await db!.tarea.findUniqueOrThrow({ where: { idTarea: revision.idTarea } })).fechaTerminada, null);
-      await tareaService.cambiarEstadoTarea(ana, idGrupo, revision.idTarea, "en_revision");
+      await enviar(ana, revision.idTarea);
       const avisosAntes = await db!.notificacion.count({ where: { tipo: "tarea_completada", idUsuario: ana } });
-      await tareaService.cambiarEstadoTarea(luis, idGrupo, revision.idTarea, "completada");
+      await tareaService.cambiarEstadoTarea(lider, idGrupo, revision.idTarea, "completada");
       assert.equal(await db!.notificacion.count({ where: { tipo: "tarea_completada", idUsuario: ana } }), avisosAntes + 1);
       const historial = await db!.tareaHistorial.findMany({ where: { idTarea: revision.idTarea, accion: "estado" }, orderBy: { idHistorial: "asc" } });
       assert.deepEqual(historial.map((cambio) => [cambio.valorAnterior, cambio.valorNuevo]), [
         ["pendiente", "en_progreso"], ["en_progreso", "en_revision"], ["en_revision", "en_progreso\n\nMotivo de devolución: Debe corregir las conclusiones"],
         ["en_progreso", "en_revision"], ["en_revision", "completada"],
       ]);
-      assert.equal(historial.at(-1)?.idUsuario, luis);
+      assert.equal(historial.at(-1)?.idUsuario, lider);
       const { obtenerMetricasGrupo } = await import("../src/server/services/metricas");
       assert.equal((await obtenerMetricasGrupo(luis, idGrupo)).avance, 1);
       const historialAntes = await db!.tareaHistorial.count();
       await assert.rejects(tareaService.cambiarEstadoTarea(luis, idGrupo, revision.idTarea, "completada"), ErrorDeNegocio);
       assert.equal(await db!.tareaHistorial.count(), historialAntes);
+    });
+    await caso("la entrega exige contenido válido y solo la envía el responsable; si falla no queda nada", async () => {
+      const { validarArchivosEntrega, LIMITES_ENTREGA } = await import("../src/lib/entregas");
+      const texto = (contenido: string) => new TextEncoder().encode(contenido);
+      const pdf = texto("%PDF-1.4 prueba");
+      const t = await tareaService.crearTarea(lider, idGrupo, { titulo: "Con entrega", peso: 1, idAsignado: String(ana), fechaLimite: fechaLimitePrueba });
+      await tareaService.cambiarEstadoTarea(ana, idGrupo, t.idTarea, "en_progreso");
+      const sinContenido = entregaService.enviarEntrega(ana, { idGrupo, idTarea: t.idTarea, titulo: "Vacía", descripcion: "", enlace: "" }, []);
+      await assert.rejects(sinContenido, ErrorDeNegocio);
+      await assert.rejects(enviar(luis, t.idTarea), ErrorDeNegocio);
+      await assert.rejects(enviar(lider, t.idTarea), ErrorDeNegocio);
+      await assert.rejects(enviar(ana, t.idTarea, [{ nombre: "programa.exe", datos: pdf }]), ErrorDeNegocio);
+      await assert.rejects(enviar(ana, t.idTarea, [{ nombre: "falso.pdf", datos: texto("MZ esto no es un pdf") }]), ErrorDeNegocio);
+      assert.equal(await db!.entrega.count({ where: { idTarea: t.idTarea } }), 0);
+      assert.equal((await db!.tarea.findUniqueOrThrow({ where: { idTarea: t.idTarea } })).estado, "en_progreso");
+
+      await enviar(ana, t.idTarea, [{ nombre: "informe.pdf", datos: pdf }]);
+      const entrega = await db!.entrega.findFirstOrThrow({ where: { idTarea: t.idTarea }, include: { archivos: { include: { contenido: true } } } });
+      assert.equal(entrega.resultado, "en_revision");
+      assert.equal(entrega.archivos[0].tamano, pdf.length);
+      assert.equal(entrega.archivos[0].contenido?.datos.length, pdf.length);
+      // En revisión ya no se puede volver a enviar, y el estado suelto tampoco sirve.
+      await assert.rejects(enviar(ana, t.idTarea), ErrorDeNegocio);
+      await assert.rejects(tareaService.cambiarEstadoTarea(ana, idGrupo, t.idTarea, "en_revision"), ErrorDeNegocio);
+
+      await tareaService.cambiarEstadoTarea(lider, idGrupo, t.idTarea, "en_progreso", "Falta la portada");
+      const devuelta = await db!.entrega.findUniqueOrThrow({ where: { idEntrega: entrega.idEntrega } });
+      assert.deepEqual([devuelta.resultado, devuelta.idRevisor, devuelta.motivoDevolucion], ["devuelta", lider, "Falta la portada"]);
+      await enviar(ana, t.idTarea);
+      await tareaService.cambiarEstadoTarea(lider, idGrupo, t.idTarea, "completada");
+      const entregas = await db!.entrega.findMany({ where: { idTarea: t.idTarea }, orderBy: { idEntrega: "asc" } });
+      assert.deepEqual(entregas.map((e) => e.resultado), ["devuelta", "aprobada"]);
+
+      assert.equal(validarArchivosEntrega([{ nombre: "a.pdf", tamano: LIMITES_ENTREGA.bytesPorArchivo + 1 }]) !== null, true);
+      assert.equal(validarArchivosEntrega(Array.from({ length: 4 }, (_, i) => ({ nombre: `${i}.png`, tamano: 10 }))) !== null, true);
+      assert.equal(validarArchivosEntrega([{ nombre: "a.pdf", tamano: 10 }], LIMITES_ENTREGA.bytesPorGrupo) !== null, true);
+      assert.equal(validarArchivosEntrega([{ nombre: "a.pdf", tamano: 10 }]), null);
+    });
+    await caso("el líder aprueba su propia entrega y se avisa a los demás sin correo", async () => {
+      const { esAutoaprobada } = await import("../src/lib/entregas");
+      const propia = await tareaService.crearTarea(lider, idGrupo, { titulo: "Tarea del líder", peso: 1, idAsignado: String(lider), fechaLimite: fechaLimitePrueba });
+      await tareaService.cambiarEstadoTarea(lider, idGrupo, propia.idTarea, "en_progreso");
+      await enviar(lider, propia.idTarea);
+      const avisosAntes = await db!.notificacion.count({ where: { tipo: "tarea_completada", idUsuario: ana } });
+      await assert.rejects(tareaService.cambiarEstadoTarea(ana, idGrupo, propia.idTarea, "completada"), ErrorDeNegocio);
+      await tareaService.cambiarEstadoTarea(lider, idGrupo, propia.idTarea, "completada");
+      const entrega = await db!.entrega.findFirstOrThrow({ where: { idTarea: propia.idTarea } });
+      assert.equal(esAutoaprobada(entrega), true);
+      assert.equal(await db!.notificacion.count({ where: { tipo: "tarea_completada", idUsuario: ana } }), avisosAntes + 1);
+      assert.equal(await db!.notificacion.count({ where: { tipo: "tarea_completada", idUsuario: lider } }), 0);
+      // Solo los grupos que lidera aparecen en "por revisar".
+      const otra = await tareaService.crearTarea(lider, idGrupo, { titulo: "Por revisar", peso: 1, idAsignado: String(ana), fechaLimite: fechaLimitePrueba });
+      await tareaService.cambiarEstadoTarea(ana, idGrupo, otra.idTarea, "en_progreso");
+      await enviar(ana, otra.idTarea);
+      assert.equal((await tareaService.listarTareasPorRevisar(lider)).some((item) => item.idTarea === otra.idTarea), true);
+      assert.equal((await tareaService.listarTareasPorRevisar(luis)).some((item) => item.idTarea === otra.idTarea), false);
+      await tareaService.cambiarEstadoTarea(lider, idGrupo, otra.idTarea, "completada");
     });
     await caso("solo el líder descarta, restaura y reabre con motivo; lo descartado sale del avance", async () => {
       const { obtenerMetricasGrupo } = await import("../src/server/services/metricas");
@@ -338,8 +399,8 @@ async function verificar() {
       await assert.rejects(tareaService.cambiarEstadoTarea(ana, idGrupo, ciclo.idTarea, "pendiente"), ErrorDeNegocio);
       await tareaService.cambiarEstadoTarea(lider, idGrupo, ciclo.idTarea, "pendiente");
       await tareaService.cambiarEstadoTarea(ana, idGrupo, ciclo.idTarea, "en_progreso");
-      await tareaService.cambiarEstadoTarea(ana, idGrupo, ciclo.idTarea, "en_revision");
-      await tareaService.cambiarEstadoTarea(luis, idGrupo, ciclo.idTarea, "completada");
+      await enviar(ana, ciclo.idTarea);
+      await tareaService.cambiarEstadoTarea(lider, idGrupo, ciclo.idTarea, "completada");
       await assert.rejects(tareaService.cambiarEstadoTarea(luis, idGrupo, ciclo.idTarea, "en_progreso", "Falta algo"), ErrorDeNegocio);
       await assert.rejects(tareaService.cambiarEstadoTarea(lider, idGrupo, ciclo.idTarea, "en_progreso"), ErrorDeNegocio);
       await tareaService.cambiarEstadoTarea(lider, idGrupo, ciclo.idTarea, "en_progreso", "Faltó la bibliografía");
@@ -347,8 +408,8 @@ async function verificar() {
       assert.equal(reabierta.estado, "en_progreso");
       assert.equal(reabierta.fechaTerminada, null);
       assert.equal(await db!.notificacion.count({ where: { tipo: "tarea_reabierta", idUsuario: ana } }), 1);
-      await tareaService.cambiarEstadoTarea(ana, idGrupo, ciclo.idTarea, "en_revision");
-      await tareaService.cambiarEstadoTarea(luis, idGrupo, ciclo.idTarea, "completada");
+      await enviar(ana, ciclo.idTarea);
+      await tareaService.cambiarEstadoTarea(lider, idGrupo, ciclo.idTarea, "completada");
       const estados = await db!.tareaHistorial.findMany({ where: { idTarea: ciclo.idTarea, accion: "estado" }, orderBy: { idHistorial: "asc" } });
       assert.deepEqual(estados.map((cambio) => [cambio.valorAnterior, cambio.valorNuevo]), [
         ["pendiente", "descartada\n\nMotivo de descarte: Cambió el alcance"], ["descartada", "pendiente"],
@@ -433,12 +494,52 @@ async function verificar() {
       assert.deepEqual(integrantes.map((integrante) => integrante.idUsuario), [luis]);
       assert.equal(await db!.notificacion.count({ where: { idUsuario: luis, tipo: "integrante_salio" } }), 1);
     });
+    await caso("quien rechazó una invitación puede ser invitado de nuevo; quien salió, no", async () => {
+      const persona = await db!.usuario.create({ data: { googleId: "prueba-Rechazante", correo: "rechazante@example.invalid", nombre: "Rechazante", perfil: { create: {} } } });
+      // Las pruebas anteriores ya gastaron el cupo de invitaciones por hora: se envejecen para no tropezar con él.
+      await db!.grupoIntegrante.updateMany({ data: { fechaInvitacion: new Date(Date.now() - 2 * 60 * 60 * 1000) } });
+      await grupoService.invitarIntegrante(lider, idGrupo, persona.idUsuario);
+      await grupoService.responderInvitacion(persona.idUsuario, idGrupo, "rechazada");
+      await grupoService.invitarIntegrante(lider, idGrupo, persona.idUsuario);
+      const fila = await db!.grupoIntegrante.findUniqueOrThrow({ where: { idGrupo_idUsuario: { idGrupo, idUsuario: persona.idUsuario } } });
+      assert.deepEqual([fila.estadoInvitacion, fila.fechaRespuesta, fila.idInvitador], ["pendiente", null, lider]);
+      assert.equal(await db!.grupoIntegrante.count({ where: { idGrupo, idUsuario: persona.idUsuario } }), 1);
+      await assert.rejects(grupoService.invitarIntegrante(lider, idGrupo, persona.idUsuario), ErrorDeNegocio);
+    });
+    await caso("cancelar una invitación pendiente no deja a nadie como retirado y se puede volver a invitar", async () => {
+      const persona = await db!.usuario.create({ data: { googleId: "prueba-Equivocado", correo: "equivocado@example.invalid", nombre: "Equivocado", perfil: { create: {} } } });
+      const estado = async () => (await db!.grupoIntegrante.findUniqueOrThrow({ where: { idGrupo_idUsuario: { idGrupo, idUsuario: persona.idUsuario } } }));
+      await db!.grupoIntegrante.updateMany({ data: { fechaInvitacion: new Date(Date.now() - 2 * 60 * 60 * 1000) } });
+      await grupoService.invitarIntegrante(lider, idGrupo, persona.idUsuario);
+      await assert.rejects(grupoService.cancelarInvitacion(ana, idGrupo, persona.idUsuario), ErrorDeNegocio);
+      await grupoService.cancelarInvitacion(lider, idGrupo, persona.idUsuario);
+      const cancelada = await estado();
+      assert.deepEqual([cancelada.estadoInvitacion, cancelada.fechaRetiro, cancelada.retiroVoluntario], ["cancelada", null, false]);
+      await assert.rejects(grupoService.cancelarInvitacion(lider, idGrupo, persona.idUsuario), ErrorDeNegocio);
+      assert.equal((await grupoService.listarHistorialInvitaciones(persona.idUsuario)).length, 0);
+      assert.equal((await grupoService.listarInvitacionesPendientes(persona.idUsuario)).length, 0);
+
+      // Volver a invitar reabre la misma fila; "Retirar" sobre una pendiente la cancela en vez de retirarla.
+      await grupoService.invitarIntegrante(lider, idGrupo, persona.idUsuario);
+      assert.equal((await estado()).estadoInvitacion, "pendiente");
+      await grupoService.retirarIntegrante(lider, idGrupo, persona.idUsuario);
+      assert.equal((await estado()).estadoInvitacion, "cancelada");
+      await grupoService.invitarIntegrante(lider, idGrupo, persona.idUsuario);
+      assert.equal((await grupoService.listarInvitacionesPendientes(persona.idUsuario)).length, 1);
+
+      // Quien ya fue integrante sigue sin poder volver tras un retiro.
+      await grupoService.responderInvitacion(persona.idUsuario, idGrupo, "aceptada");
+      await grupoService.retirarIntegrante(lider, idGrupo, persona.idUsuario);
+      assert.equal((await estado()).estadoInvitacion, "retirado");
+      await assert.rejects(grupoService.invitarIntegrante(lider, idGrupo, persona.idUsuario), ErrorDeNegocio);
+      await assert.rejects(grupoService.cancelarInvitacion(lider, idGrupo, persona.idUsuario), ErrorDeNegocio);
+    });
     const abierta = await tareaService.crearTarea(ana, idGrupo, { titulo: "Consulta posterior", peso: 1, idAsignado: String(ana), fechaLimite: fechaLimitePrueba });
     await caso("solo el líder puede finalizar el grupo", async () => {
       await assert.rejects(grupoService.actualizarGrupo(ana, idGrupo, { nombre: "Grupo", estado: "finalizado" }), ErrorDeNegocio);
       await assert.rejects(grupoService.actualizarGrupo(lider, idGrupo, { nombre: "Grupo", estado: "finalizado" }), ErrorDeNegocio);
       await tareaService.cambiarEstadoTarea(ana, idGrupo, abierta.idTarea, "en_progreso");
-      await tareaService.cambiarEstadoTarea(ana, idGrupo, abierta.idTarea, "en_revision");
+      await enviar(ana, abierta.idTarea);
       await tareaService.cambiarEstadoTarea(lider, idGrupo, abierta.idTarea, "completada");
       await grupoService.actualizarGrupo(lider, idGrupo, { nombre: "Grupo finalizado", estado: "finalizado" });
     });

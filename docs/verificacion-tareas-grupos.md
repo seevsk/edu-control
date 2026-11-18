@@ -51,3 +51,11 @@ npm run verificar:acciones-tarea-http -- --visual
 Abre la URL impresa. El sufijo `/__qa/2` muestra al responsable y `/__qa/3` al revisor;
 agrega `?vista=tablero` o `?vista=detalle` para cambiar la vista. Presiona Enter en la terminal
 al terminar. El acceso de prueba solo existe en el proxy local de este script, sobre la base temporal.
+
+## Entregas de tarea (2026-11-18)
+
+`npm run verificar:tareas-grupos` también cubre las entregas: contenido mínimo, tipos y firma de archivo,
+reversión completa si algo falla, que solo el responsable envíe, que solo el líder apruebe o devuelva
+(también su propia entrega, con aviso solo dentro de la app) y que "por revisar" muestre únicamente los
+grupos que lidera. Para probar la interfaz: pasar una tarea a En progreso, usar **Enviar a revisión** con
+un archivo y comprobar la descarga, devolverla con motivo, reenviar y aprobarla.

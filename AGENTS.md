@@ -27,7 +27,7 @@ Nació como proyecto del curso *Proyecto Tecnológico* (NRC 3708, ISIL, metodolo
 
 - Repositorio: `seevsk/edu-control` (GitHub). Ramas: `main` y `develop`.
 - Next.js (App Router, TypeScript, carpeta `src/`, alias `@/*`) con PostgreSQL + Prisma, login con Google y sesión propia.
-- **Implementado (develop, 2026-11-16):** cursos con horario y evaluaciones (con estados e historial), grupos con invitaciones y salida voluntaria, tareas con tablero, lista, detalle, historial y tiempos, métricas del grupo, Bandeja (notificaciones e invitaciones) con correo por Resend, calendario, tiempo ocupado (incluido horario excepcional), disponibilidad y horarios del grupo, reuniones, perfil y perfiles de otros, buscador de personas, guía de bienvenida, SEO y demo en Render.
+- **Implementado (develop, 2026-11-16):** cursos con horario y evaluaciones (con estados e historial), grupos con invitaciones y salida voluntaria, tareas con tablero, lista, detalle, historial y tiempos, entregas de tarea con archivos (rama `feature/entregas-tareas`, 2026-11-18, ver 8.4), métricas del grupo, Bandeja (notificaciones e invitaciones) con correo por Resend, calendario, tiempo ocupado (incluido horario excepcional), disponibilidad y horarios del grupo, reuniones, perfil y perfiles de otros, buscador de personas, guía de bienvenida, SEO y demo en Render.
 - **Pendiente:** ver sección 13.
 - El backlog vive en Azure DevOps, pero **puede estar desactualizado**. La referencia de historias de usuario es el Excel del equipo (PBIs v1.3) más lo definido en este archivo. Si hay conflicto, **gana este archivo**, porque refleja decisiones posteriores.
 
@@ -48,6 +48,7 @@ Nació como proyecto del curso *Proyecto Tecnológico* (NRC 3708, ISIL, metodolo
 | Disponibilidad del grupo | — (aprobado por el usuario, 2026-10-05) | Pestaña "Horarios" del grupo: mapa semanal ocupado/libre y huecos en común. Calculado, sin tabla (ver 8.5) |
 | Reuniones | — (aprobado por el usuario, 2026-10-05) | Módulo propio en el sidebar (`/reuniones`): programar con sugerencias de la disponibilidad del grupo, confirmar asistencia, verlas en el Calendario. Modelos `reunion` y `reunion_asistente` (ver 8.7) |
 | Perfil de otros usuarios y buscador de personas | — (aprobado por el usuario, 2026-10-05) | `/usuarios` y `/usuarios/[id]` (ver 8.1) |
+| Entregas de tarea | — (aprobado por el usuario, 2026-11-18) | Para pasar a revisión el asignado envía una entrega (título, descripción, enlace y archivos con tope de MB); el líder la aprueba o devuelve; todos la ven y descargan. Modelos `entrega`, `entrega_archivo` y `entrega_archivo_contenido` (ver 8.4) |
 
 **Las tareas existen solo dentro de grupos.** No hay tareas personales en el MVP.
 
@@ -57,7 +58,7 @@ Nació como proyecto del curso *Proyecto Tecnológico* (NRC 3708, ISIL, metodolo
 - Sincronización con **Google Calendar** y envío por la **API de Gmail** (HU-016, HU-022, HU-023). El calendario y las notificaciones son propios.
 - **Pagos académicos** (HU-024, HU-025, HU-026) y cualquier API del centro educativo.
 - **Recuperación de acceso** (HU-002): no aplica, porque no hay contraseñas propias; la recuperación la gestiona Google.
-- Subida de archivos o capturas como evidencia de tareas (descartado por complejidad).
+- Subida de archivos fuera de una entrega de tarea (los únicos archivos permitidos son los adjuntos de una entrega, ver 8.4). Sin vista previa dentro de la app: solo descarga.
 - Ranking o puntaje único de participación (ver sección 8.5).
 
 ### Recorrido principal de usuario (guía para la demo)
@@ -166,7 +167,7 @@ Reglas de arquitectura:
 
 ## 7. Modelo de datos
 
-**La especificación exacta está en `docs/educontrol.dbml`** (14 tablas). Si ese archivo no existe, pídelo al usuario; no inventes el esquema. Una vez creado `prisma/schema.prisma`, este pasa a ser la fuente de verdad y el `.dbml` se actualiza en el mismo cambio.
+**La especificación exacta está en `docs/educontrol.dbml`** (17 tablas). Si ese archivo no existe, pídelo al usuario; no inventes el esquema. Una vez creado `prisma/schema.prisma`, este pasa a ser la fuente de verdad y el `.dbml` se actualiza en el mismo cambio.
 
 | Tabla | Propósito |
 |---|---|
@@ -184,6 +185,9 @@ Reglas de arquitectura:
 | `reunion` | Reunión de un grupo, de una sola vez (título, inicio, fin, lugar y enlace opcionales) |
 | `reunion_asistente` | Confirmación de asistencia por integrante (`pendiente` \| `asistire` \| `no_asistire`) |
 | `evaluacion_historial` | Registro inmutable del avance personal de cada evaluación (como `tarea_historial`) |
+| `entrega` | Lo que el asignado envía al pasar una tarea a revisión: título, descripción, enlace, `resultado` (`en_revision` \| `aprobada` \| `devuelta`), revisor, fecha y motivo de devolución |
+| `entrega_archivo` | Metadatos de cada archivo adjunto (nombre, tipo, tamaño) |
+| `entrega_archivo_contenido` | El binario del archivo, en tabla aparte para no cargarlo al listar (ver 8.4) |
 
 **Lo que NO tiene tabla** (se calcula con consultas): el calendario, el avance del grupo, la carga y el cumplimiento por integrante, el feed de actividad y el tiempo libre.
 
@@ -253,7 +257,7 @@ Reglas de arquitectura:
 - `grupo.estado`: `activo` | `finalizado`. Un grupo finalizado es de solo lectura.
 - **Invitaciones:** el líder busca a un usuario ya registrado y crea una fila con `estado_invitacion = 'pendiente'`. **El invitado acepta o rechaza dentro de la web**, nunca desde un enlace del correo (no hay tokens de aceptación). Al responder se llena `fecha_respuesta`.
 - Antes de aceptar, el invitado debe confirmar expresamente que fue informado de los datos personales que compartirán los integrantes del grupo, la finalidad de coordinación y las consecuencias de aceptar o rechazar. Esta confirmación se valida también en el servidor (decisión del usuario, 2026-10-19).
-- Estados: `pendiente` | `aceptada` | `rechazada` | `retirado`. **Solo los integrantes `aceptada` cuentan** para asignaciones, métricas, notificaciones y permisos.
+- Estados: `pendiente` | `aceptada` | `rechazada` | `cancelada` | `retirado`. `cancelada` (confirmado, 2026-11-18): el líder retiró la invitación **antes de que respondiera** (invitó a la persona equivocada); nunca fue integrante, así que no figura en la tabla de Integrantes ni en el historial de quien la recibió, y se puede volver a invitar (igual que a quien `rechazó`, reabriendo su misma fila). En Integrantes, una invitación pendiente ofrece **"Cancelar invitación"** y solo los aceptados ofrecen **"Retirar"**; `retirado` queda solo para quien ya fue integrante y no puede volver. **Solo los integrantes `aceptada` cuentan** para asignaciones, métricas, notificaciones y permisos.
 - **Retirar a un integrante:** cambia su estado a `retirado` y llena `fecha_retiro`; **no borres la fila** (conserva su historial de aporte). Desasigna sus tareas abiertas y registra el cambio en `tarea_historial`.
 - **Salir del grupo (confirmado, 2026-11-16):** cualquier integrante aceptado de un grupo activo puede salir por su cuenta desde Integrantes. Queda igual que un retiro (`retirado`, `fecha_retiro`, tareas abiertas desasignadas con historial) pero con `retiro_voluntario = true`. El líder primero cede el liderazgo a un miembro aceptado (no observador); si no hay ninguno, no puede salir. Se avisa al líder (o al nuevo líder) con `integrante_salio`. Hoy no se puede volver a invitar a quien salió (la fila ya existe).
 - **Historial de invitaciones (confirmado, 2026-11-15):** cada invitación guarda quién la envió (`id_invitador`). En la Bandeja (filtro Invitaciones; el módulo Invitaciones se integró ahí el 2026-11-16), cada usuario ve las pendientes y su historial: qué aceptó o rechazó (con la fecha de respuesta, quién lo invitó y a qué grupo y curso) y de qué grupos lo retiraron (con `fecha_retiro`). Los registros anteriores a estas columnas asumen al creador del grupo como invitador y no tienen fecha de retiro.
@@ -274,9 +278,9 @@ Reglas de arquitectura:
 | Transición | Quién |
 |---|---|
 | `pendiente` → `en_progreso` | El asignado (o el líder) |
-| `en_progreso` → `en_revision` | El asignado. Significa "terminé". Se llena `fecha_terminada` |
-| `en_revision` → `completada` | Cualquier integrante aceptado (no observador) que no sea el asignado (confirmado) |
-| `en_revision` → `en_progreso` | Otro integrante, al devolverla. Debe escribir obligatoriamente un motivo y se borra `fecha_terminada` |
+| `en_progreso` → `en_revision` | Solo el asignado, **enviando una entrega** (ver abajo); no existe como cambio de estado suelto. Significa "terminé". Se llena `fecha_terminada` |
+| `en_revision` → `completada` | **Solo el líder** (aprueba la entrega). También puede aprobar la suya (confirmado, 2026-11-18) |
+| `en_revision` → `en_progreso` | **Solo el líder**, al devolverla. Debe escribir obligatoriamente un motivo y se borra `fecha_terminada` |
 | `completada` → `en_progreso` (reabrir) | Solo el líder, con motivo obligatorio. Se borra `fecha_terminada`. Si el responsable ya no puede recibir tareas, vuelve a `pendiente` sin asignar (confirmado, 2026-11-09) |
 | abierta → `descartada` | Solo el líder, con motivo obligatorio (confirmado, 2026-11-09) |
 | `descartada` → `pendiente` (restaurar) | Solo el líder. Si el responsable ya no puede recibir tareas, queda sin asignar |
@@ -292,7 +296,15 @@ Reglas de arquitectura:
   - `id_usuario` sale de la sesión del servidor.
 - **Seguimiento de tiempos (confirmado, 2026-11-09, `src/lib/tiempos-tarea.ts`):** se calcula desde `tarea_historial`, nunca se guarda. Cada cambio de estado o de responsable cierra un tramo y abre otro, con reloj corrido (24/7, sin calendario laboral). Contadores: **Sin asignar** (tarea abierta sin responsable), **Pendiente** (desde que se asignó hasta que empezó), **En progreso** (trabajo del asignado; suma todos sus tramos, también tras una devolución o reapertura), **En revisión** (tiempo del revisor: el reloj del asignado queda pausado) y **Total** (desde que se creó hasta que se cerró, o hasta ahora). Si se reasigna, cada persona suma solo sus horas. El tramo abierto se mide hasta el momento actual. El detalle de la tarea muestra la línea de tiempo con la hora de cada paso (12 h, America/Lima) y la duración de cada tramo (`45 min`, `7 h 20 min`, `2 d 3 h`).
 - El historial nunca se edita ni se borra.
-- No hay evidencia adjunta por tarea. Como mucho, el `enlace_trabajo` del grupo.
+- **Entregas (confirmado, 2026-11-18; `src/lib/entregas.ts`, `src/server/services/entrega.ts`):**
+  - Pasar a `en_revision` exige una entrega: **título** (≤120) más **descripción** (≤2000), **enlace** (`http(s)://`) o al menos un **archivo**. Solo la envía el asignado y solo con la tarea `en_progreso`. Crear la entrega, pasar la tarea a revisión, escribir el historial (`estado`) y notificar ocurre en **una sola transacción**: si algo falla no queda nada.
+  - `entrega.resultado`: `en_revision` → `aprobada` o `devuelta`. Lo fija el líder al aprobar o devolver la tarea, en la misma transacción que el cambio de estado, junto con `id_revisor`, `fecha_revision` y, al devolver, `motivo_devolucion`. Cada devolución cierra su entrega; el asignado envía una **entrega nueva** (no se edita la enviada). Las entregas se distinguen por orden de fecha: **no hay "rondas" ni columna de número**. Una tarea que ya estaba en revisión antes de existir las entregas se aprueba o devuelve igual, sin entrega.
+  - **Autoaprobada** = `id_revisor = id_autor` (se calcula, no se guarda). Se muestra "Aprobada por el propio líder" y se avisa dentro de la app (sin correo) a los demás integrantes.
+  - Los integrantes aceptados, **observadores incluidos**, ven las entregas y descargan; solo el líder aprueba o devuelve. Un grupo finalizado conserva todo en lectura. En una tarea `descartada` la entrega pendiente no se etiqueta.
+  - **Archivos (tope de la demo, porque Render free tiene disco efímero y 1 GB de Postgres compartido):** 5 MB por archivo, 3 archivos y 10 MB por entrega, 40 MB por grupo. Tipos: PDF, Word, PowerPoint, Excel, PNG y JPG (lista cerrada por extensión y firma del archivo; nunca html ni svg). El binario vive en `entrega_archivo_contenido` (bytea); el resto de consultas nunca lo carga. Si algo pesa más, se usa el enlace.
+  - Subida por `POST /api/entregas` (multipart; fuera del proxy, con sesión del servidor y comprobación de origen) y descarga por `GET /api/entregas/archivos/[id]`: verifica membresía (sin acceso = 404), responde `attachment` con `nosniff` y sin caché. El nombre se sanea al guardar.
+  - Para producción el acceso a los bytes se cambia por almacenamiento de objetos (S3/R2) sin tocar las reglas; ver sección 13.
+- El `enlace_trabajo` del grupo sigue siendo opcional y distinto del enlace de una entrega.
 
 ### 8.5 Métricas del grupo (siempre calculadas, nunca guardadas)
 
@@ -323,6 +335,7 @@ Reglas de arquitectura:
 | Una tarea pasa a `en_revision` | `tarea_en_revision` | Integrantes aceptados que no sean observadores ni el asignado | Sí |
 | Devuelven una tarea a `en_progreso` | `tarea_devuelta` | El asignado | Sí |
 | Una tarea queda `completada` | `tarea_completada` | El asignado | No |
+| El líder aprueba su propia entrega | `tarea_completada` | Integrantes aceptados no observadores, menos el líder | No |
 | El líder reabre una tarea | `tarea_reabierta` | El asignado | No |
 | Cambia la fecha límite de una tarea | `tarea_reprogramada` | El asignado | No |
 | El líder descarta una tarea | `tarea_descartada` | El asignado | No |
@@ -468,6 +481,8 @@ Datos de ejemplo (`prisma/seed.ts`, **solo desarrollo**): varios usuarios de pru
 ## 13. Decisiones pendientes (pregunta antes de implementar)
 
 - **Dominio definitivo de producción:** la demo ya puede usar un dominio temporal verificado mediante `EMAIL_FROM`; antes de producción se debe elegir y verificar el dominio definitivo del equipo.
+- **Fechas de tarea frente a la apertura de la evaluación (pendiente, 2026-11-18):** definir qué regla aplica cuando el grupo nace de una evaluación con fecha de apertura y cuando nace de una sin apertura (por ejemplo, si la fecha límite de una tarea no puede ser anterior a la apertura). Hoy la tarea solo valida que no esté en el pasado y que no supere la fecha límite del grupo. La asignación a uno mismo o a otro integrante en "Nueva tarea" ya funciona.
+- **Almacenamiento de archivos en producción (pendiente, 2026-11-18):** la demo guarda los adjuntos de las entregas en Postgres con topes bajos. Antes de producción hay que elegir almacenamiento de objetos (por ejemplo Cloudflare R2 o Supabase Storage), subir los topes y cambiar la implementación de acceso a los bytes (`entrega.ts`) sin tocar las reglas. Los archivos de estudiantes son datos personales: entra en la decisión de privacidad de abajo.
 - **Framework de pruebas**, librería de formularios y React Compiler (los componentes e íconos ya se decidieron: ver sección 4).
 - **Recordatorios de evaluaciones (pendiente, 2026-11-16):** avisos en la Bandeja y por correo a 7 y 3 días del cierre (no si ya está terminada). Falta decidir cómo se disparan: ruta protegida llamada por GitHub Actions, revisión al entrar a la app, o ambas. El correo de "evaluación creada" ya funciona.
 - **Privacidad:** con usuarios reales aplica la Ley 29733 de Protección de Datos Personales (Perú). Antes de abrir la app hacen falta política de privacidad, términos y consentimiento; lo decide el equipo, no lo improvises.
@@ -477,7 +492,7 @@ Datos de ejemplo (`prisma/seed.ts`, **solo desarrollo**): varios usuarios de pru
 - No implementes integraciones con Moodle, Google Calendar, Gmail ni pagos.
 - No pidas más scopes de Google que `openid`, `email` y `profile`, ni guardes tokens de Google.
 - No agregues contraseñas, registro propio ni recuperación de cuenta.
-- No crees tareas personales ni subida de archivos.
+- No crees tareas personales ni subida de archivos fuera de una entrega de tarea; no superes los topes de 8.4 ni aceptes tipos fuera de la lista.
 - No borres filas de `usuario`, `grupo_integrante`, `tarea` ni `tarea_historial`. Una tarea que ya no se hará se descarta.
 - No confíes en un id de usuario que venga del cliente; no dejes rutas de grupo sin verificar membresía.
 - No expongas el `detalle` de un bloque ocupado a nadie más que su dueño, ni la disponibilidad a quien no sea compañero (ver 8.2).
