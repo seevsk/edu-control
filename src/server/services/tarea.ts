@@ -20,7 +20,7 @@ type RolDb = "lider" | "miembro" | "observador";
 
 const SOLO_ABIERTAS = { estado: { in: [...ESTADOS_TAREA_ABIERTOS] } };
 
-async function requerirIntegranteActivo(idUsuario: number, idGrupo: number, db: Prisma.TransactionClient = prisma) {
+export async function requerirIntegranteActivo(idUsuario: number, idGrupo: number, db: Prisma.TransactionClient = prisma) {
   const integrante = await db.grupoIntegrante.findUnique({
     where: { idGrupo_idUsuario: { idGrupo, idUsuario } },
     include: { grupo: { select: { estado: true, fechaLimite: true } } },
@@ -31,7 +31,7 @@ async function requerirIntegranteActivo(idUsuario: number, idGrupo: number, db: 
   return integrante;
 }
 
-async function requerirIntegranteQuePuedeModificar(idUsuario: number, idGrupo: number, tx: Prisma.TransactionClient) {
+export async function requerirIntegranteQuePuedeModificar(idUsuario: number, idGrupo: number, tx: Prisma.TransactionClient) {
   const integrante = await requerirIntegranteActivo(idUsuario, idGrupo, tx);
   if (integrante.grupo.estado !== "activo") throw new ErrorDeNegocio("El grupo está finalizado y es de solo lectura");
   if (integrante.rol === "observador") throw new ErrorDeNegocio("Los observadores no pueden modificar tareas");
@@ -85,14 +85,15 @@ export function verificarTransicion(params: {
     return;
   }
   if (estadoActual === "en_progreso" && nuevoEstado === "en_revision") {
-    if (!actorEsAsignado) throw new ErrorDeNegocio("Solo el asignado puede pasarla a revision");
-    return;
+    // Pasar a revision es enviar una entrega (servicio `entrega.ts`), no un cambio de estado suelto.
+    throw new ErrorDeNegocio("Envía una entrega para pasar la tarea a revisión");
   }
   if (
     estadoActual === "en_revision" &&
     (nuevoEstado === "completada" || nuevoEstado === "en_progreso")
   ) {
-    if (actorEsAsignado) throw new ErrorDeNegocio("El asignado no puede confirmar ni devolverse su propia tarea");
+    // Solo el lider aprueba o devuelve, incluso su propia tarea (queda marcada como autoaprobada).
+    if (!esLider) throw new ErrorDeNegocio("Solo el líder puede aprobar o devolver una entrega");
     return;
   }
   throw new ErrorDeNegocio(`No se puede pasar de "${estadoActual}" a "${nuevoEstado}"`);
@@ -145,15 +146,14 @@ export async function listarTareasAsignadasAlUsuario(idUsuario: number, limite =
   });
 }
 
-/** Tareas en revision que el usuario puede confirmar o devolver (de otros, en grupos activos donde participa). */
+/** Tareas en revision que el usuario puede aprobar o devolver: solo las de los grupos que lidera (tambien las suyas). */
 export async function listarTareasPorRevisar(idUsuario: number, limite = 20) {
   return prisma.tarea.findMany({
     where: {
       estado: "en_revision",
-      NOT: { idAsignado: idUsuario },
       grupo: {
         estado: "activo",
-        integrantes: { some: { idUsuario, estadoInvitacion: "aceptada", rol: { not: "observador" } } },
+        integrantes: { some: { idUsuario, estadoInvitacion: "aceptada", rol: "lider" } },
       },
     },
     include: {
@@ -202,6 +202,12 @@ export async function listarTareasDelGrupo(
       historial: {
         select: { idHistorial: true, idUsuario: true, accion: true, valorAnterior: true, valorNuevo: true, fecha: true },
       },
+      // Solo la entrega vigente y cuántos archivos trae, para el clip del tablero y la lista.
+      entregas: {
+        select: { _count: { select: { archivos: true } } },
+        orderBy: [{ fechaEnvio: "desc" }, { idEntrega: "desc" }],
+        take: 1,
+      },
     },
     orderBy: [{ fechaCreacion: "desc" }],
   });
@@ -238,10 +244,19 @@ export async function obtenerTareaDelGrupo(idUsuario: number, idGrupo: number, i
     where: { idTarea, idGrupo },
     include: {
       asignado: { select: { nombre: true, apellidos: true, fotoUrl: true } },
-      creador: { select: { nombre: true, apellidos: true } },
+  creador: { select: { nombre: true, apellidos: true } },
       historial: {
         include: { usuario: { select: { nombre: true, apellidos: true } } },
         orderBy: [{ fecha: "desc" }, { idHistorial: "desc" }],
+      },
+      // Sin el binario: solo los metadatos de cada archivo.
+      entregas: {
+        include: {
+          autor: { select: { idUsuario: true, nombre: true, apellidos: true, fotoUrl: true } },
+          revisor: { select: { idUsuario: true, nombre: true, apellidos: true, fotoUrl: true } },
+          archivos: { select: { idArchivo: true, nombre: true, mime: true, tamano: true }, orderBy: { idArchivo: "asc" } },
+        },
+        orderBy: [{ fechaEnvio: "desc" }, { idEntrega: "desc" }],
       },
     },
   });
@@ -460,6 +475,36 @@ export async function reasignarTarea(
   return tarea;
 }
 
+/** Avisa a los integrantes (no observadores, salvo el asignado) que una tarea paso a revision. */
+export async function notificarTareaEnRevision(idGrupo: number, idTarea: number, titulo: string, idAsignado: number | null) {
+  const destinos = await prisma.grupoIntegrante.findMany({
+    where: { idGrupo, estadoInvitacion: "aceptada", rol: { not: "observador" } },
+  });
+  for (const destino of destinos) {
+    if (destino.idUsuario === idAsignado) continue;
+    await crearNotificacion({
+      idUsuario: destino.idUsuario,
+      tipo: "tarea_en_revision",
+      idGrupo,
+      ...plantillasNotificacion.tareaEnRevision(titulo, idGrupo, idTarea),
+    });
+  }
+}
+
+async function notificarAutoaprobacion(idGrupo: number, idTarea: number, titulo: string, idLider: number) {
+  const destinos = await prisma.grupoIntegrante.findMany({
+    where: { idGrupo, estadoInvitacion: "aceptada", rol: { not: "observador" }, idUsuario: { not: idLider } },
+  });
+  for (const destino of destinos) {
+    await crearNotificacion({
+      idUsuario: destino.idUsuario,
+      tipo: "tarea_completada",
+      idGrupo,
+      ...plantillasNotificacion.tareaAutoaprobada(titulo, idGrupo, idTarea),
+    });
+  }
+}
+
 export async function cambiarEstadoTarea(
   idActor: number,
   idGrupo: number,
@@ -504,6 +549,26 @@ export async function cambiarEstadoTarea(
           : tarea.fechaTerminada;
 
     await tx.tarea.update({ where: { idTarea }, data: { estado: estadoFinal, fechaTerminada, idAsignado } });
+    // Aprobar o devolver cierra la entrega vigente. Una tarea que llego a revision antes de existir
+    // las entregas no tiene ninguna: el estado cambia igual.
+    if (estadoAnterior === "en_revision" && (estadoFinal === "completada" || accion === "devolver")) {
+      const vigente = await tx.entrega.findFirst({
+        where: { idTarea, resultado: "en_revision" },
+        orderBy: { fechaEnvio: "desc" },
+        select: { idEntrega: true },
+      });
+      if (vigente) {
+        await tx.entrega.update({
+          where: { idEntrega: vigente.idEntrega },
+          data: {
+            resultado: estadoFinal === "completada" ? "aprobada" : "devuelta",
+            idRevisor: idActor,
+            fechaRevision: new Date(),
+            motivoDevolucion: estadoFinal === "completada" ? null : motivoValidado,
+          },
+        });
+      }
+    }
     await tx.tareaHistorial.create({
       data: {
         idTarea,
@@ -528,19 +593,9 @@ export async function cambiarEstadoTarea(
   });
 
   const asignado = tarea.idAsignado;
-  if (nuevoEstado === "en_revision") {
-    const integrantesNotificables = await prisma.grupoIntegrante.findMany({
-      where: { idGrupo, estadoInvitacion: "aceptada", rol: { not: "observador" } },
-    });
-    for (const destino of integrantesNotificables) {
-      if (destino.idUsuario === asignado) continue;
-      await crearNotificacion({
-        idUsuario: destino.idUsuario,
-        tipo: "tarea_en_revision",
-        idGrupo,
-        ...plantillasNotificacion.tareaEnRevision(tarea.titulo, idGrupo, idTarea),
-      });
-    }
+  if (nuevoEstado === "completada" && asignado === idActor) {
+    // El lider aprobo su propia entrega: se avisa al resto del grupo, solo dentro de la app.
+    await notificarAutoaprobacion(idGrupo, idTarea, tarea.titulo, idActor);
     return;
   }
   if (!asignado || asignado === idActor) return;

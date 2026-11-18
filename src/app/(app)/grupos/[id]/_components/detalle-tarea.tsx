@@ -15,6 +15,8 @@ import { CampoSelect } from "@/components/ui-app/campo-select";
 import { PesoTarea } from "@/components/peso-tarea";
 import { AccionesTarea } from "../tareas/_components/acciones-tarea";
 import { LineaTiempoTarea } from "../tareas/_components/linea-tiempo-tarea";
+import { EntregasTarea } from "../tareas/_components/entregas-tarea";
+import { FormularioEntrega } from "../tareas/_components/formulario-entrega";
 import { RegistrarVista } from "../tareas/_components/registrar-vista";
 import { editarTareaAction } from "../tareas/actions";
 import type { obtenerGrupoDelUsuario } from "@/server/services/grupo";
@@ -32,6 +34,7 @@ export function DetalleTarea({
   ahora,
   hrefBase,
   editar,
+  entregar,
   error,
 }: {
   datos: DatosGrupo;
@@ -41,6 +44,8 @@ export function DetalleTarea({
   /** URL de la vista con ?tarea=ID, sobre la que se agrega &editar=1. */
   hrefBase: string;
   editar: boolean;
+  /** Abre el formulario de envío a revisión (solo lo ve el responsable de una tarea en progreso). */
+  entregar?: boolean;
   error?: string;
 }) {
   const { grupo, rolActual } = datos;
@@ -51,6 +56,20 @@ export function DetalleTarea({
   const asignables = grupo.integrantes.filter((integrante) => integrante.estadoInvitacion === "aceptada" && integrante.rol !== "observador");
   const nombres = new Map(grupo.integrantes.map((integrante) => [integrante.idUsuario, nombreCorto(integrante.usuario.nombre, integrante.usuario.apellidos)]));
   const errorVisible = error ? <p role="alert" className="mb-4 rounded-md bg-destructive/10 px-3 py-2 text-[13px] text-destructive">{error}</p> : null;
+  // Solo el responsable envía la entrega, y solo mientras la tarea está en progreso.
+  const puedeEntregar = puedeGestionar && tarea.estado === "en_progreso" && tarea.idAsignado === idUsuario;
+  const ultimaDevuelta = tarea.entregas[0]?.resultado === "devuelta" ? tarea.entregas[0] : null;
+
+  if (entregar && puedeEntregar) {
+    return (
+      <FormularioEntrega
+        idGrupo={idGrupo}
+        idTarea={tarea.idTarea}
+        hrefVolver={hrefBase}
+        motivoAnterior={ultimaDevuelta?.motivoDevolucion}
+      />
+    );
+  }
 
   if (editar && puedeEditar) {
     const vencida = tarea.fechaLimite !== null && tarea.fechaLimite < ahora;
@@ -137,6 +156,8 @@ export function DetalleTarea({
       {puedeGestionar ? (
         <AccionesTarea idGrupo={idGrupo} tarea={tarea} idUsuario={idUsuario} rol={rolActual} asignables={asignables} destino="detalle" titulo="Siguiente acción" />
       ) : null}
+
+      <EntregasTarea tarea={tarea} puedeEntregar={puedeEntregar} hrefEntregar={puedeEntregar ? `${hrefBase}&entregar=1` : null} />
 
       <section aria-labelledby="seguimiento-tarea" className="flex flex-col gap-3 border-t pt-5">
         <h3 id="seguimiento-tarea" className="text-[13px] font-medium">Seguimiento</h3>

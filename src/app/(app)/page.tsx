@@ -221,7 +221,7 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
                 ))}
               </ul>
             ) : (
-              <Vacio>Cuando un compañero termine una tarea, aparecerá aquí para que la apruebes o la devuelvas.</Vacio>
+              <Vacio>Cuando alguien envíe una entrega en un grupo que lideras, aparecerá aquí para que la apruebes o la devuelvas.</Vacio>
             )}
           </Seccion>
 
@@ -233,7 +233,7 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
                 ))}
               </ul>
             ) : (
-              <Vacio>Cuando termines una tarea y pase a revisión, aparecerá aquí hasta que un compañero la confirme.</Vacio>
+              <Vacio>Cuando envíes una entrega, aparecerá aquí hasta que el líder la revise.</Vacio>
             )}
           </Seccion>
         </div>

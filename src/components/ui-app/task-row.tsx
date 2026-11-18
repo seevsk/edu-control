@@ -15,6 +15,8 @@ export interface FilaTarea {
   asignado: { idUsuario: number; nombre: string; apellidos: string | null; fotoUrl: string | null } | null;
   /** "Te toca revisar" u otra nota corta de accion. */
   nota?: string;
+  /** Archivos de la entrega vigente (clip en el tablero y la lista). */
+  adjuntos?: number;
   /** Linea secundaria opcional (grupo, curso). */
   detalle?: ReactNode;
 }

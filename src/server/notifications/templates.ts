@@ -45,6 +45,13 @@ export const plantillasNotificacion = {
       asunto: `Tarea completada: ${titulo}`,
     };
   },
+  tareaAutoaprobada(titulo: string, idGrupo: number, idTarea: number) {
+    return {
+      mensaje: `El líder aprobó su propia entrega de “${titulo}”`,
+      enlace: `/grupos/${idGrupo}/tareas/${idTarea}`,
+      asunto: `Entrega aprobada por el propio líder: ${titulo}`,
+    };
+  },
   tareaReabierta(titulo: string, idGrupo: number, idTarea: number, motivo: string) {
     return {
       mensaje: `Reabrieron "${titulo}". Motivo: ${motivo}`,

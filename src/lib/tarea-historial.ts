@@ -68,7 +68,9 @@ export function describirCambioTarea(
     const anterior = leerValorEstadoHistorial(entrada.valorAnterior);
     const nuevo = leerValorEstadoHistorial(entrada.valorNuevo);
     const cambio = describirCambioEstado(anterior.estado, nuevo.estado);
-    return nuevo.motivo ? `${cambio}. Motivo: ${nuevo.motivo}` : cambio;
+    // El motivo de una devolución se lee en la tarjeta de la entrega; reabrir y descartar no tienen otro lugar.
+    const esDevolucion = anterior.estado === "en_revision" && nuevo.estado === "en_progreso";
+    return nuevo.motivo && !esDevolucion ? `${cambio}. Motivo: ${nuevo.motivo}` : cambio;
   }
   const responsable = (valor: string | null) => valor === null
     ? "Sin asignar"
