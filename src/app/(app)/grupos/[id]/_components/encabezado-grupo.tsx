@@ -15,6 +15,8 @@ import {
 import { aOracion } from "@/lib/presentacion";
 import { diaMesCorto, fechaEnZonaLimaISO } from "@/lib/calendario";
 import { yaImportoCurso } from "@/server/services/curso";
+import { reunionEnCursoDelGrupo } from "@/server/services/reunion";
+import { FranjaEnCurso } from "@/components/ui-app/reuniones/franja-en-curso";
 import { importarCursoAction } from "../../../cursos/actions";
 import type { obtenerGrupoDelUsuario } from "@/server/services/grupo";
 
@@ -28,12 +30,15 @@ export async function EncabezadoGrupo({
   idUsuario,
   activa,
   accionPrincipal,
+  accionMovil,
   extra,
 }: {
   datos: DatosGrupo;
   idUsuario: number;
   activa: PestanaGrupo;
   accionPrincipal?: ReactNode;
+  /** Ícono de 44 px que va antes del menú en el encabezado móvil. */
+  accionMovil?: ReactNode;
   extra?: ReactNode;
 }) {
   const { grupo, rolActual } = datos;
@@ -42,6 +47,9 @@ export async function EncabezadoGrupo({
   const puedeParticipar = rolActual !== "observador" && grupo.estado === "activo";
   const curso = grupo.evaluacion?.curso ?? null;
   const puedeImportarCurso = curso !== null && curso.idUsuario !== idUsuario && !(await yaImportoCurso(idUsuario, curso.idCurso));
+  // Franja "En curso" en todas las pestañas menos Reuniones (ahí la sección En curso cumple ese papel).
+  const enCurso = activa === "reuniones" ? null : await reunionEnCursoDelGrupo(idUsuario, idGrupo);
+  const franja = enCurso ? { idReunion: enCurso.idReunion, titulo: enCurso.titulo, inicio: enCurso.inicio } : null;
   const integrantes = grupo.integrantes.filter((integrante) => integrante.estadoInvitacion === "aceptada");
 
   const pestanas = [
@@ -134,14 +142,31 @@ export async function EncabezadoGrupo({
   );
 
   return (
+    <>
     <PageHeader
       migas={[{ href: "/grupos", texto: "Grupos" }, { texto: aOracion(grupo.nombre) }]}
       volver={{ href: "/grupos", texto: "Grupos" }}
-      accionesMovil={hayMenu ? menu("size-11 [&_svg]:size-5") : null}
+      accionesMovil={
+        hayMenu || accionMovil ? (
+          <>
+            {accionMovil}
+            {hayMenu ? menu("size-11 [&_svg]:size-5") : null}
+          </>
+        ) : null
+      }
       titulo={aOracion(grupo.nombre)}
       contexto={contexto}
       pestanas={pestanas}
-      extra={extra}
+      extra={
+        <>
+          {extra}
+          {franja ? (
+            <div className="-mx-4 mt-3 md:hidden">
+              <FranjaEnCurso reunion={franja} puedeUnirse={rolActual !== "observador"} />
+            </div>
+          ) : null}
+        </>
+      }
       acciones={
         <>
           <Link href={`/grupos/${idGrupo}/integrantes`} className="flex" aria-label={`${integrantes.length} integrantes`}>
@@ -164,5 +189,11 @@ export async function EncabezadoGrupo({
         </>
       }
     />
+    {franja ? (
+      <div className="max-md:hidden">
+        <FranjaEnCurso reunion={franja} puedeUnirse={rolActual !== "observador"} />
+      </div>
+    ) : null}
+    </>
   );
 }

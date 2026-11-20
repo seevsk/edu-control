@@ -11,18 +11,24 @@ export function MarcoGrupo({
   idUsuario,
   activa,
   accionPrincipal,
+  accionMovil,
+  superponer,
   children,
 }: {
   datos: DatosGrupo;
   idUsuario: number;
   activa: PestanaGrupo;
   accionPrincipal?: ReactNode;
+  accionMovil?: ReactNode;
+  /** Se dibuja encima de todo el contenido (por ejemplo, un botón flotante móvil). */
+  superponer?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <PaginaCompleta>
-      <EncabezadoGrupo datos={datos} idUsuario={idUsuario} activa={activa} accionPrincipal={accionPrincipal} />
+      <EncabezadoGrupo datos={datos} idUsuario={idUsuario} activa={activa} accionPrincipal={accionPrincipal} accionMovil={accionMovil} />
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-5 sm:px-6">{children}</div>
+      {superponer}
     </PaginaCompleta>
   );
 }

@@ -34,6 +34,14 @@ services:
         sync: false
       - key: EMAIL_FROM
         sync: false
+      - key: VIDEO_PROVIDER
+        value: livekit
+      - key: LIVEKIT_URL
+        sync: false
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false
 
 databases:
   - name: educontrol-demo-db

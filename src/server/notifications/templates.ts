@@ -73,11 +73,34 @@ export const plantillasNotificacion = {
       asunto: `Tarea descartada: ${titulo}`,
     };
   },
-  reunionProgramada(titulo: string, nombreGrupo: string, idGrupo: number, idReunion: number, cuando: string) {
+  reunionProgramada(titulo: string, nombreGrupo: string, _idGrupo: number, idReunion: number, cuando: string) {
     return {
       mensaje: `Nueva reunión en "${nombreGrupo}": "${titulo}", ${cuando}.`,
-      enlace: `/reuniones?grupo=${idGrupo}&reunion=${idReunion}`,
+      enlace: `/reuniones/${idReunion}`,
       asunto: `Reunión programada: ${titulo}`,
+    };
+  },
+  reunionIniciada(persona: string, titulo: string, nombreGrupo: string, idReunion: number, desde: string, hasta: string) {
+    return {
+      mensaje: `${persona} inició "${titulo}" en "${nombreGrupo}", ${desde} - ${hasta}.`,
+      enlace: `/reuniones/${idReunion}`,
+      asunto: `${persona} inició una reunión en ${nombreGrupo}`,
+    };
+  },
+  reunionFinalizada(
+    titulo: string,
+    nombreGrupo: string,
+    idReunion: number,
+    duracion: string,
+    entraron: number,
+    finalizador: string | null,
+  ) {
+    return {
+      mensaje:
+        `Terminó "${titulo}" en "${nombreGrupo}". Duró ${duracion}; entraron ${entraron}.` +
+        (finalizador ? ` La finalizó ${finalizador}.` : " Se cerró automáticamente."),
+      enlace: `/reuniones/${idReunion}`,
+      asunto: `Terminó la reunión ${titulo}`,
     };
   },
   integranteSalio(persona: string, nombreGrupo: string, idGrupo: number, ahoraEresLider: boolean) {
