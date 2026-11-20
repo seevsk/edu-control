@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { ConnectionState, Track } from "livekit-client";
 import {
@@ -12,7 +12,11 @@ import {
   RoomAudioRenderer,
   StartAudio,
   TrackToggle,
+  VideoTrack,
+  isTrackReference,
   useConnectionState,
+  useRoomContext,
+  useTrackRefContext,
   useTracks,
   type PreJoinProps,
 } from "@livekit/components-react";
@@ -20,12 +24,45 @@ import "@livekit/components-styles";
 import { PhoneOff } from "lucide-react";
 import { toast } from "sonner";
 import { useEsMovil } from "@/hooks/use-es-movil";
+import { colorAvatar, iniciales } from "@/lib/presentacion";
+import { nombrePila } from "@/lib/nombres";
 import { Skeleton } from "@/components/ui/skeleton";
 
 // Colores y medidas del tablero: fondo #101012, mosaicos #1b1b1e de 12 px de radio y 10 px de separación.
 const TEMA_VIDEO = { "--lk-bg": "#101012", "--lk-bg2": "#1b1b1e", "--lk-border-radius": "12px", "--lk-grid-gap": "10px" } as CSSProperties;
 
 type Eleccion = Parameters<NonNullable<PreJoinProps["onSubmit"]>>[0];
+
+/** Contenido de cada mosaico: video si hay cámara; si no, círculo de color con iniciales (como Avatar). Rótulo "Tú" o nombre de pila. */
+function ContenidoMosaico() {
+  const referencia = useTrackRefContext();
+  const { participant } = referencia;
+  const conVideo = isTrackReference(referencia) && !referencia.publication.isMuted;
+  const pantalla = referencia.source === Track.Source.ScreenShare;
+  const nombre = participant.name || "Participante";
+  const rotulo = participant.isLocal ? "Tú" : nombrePila(nombre);
+  const idUsuario = Number(participant.identity);
+  return (
+    <>
+      {conVideo ? (
+        <VideoTrack trackRef={referencia} />
+      ) : (
+        <div className="absolute inset-0 grid place-items-center">
+          <span
+            aria-hidden
+            style={colorAvatar(Number.isFinite(idUsuario) ? idUsuario : 0)}
+            className="flex size-[72px] items-center justify-center rounded-full text-2xl font-medium lg:size-24 lg:text-3xl"
+          >
+            {iniciales(nombre)}
+          </span>
+        </div>
+      )}
+      <span className="absolute bottom-2.5 left-2.5 rounded-md bg-black/55 px-2 py-0.5 text-xs text-zinc-100">
+        {pantalla ? `Pantalla de ${rotulo}` : rotulo}
+      </span>
+    </>
+  );
+}
 
 function Mosaicos() {
   const pistas = useTracks(
@@ -37,9 +74,21 @@ function Mosaicos() {
   );
   return (
     <GridLayout tracks={pistas} style={{ height: "100%" }}>
-      <ParticipantTile />
+      <ParticipantTile className="relative overflow-hidden rounded-xl bg-[#1b1b1e]">
+        <ContenidoMosaico />
+      </ParticipantTile>
     </GridLayout>
   );
+}
+
+/** Entrega a la sala la función para desconectar el cliente antes de que el servidor borre la sala. */
+function RegistroSalida({ registrar }: { registrar?: (salir: (() => Promise<void>) | null) => void }) {
+  const sala = useRoomContext();
+  useEffect(() => {
+    registrar?.(() => sala.disconnect());
+    return () => registrar?.(null);
+  }, [sala, registrar]);
+  return null;
 }
 
 function Conectando() {
@@ -87,11 +136,13 @@ export default function VideoLiveKit({
   token,
   alDesconectar,
   alError,
+  registrarSalida,
 }: {
   serverUrl: string;
   token: string;
   alDesconectar: () => void;
   alError: () => void;
+  registrarSalida?: (salir: (() => Promise<void>) | null) => void;
 }) {
   const [eleccion, setEleccion] = useState<Eleccion | null>(null);
 
@@ -130,6 +181,7 @@ export default function VideoLiveKit({
         <Mosaicos />
         <Conectando />
       </div>
+      <RegistroSalida registrar={registrarSalida} />
       <RoomAudioRenderer />
       <StartAudio label="Activar audio" />
       <Controles />

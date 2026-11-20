@@ -62,6 +62,16 @@ export function SalaReunion({
   const [error, setError] = useState(false);
   const [intento, setIntento] = useState(0);
   const conError = useRef(false);
+  const salir = useRef<(() => Promise<void>) | null>(null);
+  // Se desconecta el cliente antes de pedir al servidor que cierre la sala (evita errores del canal de datos).
+  const saliendo = useRef(false);
+  const desconectarCliente = async () => {
+    saliendo.current = true;
+    await salir.current?.();
+  };
+  const registrarSalida = (fn: (() => Promise<void>) | null) => {
+    salir.current = fn;
+  };
   const detalle = `/reuniones/${idReunion}`;
 
   const restante = minutosHasta(cierre, ahora);
@@ -71,7 +81,10 @@ export function SalaReunion({
   // Al llegar a cero la sala ya se cerró: se confirma en el servidor y se vuelve al detalle.
   useEffect(() => {
     if (!vencida) return;
-    cerrarSiVencioAction(idReunion).finally(() => router.push(detalle));
+    desconectarCliente()
+      .catch(() => {})
+      .then(() => cerrarSiVencioAction(idReunion))
+      .finally(() => router.push(detalle));
   }, [vencida, idReunion, detalle, router]);
 
   // Aviso "ya había iniciado": una vez, y se quita de la URL sin recargar (el token no debe renovarse).
@@ -95,7 +108,7 @@ export function SalaReunion({
   }
 
   function alDesconectar() {
-    if (!conError.current) router.push(detalle);
+    if (!conError.current && !saliendo.current) router.push(detalle);
   }
 
   function reintentar() {
@@ -191,7 +204,7 @@ export function SalaReunion({
       <main className="min-h-0 flex-1 bg-[#101012] p-3.5 max-md:p-2.5 max-md:pb-[calc(1.875rem+env(safe-area-inset-bottom))]">
         <div className="h-full overflow-hidden">
           {credenciales.tipo === "livekit" ? (
-            <VideoLiveKit key={intento} serverUrl={credenciales.serverUrl} token={credenciales.token} alDesconectar={alDesconectar} alError={alError} />
+            <VideoLiveKit key={intento} serverUrl={credenciales.serverUrl} token={credenciales.token} alDesconectar={alDesconectar} alError={alError} registrarSalida={registrarSalida} />
           ) : (
             <div className="grid h-full place-items-center bg-muted text-sm text-muted-foreground">Videollamada simulada</div>
           )}
@@ -203,7 +216,10 @@ export function SalaReunion({
         alCambiar={setFinalizando}
         titulo="¿Finalizar la reunión para todos?"
         confirmar="Finalizar"
-        accion={finalizarReunionAction.bind(null, idReunion)}
+        accion={async () => {
+          await desconectarCliente();
+          await finalizarReunionAction(idReunion);
+        }}
       />
     </>
   );
