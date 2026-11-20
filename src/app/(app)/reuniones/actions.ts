@@ -18,7 +18,13 @@ export async function crearReunionAction(formData: FormData) {
   const sesion = await requerirSesion();
   const parseo = crearReunionSchema.safeParse(Object.fromEntries(formData.entries()));
   const idGrupo = Number(formData.get("idGrupo"));
-  const formulario = Number.isInteger(idGrupo) && idGrupo > 0 ? `/reuniones/nueva?grupo=${idGrupo}` : "/reuniones/nueva";
+  // En móvil el formulario es una hoja sobre la pestaña Reuniones del grupo (`origen=hoja`).
+  const enHoja = formData.get("origen") === "hoja" && Number.isInteger(idGrupo) && idGrupo > 0;
+  const formulario = enHoja
+    ? `/grupos/${idGrupo}/reuniones?programar=1`
+    : Number.isInteger(idGrupo) && idGrupo > 0
+      ? `/reuniones/nueva?grupo=${idGrupo}`
+      : "/reuniones/nueva";
   if (!parseo.success) redirect(con(formulario, "error", parseo.error.issues[0].message));
 
   try {
@@ -26,12 +32,23 @@ export async function crearReunionAction(formData: FormData) {
   } catch (error) {
     const mensaje = mensajeParaUsuario(error);
     const destino = con(formulario, "error", mensaje);
-    redirect(mensaje === ERROR_SALA ? con(destino, "sala", "error") : destino);
+    if (mensaje !== ERROR_SALA) redirect(destino);
+    // Sin sala el formulario vuelve con lo escrito, para reintentar o usar un enlace propio.
+    const { titulo, fecha, horaInicio, horaFin, lugar } = parseo.data;
+    const conValores = Object.entries({ titulo, fecha, inicio: horaInicio, fin: horaFin, lugar: lugar ?? "" }).reduce(
+      (ruta, [clave, valor]) => (valor ? `${ruta}&${clave}=${encodeURIComponent(valor)}` : ruta),
+      destino,
+    );
+    redirect(con(conValores, "sala", "error"));
   }
 
   revalidatePath("/reuniones");
   revalidatePath("/calendario");
   revalidatePath(`/grupos/${parseo.data.idGrupo}/horarios`);
+  if (enHoja) {
+    revalidatePath(`/grupos/${parseo.data.idGrupo}/reuniones`);
+    redirect(con(`/grupos/${parseo.data.idGrupo}/reuniones`, "toast", "Reunión programada"));
+  }
   const horariosGrupo = `/grupos/${parseo.data.idGrupo}/horarios?semana=${parseo.data.fecha}`;
   redirect(con(horariosGrupo, "toast", "Reunión programada"));
 }
