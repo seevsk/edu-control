@@ -1,6 +1,6 @@
 import { minutosHasta, ventanaSala, type DatosEstadoReunion, type EstadoReunion as EstadoLogico } from "@/lib/estado-reunion";
 import { duracionMinutos, fechaCorta, hora } from "@/lib/formato-fecha";
-import { nombreCorto } from "@/lib/nombres";
+import { nombrePila } from "@/lib/nombres";
 import type { VarianteEstado } from "./estado-reunion";
 
 export type Respuesta = "pendiente" | "asistire" | "no_asistire";
@@ -56,7 +56,7 @@ export function entraron(asistentes: Asistente[]): Asistente[] {
 }
 
 export function nombreAsistente(a: Asistente): string {
-  return nombreCorto(a.usuario.nombre, a.usuario.apellidos);
+  return nombrePila(a.usuario.nombre);
 }
 
 /** Resolución 1: "Iniciada por Valeria · hace 33 min" (< 60 min) o "… · desde 7:00pm"; en móvil sin "Iniciada por". */
@@ -73,8 +73,11 @@ export function conteoAsistencia(
 ): string {
   const confirmados = r.asistentes.filter((a) => a.respuesta === "asistire").length;
   if (!terminada) return `${confirmados} de ${r.asistentes.length} asistirán`;
-  if (r.videollamada) return `${entraron(r.asistentes).length} entraron`;
-  return `${confirmados} de ${r.asistentes.length} asistieron`;
+  if (r.videollamada) {
+    const entradas = entraron(r.asistentes).length;
+    return entradas === 1 ? "1 entró" : `${entradas} entraron`;
+  }
+  return `${confirmados} de ${r.asistentes.length} ${confirmados === 1 ? "asistió" : "asistieron"}`;
 }
 
 export function duracionEntre(desde: Date, hasta: Date): string {

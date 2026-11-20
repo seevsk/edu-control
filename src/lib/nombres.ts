@@ -24,3 +24,8 @@ export function nombreCorto(nombre: string, apellidos?: string | null): string {
   const primerApellido = apellidos ? primeraPalabra(apellidos) : "";
   return `${primeraPalabra(nombre)} ${primerApellido}`.trim();
 }
+
+/** Solo el nombre de pila ("Valeria"), como lo muestran los avisos y las listas de la reunión. */
+export function nombrePila(nombre: string): string {
+  return primeraPalabra(nombre);
+}

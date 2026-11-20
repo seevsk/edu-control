@@ -3,7 +3,7 @@ import { cache } from "react";
 import { notFound } from "next/navigation";
 import { requerirSesion } from "@/server/auth/session";
 import { obtenerReunion } from "@/server/services/reunion";
-import { nombreCorto } from "@/lib/nombres";
+import { nombrePila } from "@/lib/nombres";
 import { Toast } from "@/components/toast";
 import { DetalleReunion } from "./_components/detalle-reunion";
 
@@ -69,7 +69,7 @@ export default async function DetalleReunionPage({ params, searchParams }: Props
           observador,
           moderador: moderador && !observador,
           puedeCancelarBase: !observador && (reunion.idCreador === sesion.idUsuario || rol === "lider"),
-          finalizadoPor: reunion.finalizador ? nombreCorto(reunion.finalizador.nombre, reunion.finalizador.apellidos) : null,
+          finalizadoPor: reunion.finalizador ? nombrePila(reunion.finalizador.nombre) : null,
         }}
       />
     </>

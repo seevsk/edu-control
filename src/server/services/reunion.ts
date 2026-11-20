@@ -131,7 +131,7 @@ export async function listarMisReuniones(idUsuario: number) {
 
   const ahora = new Date();
   const incluir = {
-    grupo: { select: { nombre: true, estado: true } },
+    grupo: { select: { nombre: true, estado: true, evaluacion: { select: { idCurso: true } } } },
     creador: { select: { idUsuario: true, nombre: true } },
     finalizador: { select: { idUsuario: true, nombre: true } },
     asistentes: {
@@ -179,7 +179,11 @@ export async function gruposParaProgramar(idUsuario: number) {
       estado: "activo",
       integrantes: { some: { idUsuario, estadoInvitacion: "aceptada", rol: { not: "observador" } } },
     },
-    select: { idGrupo: true, nombre: true },
+    select: {
+      idGrupo: true,
+      nombre: true,
+      evaluacion: { select: { curso: { select: { idCurso: true, nombre: true } } } },
+    },
     orderBy: { fechaCreacion: "desc" },
   });
 }
