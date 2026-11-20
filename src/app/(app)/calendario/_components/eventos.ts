@@ -1,6 +1,7 @@
 import type { obtenerCalendarioEntre } from "@/server/services/calendario";
 import type { CalendarEvent } from "@/components/reui/event-calendar/event-calendar-types";
 import { DIAS_LARGOS, fechaEnZonaLimaISO, minutosDelDiaLima, sumarDiasISO } from "@/lib/calendario";
+import { estadoReunion } from "@/lib/estado-reunion";
 import { aOracion, colorCurso } from "@/lib/presentacion";
 import { formatoTitulo } from "@/lib/nombres";
 import { diaYMes, fechaCorta, formatoHora, rangoHoras } from "@/lib/formato-fecha";
@@ -158,12 +159,14 @@ export function construirEventos(datos: DatosCalendario, consulta: string): Even
       readOnly: true,
       data: {
         filtro: "reuniones",
+        videollamada: reunion.videollamada,
+        enCurso: reunion.videollamada && reunion.iniciadaEn !== null && ["en_curso", "por_cerrar"].includes(estadoReunion(reunion, ahora)),
         subtitulo: `${rango(inicioMin, finMin)} · ${reunion.grupo.nombre}`,
         lineas: [
           { icono: "hora", texto: `${diaYMes(reunion.inicio, ahora)} · ${rango(inicioMin, finMin)}` },
           { icono: "grupo", texto: reunion.grupo.nombre },
         ],
-        acciones: [{ texto: "Ver reunión", href: `/reuniones?grupo=${reunion.idGrupo}#reunion-${reunion.idReunion}`, principal: true }],
+        acciones: [{ texto: "Ver reunión", href: `/reuniones/${reunion.idReunion}`, principal: true }],
       },
     });
   }

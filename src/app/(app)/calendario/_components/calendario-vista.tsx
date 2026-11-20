@@ -18,6 +18,7 @@ import {
   Repeat,
   Tag,
   Users,
+  Video,
   X,
 } from "lucide-react";
 import {
@@ -37,6 +38,7 @@ import { duracionMinutos, formatoHora, rangoHoras } from "@/lib/formato-fecha";
 import { cn } from "@/lib/utils";
 import type { EventoCalendario } from "./eventos";
 import { FILTROS_FECHAS, FILTROS_HORARIO, type DatoEvento, type FiltroCalendario, type IconoLinea, type ModoCalendario } from "./tipos-calendario";
+import { PuntoEnCurso } from "@/components/ui-app/reuniones/punto-en-curso";
 import { NuevoTiempoOcupado, type BorradorTiempo } from "./nuevo-tiempo-ocupado";
 import { CalendarioMovil } from "./calendario-movil";
 
@@ -288,12 +290,18 @@ export function CalendarioVista({
 function ContenidoEvento({ occurrence, view }: { occurrence: EventCalendarOccurrence<DatoEvento>; view: CalendarView }) {
   const dato = occurrence.event.data;
   const esBorrador = occurrence.eventId === ID_BORRADOR;
-  const punto = <span className="inline-block size-1.5 shrink-0 rounded-[2px] bg-(--ec-event-color)" aria-hidden />;
+  const punto = dato?.videollamada ? (
+    <Video className="size-3 shrink-0 text-(--ec-event-color)" aria-label="Videollamada en EduControl" />
+  ) : (
+    <span className="inline-block size-1.5 shrink-0 rounded-[2px] bg-(--ec-event-color)" aria-hidden />
+  );
+  const enCurso = dato?.enCurso ? <PuntoEnCurso tamano={6} /> : null;
   if (occurrence.allDay || view === "month") {
     return (
       <span className="flex min-w-0 items-center gap-[5px] text-[11px] leading-4">
         {punto}
         <span className="truncate">{occurrence.event.title}</span>
+        {enCurso}
       </span>
     );
   }
@@ -305,6 +313,7 @@ function ContenidoEvento({ occurrence, view }: { occurrence: EventCalendarOccurr
       <span className="flex min-w-0 items-center gap-[5px] text-xs leading-4 font-medium">
         {punto}
         <span className="truncate">{occurrence.event.title}</span>
+        {enCurso}
       </span>
       <span className="mt-0.5 truncate text-[11px] leading-4 text-muted-foreground">
         {esBorrador || !dato?.subtitulo ? rangoHoras(minutosAPartes(minutosInicio), minutosAPartes(minutosFin)) : dato.subtitulo}
