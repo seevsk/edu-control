@@ -37,7 +37,7 @@ export function AccionDobleGrupo({ idGrupo, enCurso }: { idGrupo: number; enCurs
 /** Ícono de 44 px "Programar reunión" para el encabezado móvil del grupo. */
 export function ProgramarMovil({ idGrupo, className }: { idGrupo: number; className?: string }) {
   return (
-    <Link href={`/reuniones/nueva?grupo=${idGrupo}`} aria-label="Programar reunión" className={cn(ACCION_MOVIL, className)}>
+    <Link href={`/grupos/${idGrupo}/reuniones?programar=1`} aria-label="Programar reunión" className={cn(ACCION_MOVIL, className)}>
       <CalendarPlus aria-hidden />
     </Link>
   );

@@ -16,6 +16,7 @@ import { aOracion } from "@/lib/presentacion";
 import { diaMesCorto, fechaEnZonaLimaISO } from "@/lib/calendario";
 import { yaImportoCurso } from "@/server/services/curso";
 import { reunionEnCursoDelGrupo } from "@/server/services/reunion";
+import { EnlaceProgramarReunion } from "@/components/ui-app/reuniones/enlace-programar";
 import { FranjaEnCurso } from "@/components/ui-app/reuniones/franja-en-curso";
 import { importarCursoAction } from "../../../cursos/actions";
 import type { obtenerGrupoDelUsuario } from "@/server/services/grupo";
@@ -49,7 +50,7 @@ export async function EncabezadoGrupo({
   const puedeImportarCurso = curso !== null && curso.idUsuario !== idUsuario && !(await yaImportoCurso(idUsuario, curso.idCurso));
   // Franja "En curso" en todas las pestañas menos Reuniones (ahí la sección En curso cumple ese papel).
   const enCurso = activa === "reuniones" ? null : await reunionEnCursoDelGrupo(idUsuario, idGrupo);
-  const franja = enCurso ? { idReunion: enCurso.idReunion, titulo: enCurso.titulo, inicio: enCurso.inicio } : null;
+  const franja = enCurso?.iniciadaEn ? { idReunion: enCurso.idReunion, titulo: enCurso.titulo, inicio: enCurso.inicio } : null;
   const integrantes = grupo.integrantes.filter((integrante) => integrante.estadoInvitacion === "aceptada");
 
   const pestanas = [
@@ -102,10 +103,10 @@ export async function EncabezadoGrupo({
         ) : null}
         {puedeParticipar ? (
           <DropdownMenuItem asChild>
-            <Link href={`/reuniones/nueva?grupo=${idGrupo}`}>
+            <EnlaceProgramarReunion idGrupo={idGrupo}>
               <CalendarPlus aria-hidden />
               Programar reunión
-            </Link>
+            </EnlaceProgramarReunion>
           </DropdownMenuItem>
         ) : null}
         {esLider && grupo.estado === "activo" ? (
