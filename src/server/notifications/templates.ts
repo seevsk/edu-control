@@ -97,7 +97,7 @@ export const plantillasNotificacion = {
   ) {
     return {
       mensaje:
-        `Terminó "${titulo}" en "${nombreGrupo}". Duró ${duracion}; entraron ${entraron}.` +
+        `Terminó "${titulo}" en "${nombreGrupo}". Duró ${duracion}; ${entraron === 1 ? "entró 1" : `entraron ${entraron}`}.` +
         (finalizador ? ` La finalizó ${finalizador}.` : " Se cerró automáticamente."),
       enlace: `/reuniones/${idReunion}`,
       asunto: `Terminó la reunión ${titulo}`,

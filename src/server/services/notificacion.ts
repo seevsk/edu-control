@@ -29,6 +29,8 @@ export async function marcarTodasLeidas(idUsuario: number) {
 const LIMITE_BANDEJA = 80;
 const PATRON_GRUPO = /^\/grupos\/(\d+)(?:\/tareas\/(\d+))?/;
 const PATRON_REUNION = /^\/reuniones\?grupo=(\d+)(?:&reunion=(\d+))?/;
+/** Enlace actual de una reunión: `/reuniones/12` (el grupo se resuelve en la consulta). */
+const PATRON_REUNION_ID = /^\/reuniones\/(\d+)\/?$/;
 const PATRON_INVITACION = /[?&]sel=inv-(\d+)/;
 const PATRON_EVALUACION = /^\/cursos\/(\d+)\?evaluacion=(\d+)/;
 
@@ -56,6 +58,8 @@ function leerEnlace(enlace: string | null): Destino {
   if (grupo) return { idGrupo: Number(grupo[1]), idTarea: grupo[2] ? Number(grupo[2]) : null };
   const reunion = enlace.match(PATRON_REUNION);
   if (reunion) return { idGrupo: Number(reunion[1]), idReunion: reunion[2] ? Number(reunion[2]) : null };
+  const reunionId = enlace.match(PATRON_REUNION_ID);
+  if (reunionId) return { idReunion: Number(reunionId[1]) };
   const invitacion = enlace.match(PATRON_INVITACION);
   if (invitacion) return { idInvitacion: Number(invitacion[1]) };
   const evaluacion = enlace.match(PATRON_EVALUACION);
@@ -102,6 +106,18 @@ export async function obtenerBandeja(idUsuario: number) {
     }),
   ]);
   const enlaces = notificaciones.map((notificacion) => leerEnlace(notificacion.enlace));
+  // Los enlaces `/reuniones/{id}` no traen el grupo: se obtiene de la reunión (el acceso se comprueba abajo).
+  const idsReunionSinGrupo = enlaces.flatMap((destino) => (destino.idReunion && !destino.idGrupo ? [destino.idReunion] : []));
+  if (idsReunionSinGrupo.length > 0) {
+    const reunionesDelEnlace = await prisma.reunion.findMany({
+      where: { idReunion: { in: idsReunionSinGrupo } },
+      select: { idReunion: true, idGrupo: true },
+    });
+    const grupoPorReunion = new Map(reunionesDelEnlace.map((reunion) => [reunion.idReunion, reunion.idGrupo]));
+    for (const destino of enlaces) {
+      if (destino.idReunion && !destino.idGrupo) destino.idGrupo = grupoPorReunion.get(destino.idReunion);
+    }
+  }
   const idsGrupo = [...new Set(enlaces.flatMap((destino) => (destino.idGrupo ? [destino.idGrupo] : [])))];
   const grupos = await prisma.grupo.findMany({
     // Solo grupos donde participa: un enlace no es permiso.
@@ -261,7 +277,8 @@ export async function obtenerReunionParaBandeja(idUsuario: number, idGrupo: numb
         },
     include: {
       creador: { select: PERSONA },
-      asistentes: { select: { respuesta: true, usuario: { select: PERSONA } } },
+      finalizador: { select: PERSONA },
+      asistentes: { select: { respuesta: true, fechaEntrada: true, usuario: { select: PERSONA } } },
     },
   });
 }

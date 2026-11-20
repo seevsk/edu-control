@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Bell, BookOpen, CalendarDays, CheckCheck, CheckCircle2, ChevronLeft, Clock, LogOut, Mail, Search, UserMinus, XCircle } from "lucide-react";
+import { Bell, BookOpen, CalendarDays, CheckCheck, CheckCircle2, ChevronLeft, Clock, LogOut, Mail, Search, UserMinus, Video, XCircle } from "lucide-react";
 import { requerirSesion } from "@/server/auth/session";
 import { obtenerBandeja, obtenerDetalleInvitacion, obtenerReunionParaBandeja } from "@/server/services/notificacion";
 import { obtenerTareaDelGrupo } from "@/server/services/tarea";
@@ -32,6 +32,7 @@ import {
   Fecha,
   QuePaso,
 } from "./_components/detalles";
+import { DetalleReunionFinalizada, DetalleReunionIniciada } from "./_components/detalles-reunion-video";
 
 export const metadata: Metadata = { title: "Bandeja" };
 
@@ -51,6 +52,8 @@ const ICONOS: Record<string, typeof Bell> = {
   invitacion_grupo: Mail,
   invitacion_respondida: Mail,
   reunion_programada: CalendarDays,
+  reunion_iniciada: Video,
+  reunion_finalizada: Video,
   integrante_salio: UserMinus,
   evaluacion_creada: BookOpen,
 };
@@ -125,7 +128,7 @@ export default async function BandejaPage({ searchParams }: { searchParams: Prom
     idInvitacion && Number.isInteger(idInvitacion) ? obtenerDetalleInvitacion(sesion.idUsuario, idInvitacion) : null,
     seleccionado?.idGrupo && seleccionado.idTarea ? obtenerTareaDelGrupo(sesion.idUsuario, seleccionado.idGrupo, seleccionado.idTarea).catch(() => null) : null,
     seleccionado?.idGrupo ? obtenerGrupoDelUsuario(sesion.idUsuario, seleccionado.idGrupo).catch(() => null) : null,
-    seleccionado?.tipo === "reunion_programada" && seleccionado.idGrupo
+    (seleccionado?.tipo === "reunion_programada" || seleccionado?.tipo === "reunion_iniciada" || seleccionado?.tipo === "reunion_finalizada") && seleccionado.idGrupo
       ? obtenerReunionParaBandeja(sesion.idUsuario, seleccionado.idGrupo, seleccionado.idReunion, resumen?.objeto ?? null, seleccionado.fecha)
       : null,
     seleccionado?.tipo === "evaluacion_creada" && seleccionado.idEvaluacion
@@ -368,6 +371,10 @@ export default async function BandejaPage({ searchParams }: { searchParams: Prom
                     </ol>
                   </div>
                 </>
+              ) : reunion && seleccionado?.tipo === "reunion_iniciada" ? (
+                <DetalleReunionIniciada reunion={reunion} grupo={contextoGrupo} idUsuario={sesion.idUsuario} ahora={ahora} puedeUnirse={reunion.videollamada && grupoDelAviso?.rolActual !== "observador"} />
+              ) : reunion && seleccionado?.tipo === "reunion_finalizada" ? (
+                <DetalleReunionFinalizada reunion={reunion} grupo={contextoGrupo} idUsuario={sesion.idUsuario} />
               ) : reunion && seleccionado ? (
                 <DetalleReunion reunion={reunion} grupo={contextoGrupo} idUsuario={sesion.idUsuario} ahora={ahora} />
               ) : evaluacion ? (
