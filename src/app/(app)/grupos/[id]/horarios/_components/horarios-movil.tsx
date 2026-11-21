@@ -116,7 +116,7 @@ export function HorariosMovil({
               </span>
               {todos && puedeProgramar && !pasado && tramo.finMin - tramo.inicioMin >= 60 ? (
                 <Link
-                  href={`/reuniones/nueva?grupo=${idGrupo}&fecha=${dia.fechaISO}&inicio=${hhmm(tramo.inicioMin)}&fin=${hhmm(fin)}`}
+                  href={`/grupos/${idGrupo}/reuniones?programar=1&fecha=${dia.fechaISO}&inicio=${hhmm(tramo.inicioMin)}&fin=${hhmm(fin)}`}
                   className="flex h-9 shrink-0 items-center rounded-full border border-input px-3.5 text-sm"
                 >
                   Programar

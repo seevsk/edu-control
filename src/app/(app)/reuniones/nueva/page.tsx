@@ -1,29 +1,23 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { requerirSesion } from "@/server/auth/session";
-import { gruposParaProgramar, reunionesDelGrupoEntre } from "@/server/services/reunion";
-import { obtenerDisponibilidadGrupo } from "@/server/services/disponibilidad";
+import { gruposParaProgramar } from "@/server/services/reunion";
 import {
-  DIAS_CORTOS,
   DIAS_LARGOS,
   diaSemanaISO,
   etiquetaMinutos,
   fechaEnZonaLimaISO,
   minutosDelDiaLima,
   proximaFechaDelDia,
-  sumarDiasISO,
 } from "@/lib/calendario";
-import { bloquearReunionesParaTodos, huecos, mapaDeDisponibilidad, type Franja } from "@/lib/disponibilidad";
+import type { Franja } from "@/lib/disponibilidad";
+import { Migas } from "@/components/ui-app/barra-superior";
+import { VolverMovil } from "@/components/ui-app/page-header";
 import { MapaSemanal } from "@/components/mapa-semanal";
-import { FormularioReunion, type Sugerencia } from "./formulario-reunion";
+import { FormularioReunion } from "./formulario-reunion";
+import { RedirigirAHojaEnMovil } from "./redirigir-a-hoja";
+import { cargarDatosProgramar, inicialesDeParametros } from "./datos-programar";
 
 export const metadata: Metadata = { title: "Programar reunión" };
-
-const HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
-
-function hhmm(minutos: number) {
-  return `${String(Math.floor(minutos / 60)).padStart(2, "0")}:${String(minutos % 60).padStart(2, "0")}`;
-}
 
 function nivelDeFranja(libres: number, total: number) {
   if (libres === total) return "bg-estado-completada/15 text-estado-completada";
@@ -35,31 +29,25 @@ function nivelDeFranja(libres: number, total: number) {
 export default async function NuevaReunionPage({
   searchParams,
 }: {
-  searchParams: Promise<{ grupo?: string; fecha?: string; inicio?: string; fin?: string; error?: string }>;
+  searchParams: Promise<{
+    grupo?: string;
+    fecha?: string;
+    inicio?: string;
+    fin?: string;
+    titulo?: string;
+    lugar?: string;
+    sala?: string;
+    error?: string;
+  }>;
 }) {
   const sesion = await requerirSesion();
-  const { grupo, fecha, inicio, fin, error } = await searchParams;
+  const { grupo, fecha, inicio, fin, titulo, lugar, sala, error } = await searchParams;
   const grupos = await gruposParaProgramar(sesion.idUsuario);
   const idGrupo =
     grupos.find((g) => g.idGrupo === Number(grupo))?.idGrupo ?? (grupos.length === 1 ? grupos[0].idGrupo : null);
 
-  const ahora = new Date();
-  const hoyISO = fechaEnZonaLimaISO(ahora);
-  const ahoraMin = minutosDelDiaLima(ahora);
-
-  const finPeriodoISO = sumarDiasISO(hoyISO, 7);
-  const desdePeriodo = new Date(`${hoyISO}T00:00:00-05:00`);
-  const hastaPeriodo = new Date(`${finPeriodoISO}T00:00:00-05:00`);
-  const [integrantesBase, reuniones] = idGrupo
-    ? await Promise.all([
-        obtenerDisponibilidadGrupo(sesion.idUsuario, idGrupo),
-        reunionesDelGrupoEntre(sesion.idUsuario, idGrupo, desdePeriodo, hastaPeriodo),
-      ])
-    : [[], []];
-  const integrantesConReuniones = bloquearReunionesParaTodos(integrantesBase, reuniones);
-  const total = integrantesBase.length;
-  const nombres = new Map(integrantesBase.map((i) => [i.idUsuario, i.idUsuario === sesion.idUsuario ? "ti" : i.nombre]));
-  const mapa = idGrupo ? mapaDeDisponibilidad(integrantesConReuniones) : null;
+  const { hoyISO, ahoraMin, reuniones, total, nombres, mapa, sugerencias, integrantes, reunionesProgramadas } =
+    await cargarDatosProgramar(sesion.idUsuario, idGrupo);
   const fechasDias = Array.from({ length: 7 }, (_, indice) => proximaFechaDelDia(hoyISO, indice + 1));
   const eventosMapa = reuniones.map((reunion) => ({
     clave: `reunion-${reunion.idReunion}`,
@@ -71,28 +59,6 @@ export default async function NuevaReunionPage({
     href: `/reuniones?grupo=${idGrupo}#reunion-${reunion.idReunion}`,
   }));
 
-  let sugerencias: Sugerencia[] = [];
-  if (mapa) {
-    const comunes = huecos(mapa);
-    const base = comunes.length > 0 ? comunes : total > 2 ? huecos(mapa, { toleranciaFaltantes: 1 }) : [];
-    sugerencias = base
-      .map((hueco): Sugerencia | null => {
-        const dia = proximaFechaDelDia(hoyISO, hueco.diaSemana);
-        const desde = dia === hoyISO ? Math.max(hueco.inicioMin, Math.ceil((ahoraMin + 1) / 30) * 30) : hueco.inicioMin;
-        if (desde + 60 > hueco.finMin) return null;
-        return {
-          fecha: dia,
-          inicio: hhmm(desde),
-          fin: hhmm(desde + 60),
-          etiqueta: `${DIAS_CORTOS[hueco.diaSemana - 1]} ${Number(dia.slice(8))} · ${etiquetaMinutos(desde)} - ${etiquetaMinutos(desde + 60)}`,
-          faltan: hueco.faltan.map((id) => nombres.get(id) ?? "").join(", ") || null,
-        };
-      })
-      .filter((sugerencia): sugerencia is Sugerencia => sugerencia !== null)
-      .sort((a, b) => (a.fecha + a.inicio).localeCompare(b.fecha + b.inicio))
-      .slice(0, 8);
-  }
-
   const describirFranja = (franja: Franja) => {
     const libres = total - franja.ocupados.length;
     const faltan = franja.ocupados.map((id) => nombres.get(id)).join(", ");
@@ -102,15 +68,15 @@ export default async function NuevaReunionPage({
   };
 
   return (
-    <div className="animate-page-in mx-auto flex max-w-4xl flex-col gap-5">
+    <div className="animate-page-in mx-auto flex max-w-4xl flex-col gap-5 lg:pt-4">
+      {idGrupo ? <RedirigirAHojaEnMovil idGrupo={idGrupo} parametros={{ fecha, inicio, fin, titulo, lugar, sala, error }} /> : null}
+      <Migas items={[{ href: "/reuniones", texto: "Reuniones" }, { texto: "Programar" }]} />
       <div>
-        <Link href="/reuniones" className="text-sm text-primary hover:underline">
-          Reuniones
-        </Link>
-        <h1 className="mt-1 text-xl font-semibold">Programar reunión</h1>
+        <VolverMovil href="/reuniones" texto="Reuniones" className="-mt-2" />
+        <h1 className="mt-1 text-[22px] font-bold tracking-[-0.02em]">Programar reunión</h1>
       </div>
 
-      {error ? (
+      {error && sala !== "error" ? (
         <p role="alert" className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
           {error}
         </p>
@@ -121,25 +87,19 @@ export default async function NuevaReunionPage({
           Sin grupos activos donde programar.
         </p>
       ) : (
+        <div className="w-full max-w-[640px] self-center">
         <FormularioReunion
           key={idGrupo ?? "sin-grupo"}
           grupos={grupos}
           idGrupo={idGrupo}
           hoyISO={hoyISO}
-          integrantes={integrantesBase.map((i) => ({ idUsuario: i.idUsuario, nombre: nombres.get(i.idUsuario) ?? i.nombre, ocupados: i.ocupados }))}
-          reunionesProgramadas={reuniones.map((reunion) => ({
-            titulo: reunion.titulo,
-            fecha: fechaEnZonaLimaISO(reunion.inicio),
-            inicioMin: minutosDelDiaLima(reunion.inicio),
-            finMin: minutosDelDiaLima(reunion.fin),
-          }))}
+          integrantes={integrantes}
+          reunionesProgramadas={reunionesProgramadas}
           sugerencias={sugerencias}
-          iniciales={{
-            fecha: fecha && /^\d{4}-\d{2}-\d{2}$/.test(fecha) && fecha >= hoyISO ? fecha : "",
-            inicio: inicio && HORA.test(inicio) ? inicio : "18:00",
-            fin: fin && HORA.test(fin) ? fin : "19:00",
-          }}
+          iniciales={inicialesDeParametros({ fecha, inicio, fin, titulo, lugar }, hoyISO)}
+          errorSala={sala === "error"}
         />
+        </div>
       )}
 
       {mapa ? (

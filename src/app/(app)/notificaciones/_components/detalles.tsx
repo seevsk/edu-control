@@ -223,7 +223,7 @@ export function DetalleReunion({ reunion, grupo, idUsuario, ahora }: { reunion: 
         icono={<CalendarDays className="size-5 text-cat-reunion" aria-hidden />}
         titulo={reunion.titulo}
         contexto={grupo}
-        accion={<Button size="sm" asChild><Link href={`/reuniones?grupo=${reunion.idGrupo}`}>{propia?.respuesta === "pendiente" ? "Confirmar asistencia" : "Ver reuniones"}</Link></Button>}
+        accion={<Button size="sm" asChild><Link href={`/reuniones/${reunion.idReunion}`}>{propia?.respuesta === "pendiente" ? "Confirmar asistencia" : "Ver detalle"}</Link></Button>}
       />
       <QuePaso persona={reunion.creador} accion="programó una reunión" fecha={reunion.fechaCreacion} ahora={ahora} idUsuarioActual={idUsuario} />
       <dl className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-x-6 gap-y-4 border-y py-4">

@@ -26,6 +26,10 @@ export interface DatoEvento {
   acciones: { texto: string; href: string; principal?: boolean }[];
   /** Ventana semanal (clases y bloques): sirve para avisar choques al crear tiempo ocupado. */
   semanal?: { diaSemana: number; inicioMin: number; finMin: number };
+  /** Reunión con videollamada en EduControl (ícono Video). */
+  videollamada?: boolean;
+  /** La videollamada ya empezó y sigue abierta (punto pulsante). */
+  enCurso?: boolean;
 }
 
 export type ModoCalendario = "mes" | "semana" | "agenda";

@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Plus, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Search, Video } from "lucide-react";
 import { diaSemanaISO, fechaEnZonaLimaISO, minutosDelDiaLima, sumarDiasISO } from "@/lib/calendario";
 import { formatoHora } from "@/lib/formato-fecha";
 import { ACCION_MOVIL } from "@/components/ui-app/page-header";
+import { PuntoEnCurso } from "@/components/ui-app/reuniones/punto-en-curso";
 import { cn } from "@/lib/utils";
 import type { EventoCalendario } from "./eventos";
 
@@ -25,6 +26,8 @@ interface Ocurrencia {
   /** Termina al día siguiente (horario excepcional). */
   cruza: boolean;
   href: string | null;
+  videollamada?: boolean;
+  enCurso?: boolean;
 }
 
 const hora = (minutos: number) => formatoHora(Math.floor(minutos / 60) % 24, minutos % 60);
@@ -54,7 +57,7 @@ function ocurrenciasDel(diaISO: string, eventos: EventoCalendario[]): Ocurrencia
     }
     const inicioMin = minutosDelDiaLima(inicio);
     const finMin = minutosDelDiaLima(new Date(evento.end)) || 1440;
-    lista.push({ clave: `${evento.id}`, titulo, subtitulo: sinRango(dato?.subtitulo ?? ""), color: evento.color ?? "var(--muted-foreground)", inicioMin, finMin, cruza: false, href });
+    lista.push({ clave: `${evento.id}`, titulo, subtitulo: sinRango(dato?.subtitulo ?? ""), color: evento.color ?? "var(--muted-foreground)", inicioMin, finMin, cruza: false, href, videollamada: dato?.videollamada, enCurso: dato?.enCurso });
   }
   // Entregas primero (todo el día) y luego por hora de inicio.
   return lista.sort((a, b) => (a.inicioMin ?? -1) - (b.inicioMin ?? -1));
@@ -157,7 +160,11 @@ export function CalendarioMovil({
                       </span>
                       <span className="w-[3px] shrink-0 self-stretch rounded-full" style={{ backgroundColor: ocurrencia.color }} aria-hidden />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[15px]">{ocurrencia.titulo}</span>
+                        <span className="flex items-center gap-1.5 text-[15px]">
+                          {ocurrencia.videollamada ? <Video className="size-3.5 shrink-0 text-cat-reunion" aria-label="Videollamada en EduControl" /> : null}
+                          <span className="truncate">{ocurrencia.titulo}</span>
+                          {ocurrencia.enCurso ? <PuntoEnCurso tamano={6} /> : null}
+                        </span>
                         {ocurrencia.subtitulo ? <span className="mt-0.5 block truncate text-[13px] text-subtle-foreground">{ocurrencia.subtitulo}</span> : null}
                       </span>
                     </>

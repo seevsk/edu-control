@@ -14,6 +14,8 @@ export type TipoBandeja =
   | "tarea_reprogramada"
   | "tarea_descartada"
   | "reunion_programada"
+  | "reunion_iniciada"
+  | "reunion_finalizada"
   | "integrante_salio"
   | "evaluacion_creada";
 
@@ -28,6 +30,8 @@ const TITULOS: Record<TipoBandeja, string> = {
   tarea_reprogramada: "Nueva fecha límite",
   tarea_descartada: "Tarea descartada",
   reunion_programada: "Nueva reunión",
+  reunion_iniciada: "Reunión iniciada",
+  reunion_finalizada: "Reunión terminada",
   integrante_salio: "Un integrante salió",
   evaluacion_creada: "Evaluación registrada",
 };
@@ -72,6 +76,16 @@ export function resumirNotificacion(tipo: string, mensaje: string): ResumenNotif
       // 'Nueva reunión en "Grupo": "Título", lun 9, 7:00pm.' -> el titulo es la segunda cita.
       const citas = [...mensaje.matchAll(/[“"]([^”"]+)[”"]/g)].map((coincidencia) => coincidencia[1]);
       return { ...base, objeto: citas[1] ?? citas[0] ?? null };
+    }
+    case "reunion_iniciada": {
+      // 'Ana inició "Título" en "Grupo", 7:00pm - 8:00pm.'
+      const citas = [...mensaje.matchAll(/[“"]([^”"]+)[”"]/g)].map((coincidencia) => coincidencia[1]);
+      const persona = mensaje.match(/^(.+?) inició /)?.[1] ?? null;
+      return { ...base, persona, objeto: citas[0] ?? null };
+    }
+    case "reunion_finalizada": {
+      const citas = [...mensaje.matchAll(/[“"]([^”"]+)[”"]/g)].map((coincidencia) => coincidencia[1]);
+      return { ...base, objeto: citas[0] ?? null };
     }
     case "integrante_salio": {
       const salida = mensaje.match(/^(.+?) salió de (.+?)( y te dejó como líder)?$/);

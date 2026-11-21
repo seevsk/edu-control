@@ -46,7 +46,7 @@ Nació como proyecto del curso *Proyecto Tecnológico* (NRC 3708, ISIL, metodolo
 | Evaluaciones | HU-009, HU-010 | Modelo `evaluacion` |
 | Perfil y disponibilidad | HU-003, HU-017, HU-018 | Modelo `perfil` y `bloque_ocupado`; se construye después del núcleo |
 | Disponibilidad del grupo | — (aprobado por el usuario, 2026-10-05) | Pestaña "Horarios" del grupo: mapa semanal ocupado/libre y huecos en común. Calculado, sin tabla (ver 8.5) |
-| Reuniones | — (aprobado por el usuario, 2026-10-05) | Módulo propio en el sidebar (`/reuniones`): programar con sugerencias de la disponibilidad del grupo, confirmar asistencia, verlas en el Calendario. Modelos `reunion` y `reunion_asistente` (ver 8.7) |
+| Reuniones | — (aprobado por el usuario, 2026-10-05) | Módulo propio en el sidebar (`/reuniones`): programar con sugerencias de la disponibilidad del grupo, confirmar asistencia, verlas en el Calendario. Modelos `reunion` y `reunion_asistente` (ver 8.7). Con videollamada propia (sala privada en un proveedor de video, incrustada) y "Reunirse ahora" (aprobado 2026-11-20) |
 | Perfil de otros usuarios y buscador de personas | — (aprobado por el usuario, 2026-10-05) | `/usuarios` y `/usuarios/[id]` (ver 8.1) |
 | Entregas de tarea | — (aprobado por el usuario, 2026-11-18) | Para pasar a revisión el asignado envía una entrega (título, descripción, enlace y archivos con tope de MB); el líder la aprueba o devuelve; todos la ven y descargan. Modelos `entrega`, `entrega_archivo` y `entrega_archivo_contenido` (ver 8.4) |
 
@@ -76,7 +76,7 @@ Nació como proyecto del curso *Proyecto Tecnológico* (NRC 3708, ISIL, metodolo
 | Capa | Tecnología |
 |---|---|
 | Frontend | Next.js (App Router) + React + Tailwind CSS |
-| Componentes e íconos | shadcn/ui (sobre Radix), lucide-react, calendario ReUI (`src/components/reui`), dnd-kit (tablero), cmdk, sonner, date-fns |
+| Componentes e íconos | shadcn/ui (sobre Radix), lucide-react, calendario ReUI (`src/components/reui`), dnd-kit (tablero), cmdk, sonner, date-fns, `livekit-client`, `@livekit/components-react` y `@livekit/components-styles` (sala de videollamada; aprobadas 2026-11-20) |
 | Backend | TypeScript dentro del mismo proyecto Next.js (Route Handlers y Server Actions). **No hay backend separado ni CORS** |
 | Base de datos | PostgreSQL |
 | ORM y migraciones | Prisma |
@@ -84,6 +84,7 @@ Nació como proyecto del curso *Proyecto Tecnológico* (NRC 3708, ISIL, metodolo
 | Animaciones | `motion` (solo en el login, pedido del usuario 2026-11-16) |
 | Autenticación | Google OAuth únicamente, flujo manual con `openid-client` + `jose` (ver 8.1) |
 | Correo | Resend mediante `EmailSender` configurable por entorno (ver 8.6) |
+| Videollamadas | LiveKit Cloud (plan Build, sin tarjeta; al pasar el tope corta en vez de cobrar) detrás de `ProveedorVideo`, con implementaciones `simulado` y `livekit`, configurable por entorno (ver 8.7). Los tokens se firman con `jose` (HS256); no se usa `livekit-server-sdk` |
 | Entorno local | Docker solo para PostgreSQL |
 | Control de versiones | GitHub |
 | Gestión del proyecto | Azure DevOps |
@@ -182,8 +183,8 @@ Reglas de arquitectura:
 | `tarea` | Tareas de un grupo, con responsable, estado y peso |
 | `tarea_historial` | Registro inmutable de cambios de cada tarea |
 | `notificacion` | Avisos por destinatario, con estado de envío de correo |
-| `reunion` | Reunión de un grupo, de una sola vez (título, inicio, fin, lugar y enlace opcionales) |
-| `reunion_asistente` | Confirmación de asistencia por integrante (`pendiente` \| `asistire` \| `no_asistire`) |
+| `reunion` | Reunión de un grupo, de una sola vez (título, inicio, fin, lugar y enlace opcionales; `videollamada`, `sala_url`, `iniciada_en`, `finalizada_en`, `id_finalizador`) |
+| `reunion_asistente` | Confirmación de asistencia por integrante (`pendiente` \| `asistire` \| `no_asistire`) y `fecha_entrada` (primera vez que pulsó Unirse) |
 | `evaluacion_historial` | Registro inmutable del avance personal de cada evaluación (como `tarea_historial`) |
 | `entrega` | Lo que el asignado envía al pasar una tarea a revisión: título, descripción, enlace, `resultado` (`en_revision` \| `aprobada` \| `devuelta`), revisor, fecha y motivo de devolución |
 | `entrega_archivo` | Metadatos de cada archivo adjunto (nombre, tipo, tamaño) |
@@ -341,6 +342,8 @@ Reglas de arquitectura:
 | El líder descarta una tarea | `tarea_descartada` | El asignado | No |
 | Cambio a `en_progreso` | — | Nadie (solo queda en el historial) | No |
 | Programan una reunión | `reunion_programada` | Integrantes aceptados no observadores, menos quien la programó | Sí (confirmado por el usuario, 2026-11-02) |
+| Inicia una videollamada (entra la primera persona) | `reunion_iniciada` | Integrantes aceptados no observadores, menos quien entró primero | Sí (aprobado 2026-11-20) |
+| Termina una videollamada (botón o cierre automático) | `reunion_finalizada` | Integrantes aceptados no observadores, menos quien finalizó | Sí, silenciable con `correo_actividad` (aprobado 2026-11-20) |
 | Un integrante sale del grupo | `integrante_salio` | El líder (o quien queda como líder) | No |
 | Registras una evaluación | `evaluacion_creada` | **El propio dueño** (excepción a "nunca notifiques a quien realizó la acción", pedida por el usuario 2026-11-16) | Sí |
 
@@ -363,6 +366,12 @@ Reglas de arquitectura:
 - Responden (`asistire` | `no_asistire`) los integrantes aceptados no observadores mientras la reunión no haya terminado. Cancelan (borrar la fila; borra en cascada sus asistentes) quien la programó o el líder. Cancelar no notifica en el MVP.
 - Los observadores ven las reuniones del grupo pero no son asistentes ni reciben avisos.
 - Aparecen en el Calendario de cada integrante participante (solo en la vista "Todo", con su propio color), sin contar en las horas por categoría.
+- **Videollamada (aprobado 2026-11-20):** una reunión puede ser `videollamada`: el servidor crea una sala privada con el `ProveedorVideo` (`src/server/video`: implementaciones `simulado` y `livekit`) y cada participante entra con un token que el servidor firma al pulsar **Unirse**. `reunion.sala_url` guarda el **nombre de la sala** de LiveKit, no una URL. Nunca se envía `sala_url` ni el permiso a componentes de cliente fuera de la página de sala. Sin grabación.
+- **Ventana de la sala:** abre 10 min antes del inicio y cierra 15 min después del fin. Aviso visual en los últimos 5 min. El estado (`programada`, `sala_abierta`, `en_curso`, `por_cerrar`, `terminada`) se calcula en `src/lib/estado-reunion.ts`, nunca se guarda. No hay cron: las vencidas se cierran de forma perezosa al consultarlas (`finalizada_en` = hora de cierre).
+- **Reunirse ahora:** crea en un clic una reunión que empieza ahora y dura 1 h, y entra a la sala. Solo una reunión activa por grupo (bloqueo por grupo): si ya hay una, se entra a esa. No envía `reunion_programada`; el aviso es `reunion_iniciada`.
+- **Moderadores:** el líder y quien creó la reunión finalizan para todos. Los observadores ven las reuniones pero no entran a la llamada.
+- **Asistencia real:** `reunion_asistente.fecha_entrada` guarda la primera vez que cada integrante pulsó Unirse. Es un dato informativo: sin porcentajes, ranking ni puntaje.
+- Las reuniones con enlace manual (sin videollamada) siguen funcionando como antes.
 
 ## 9. Diseño de la interfaz
 
@@ -391,6 +400,8 @@ Usa **Azure DevOps** como referencia visual: se siente profesional, densa en inf
 - Estado con **ícono de forma + color** (`StatusIcon`): pendiente gris (círculo vacío), en progreso ámbar (mitad), en revisión violeta (tres cuartos), completada verde (check), descartada gris atenuado (tachado). Las evaluaciones usan los mismos íconos.
 
 **Avance:** barra de progreso o dona para el avance del grupo; carga y cumplimiento por integrante lado a lado, sin ranking.
+
+**Color de reunión:** cian (`cat-reunion`), distinto del violeta de En revisión.
 
 **Estilo visual** (valores orientativos, defínelos como variables CSS o tokens de Tailwind para poder ajustarlos):
 
@@ -449,6 +460,7 @@ DATABASE_URL=postgresql://educontrol:educontrol_dev@localhost:5432/educontrol?sc
 APP_URL=http://localhost:3000
 # Google OAuth: ID y secreto del cliente, y secreto para firmar la sesión
 # Correo: EMAIL_PROVIDER (`console` | `resend`); con Resend, RESEND_API_KEY y EMAIL_FROM
+# Video: VIDEO_PROVIDER (`simulado` | `livekit`); con LiveKit, LIVEKIT_URL (pública, wss://), LIVEKIT_API_KEY y LIVEKIT_API_SECRET (solo servidor)
 ```
 
 Comandos habituales (confirma los scripts reales en `package.json`):

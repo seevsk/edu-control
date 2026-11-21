@@ -19,6 +19,8 @@ export const crearReunionSchema = z
       })
       .optional()
       .or(z.literal("")),
+    // El checkbox llega como "on" o ausente. Con videollamada se ignora `enlace`.
+    videollamada: z.preprocess((valor) => valor === "on" || valor === true, z.boolean()),
   })
   .refine((datos) => datos.horaFin > datos.horaInicio, {
     message: "La hora de fin debe ser después de la de inicio",
@@ -28,3 +30,6 @@ export const crearReunionSchema = z
 export const responderReunionSchema = z.object({
   respuesta: z.enum(["asistire", "no_asistire"]),
 });
+
+export const idReunionSchema = z.coerce.number().int().positive();
+export const idGrupoSchema = z.coerce.number().int().positive();

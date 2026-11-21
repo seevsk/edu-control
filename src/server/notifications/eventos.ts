@@ -14,6 +14,9 @@ export const EVENTOS_NOTIFICACION = {
   tarea_descartada: { correo: false, actividad: false },
   // Requiere que los invitados confirmen asistencia, por eso se considera importante.
   reunion_programada: { correo: true, actividad: false },
+  // Aprobado por el usuario (2026-11-20): aviso y correo al iniciar y al terminar una videollamada.
+  reunion_iniciada: { correo: true, actividad: false },
+  reunion_finalizada: { correo: true, actividad: true },
   integrante_salio: { correo: false, actividad: false },
   // Aprobado por el usuario (2026-11-16): aviso y correo al registrar una evaluación propia.
   evaluacion_creada: { correo: true, actividad: false },

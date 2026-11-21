@@ -80,6 +80,8 @@ enum TipoNotificacion {
   tarea_reprogramada
   tarea_descartada
   reunion_programada
+  reunion_iniciada
+  reunion_finalizada
   integrante_salio
   evaluacion_creada
 }
@@ -138,6 +140,7 @@ model Usuario {
   entregasRevisadas Entrega[]        @relation("EntregaRevisor")
   notificaciones  Notificacion[]
   reunionesCreadas Reunion[]         @relation("ReunionCreador")
+  reunionesFinalizadas Reunion[]     @relation("ReunionFinalizador")
   reuniones        ReunionAsistente[]
 
   @@map("usuario")
@@ -406,11 +409,17 @@ model Reunion {
   fin           DateTime
   lugar         String?  @db.VarChar(160)
   enlace        String?
-  fechaCreacion DateTime @default(now()) @map("fecha_creacion")
+  fechaCreacion DateTime  @default(now()) @map("fecha_creacion")
+  videollamada  Boolean   @default(false)
+  salaUrl       String?   @map("sala_url")
+  iniciadaEn    DateTime? @map("iniciada_en")
+  finalizadaEn  DateTime? @map("finalizada_en")
+  idFinalizador Int?      @map("id_finalizador")
 
-  grupo      Grupo              @relation(fields: [idGrupo], references: [idGrupo], onDelete: Cascade)
-  creador    Usuario            @relation("ReunionCreador", fields: [idCreador], references: [idUsuario])
-  asistentes ReunionAsistente[]
+  grupo       Grupo              @relation(fields: [idGrupo], references: [idGrupo], onDelete: Cascade)
+  creador     Usuario            @relation("ReunionCreador", fields: [idCreador], references: [idUsuario])
+  finalizador Usuario?           @relation("ReunionFinalizador", fields: [idFinalizador], references: [idUsuario])
+  asistentes  ReunionAsistente[]
 
   @@index([idGrupo, inicio])
   @@map("reunion")
@@ -422,6 +431,7 @@ model ReunionAsistente {
   idUsuario      Int              @map("id_usuario")
   respuesta      RespuestaReunion @default(pendiente)
   fechaRespuesta DateTime?        @map("fecha_respuesta")
+  fechaEntrada   DateTime?        @map("fecha_entrada")
 
   reunion Reunion @relation(fields: [idReunion], references: [idReunion], onDelete: Cascade)
   usuario Usuario @relation(fields: [idUsuario], references: [idUsuario])

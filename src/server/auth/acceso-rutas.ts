@@ -6,6 +6,8 @@ const MAX_ID = 2_147_483_647;
 
 /** Rutas privadas cuyo acceso depende del recurso: grupo, curso o perfil de otra persona. */
 const RUTAS = [
+  // \d+ evita que /reuniones/nueva se trate como una reunion.
+  { patron: /^\/reuniones\/(\d+)(?:\/sala)?\/?$/, tipo: "reunion" },
   { patron: /^\/grupos\/([^/]+)(?:\/.*)?$/, tipo: "grupo" },
   { patron: /^\/cursos\/([^/]+)\/?$/, tipo: "curso" },
   { patron: /^\/usuarios\/([^/]+)\/disponibilidad\/?$/, tipo: "disponibilidad" },
@@ -34,6 +36,11 @@ export async function puedeAbrirRuta(idUsuario: number, ruta: string): Promise<b
     switch (tipo) {
       case "grupo":
         return (await prisma.grupoIntegrante.count({ where: { idGrupo: id, idUsuario, estadoInvitacion: "aceptada" } })) > 0;
+      case "reunion": {
+        const reunion = await prisma.reunion.findUnique({ where: { idReunion: id }, select: { idGrupo: true } });
+        if (!reunion) return false;
+        return (await prisma.grupoIntegrante.count({ where: { idGrupo: reunion.idGrupo, idUsuario, estadoInvitacion: "aceptada" } })) > 0;
+      }
       case "curso":
         return (await prisma.curso.count({ where: { idCurso: id, idUsuario } })) > 0;
       case "perfil":

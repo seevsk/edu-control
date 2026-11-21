@@ -4,6 +4,8 @@ export interface DatosEmail {
   asunto: string;
   cuerpo: string;
   enlace?: string;
+  /** Texto que acompaña al enlace; por defecto "Abrir en EduControl". */
+  textoEnlace?: string;
 }
 
 export interface ResultadoEnvio {

@@ -2,6 +2,12 @@ import { prisma } from "@/server/db/client";
 import { emailSender } from "@/server/email";
 import { EVENTOS_NOTIFICACION, type TipoNotificacionConfigurado } from "./eventos";
 
+/** Texto del enlace del correo para los avisos de videollamada (el resto usa el genérico). */
+const TEXTO_ENLACE: Partial<Record<TipoNotificacionConfigurado, string>> = {
+  reunion_iniciada: "Unirse a la reunión",
+  reunion_finalizada: "Ver detalle",
+};
+
 /**
  * Crea la fila de notificacion in-app, decide estado_correo segun la politica de
  * EVENTOS_NOTIFICACION, y si corresponde manda el correo ahi mismo (sin colas ni reintentos
@@ -49,6 +55,7 @@ export async function crearNotificacion(datos: {
         asunto: datos.asunto,
         cuerpo: datos.mensaje,
         enlace: datos.enlace,
+        textoEnlace: TEXTO_ENLACE[datos.tipo],
       });
       await prisma.notificacion.update({
         where: { idNotificacion: notificacion.idNotificacion },

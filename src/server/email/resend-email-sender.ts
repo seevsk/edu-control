@@ -19,7 +19,7 @@ export class ResendEmailSender implements EmailSender {
         : null;
       const cuerpo = [
         datos.cuerpo,
-        enlaceAbsoluto ? `Abrir en EduControl: ${enlaceAbsoluto}` : null,
+        enlaceAbsoluto ? `${datos.textoEnlace ?? "Abrir en EduControl"}: ${enlaceAbsoluto}` : null,
         "",
         "Este es un mensaje automatico de EduControl.",
       ]

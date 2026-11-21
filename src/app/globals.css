@@ -68,10 +68,10 @@
   --cat-fam-bg: #f7fee7;
   --cat-fam-fg: #3f6212;
   --cat-fam-borde: #d9f99d;
-  --cat-reunion: #c026d3;
-  --cat-reunion-bg: #fdf4ff;
-  --cat-reunion-fg: #86198f;
-  --cat-reunion-borde: #f5d0fe;
+  --cat-reunion: #0891b2;
+  --cat-reunion-bg: #ecfeff;
+  --cat-reunion-fg: #0e7490;
+  --cat-reunion-borde: #a5f3fc;
 
   /* Identidad de curso: punto de color derivado de idCurso (src/lib/presentacion.ts). */
   --curso-0: #0d9488;
@@ -150,10 +150,10 @@
   --cat-fam-bg: #1a2e05;
   --cat-fam-fg: #d9f99d;
   --cat-fam-borde: #365314;
-  --cat-reunion: #e879f9;
-  --cat-reunion-bg: #2e0a33;
-  --cat-reunion-fg: #f5d0fe;
-  --cat-reunion-borde: #701a75;
+  --cat-reunion: #22d3ee;
+  --cat-reunion-bg: #083344;
+  --cat-reunion-fg: #a5f3fc;
+  --cat-reunion-borde: #155e75;
 
   --curso-0: #2dd4bf;
   --curso-1: #f472b6;
@@ -286,6 +286,22 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  @keyframes pulso-reunion {
+    0% {
+      box-shadow: 0 0 0 0 color-mix(in oklab, var(--cat-reunion) 50%, transparent);
+    }
+    70% {
+      box-shadow: 0 0 0 6px color-mix(in oklab, var(--cat-reunion) 0%, transparent);
+    }
+    100% {
+      box-shadow: 0 0 0 0 color-mix(in oklab, var(--cat-reunion) 0%, transparent);
+    }
+  }
+
+  .animate-pulso-reunion {
+    animation: pulso-reunion 1.8s ease-out infinite;
+  }
+
   @keyframes fade-slide-in {
     from {
       opacity: 0;

@@ -148,7 +148,12 @@ CREATE TABLE "reunion" (
   "fin" timestamp NOT NULL,
   "lugar" varchar(160),
   "enlace" varchar,
-  "fecha_creacion" timestamp DEFAULT (now())
+  "fecha_creacion" timestamp DEFAULT (now()),
+  "videollamada" boolean NOT NULL DEFAULT false,
+  "sala_url" varchar,
+  "iniciada_en" timestamp,
+  "finalizada_en" timestamp,
+  "id_finalizador" integer
 );
 
 CREATE TABLE "reunion_asistente" (
@@ -156,6 +161,7 @@ CREATE TABLE "reunion_asistente" (
   "id_usuario" integer NOT NULL,
   "respuesta" varchar NOT NULL DEFAULT 'pendiente',
   "fecha_respuesta" timestamp,
+  "fecha_entrada" timestamp,
   PRIMARY KEY ("id_reunion", "id_usuario")
 );
 
@@ -282,11 +288,17 @@ COMMENT ON COLUMN "tarea_historial"."valor_nuevo" IS 'Estado nuevo (con motivo s
 
 COMMENT ON COLUMN "notificacion"."id_usuario" IS 'Destinatario. Una fila por destinatario, no por evento';
 
-COMMENT ON COLUMN "notificacion"."tipo" IS 'invitacion_grupo | invitacion_respondida | tarea_asignada | tarea_en_revision | tarea_devuelta | tarea_completada | tarea_reabierta | tarea_reprogramada | tarea_descartada | reunion_programada | integrante_salio | evaluacion_creada';
+COMMENT ON COLUMN "notificacion"."tipo" IS 'invitacion_grupo | invitacion_respondida | tarea_asignada | tarea_en_revision | tarea_devuelta | tarea_completada | tarea_reabierta | tarea_reprogramada | tarea_descartada | reunion_programada | reunion_iniciada | reunion_finalizada | integrante_salio | evaluacion_creada';
 
 COMMENT ON TABLE "reunion" IS 'Reunion de un grupo, de una sola vez. La crean lider o miembros; inicio/fin en UTC';
 
 COMMENT ON COLUMN "reunion"."enlace" IS 'Opcional. Solo https:// o http:// (validado con Zod)';
+COMMENT ON COLUMN "reunion"."videollamada" IS 'true = sala propia en el proveedor de video; enlace queda NULL';
+COMMENT ON COLUMN "reunion"."sala_url" IS 'Nombre de la sala privada en el proveedor (LiveKit), no una URL. Nunca se envia al cliente fuera de la pagina de sala';
+COMMENT ON COLUMN "reunion"."iniciada_en" IS 'Primera vez que alguien pulso Unirse (UTC)';
+COMMENT ON COLUMN "reunion"."finalizada_en" IS 'Fin manual o cierre automatico (UTC)';
+COMMENT ON COLUMN "reunion"."id_finalizador" IS 'NULL si se cerro automaticamente';
+COMMENT ON COLUMN "reunion_asistente"."fecha_entrada" IS 'Primera vez que pulso Unirse; dato de asistencia, sin ranking';
 
 COMMENT ON TABLE "reunion_asistente" IS 'Una fila por integrante aceptado no observador al crear la reunion';
 
@@ -339,6 +351,8 @@ ALTER TABLE "notificacion" ADD FOREIGN KEY ("id_usuario") REFERENCES "usuario" (
 ALTER TABLE "reunion" ADD FOREIGN KEY ("id_grupo") REFERENCES "grupo" ("id_grupo") ON DELETE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "reunion" ADD FOREIGN KEY ("id_creador") REFERENCES "usuario" ("id_usuario") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "reunion" ADD FOREIGN KEY ("id_finalizador") REFERENCES "usuario" ("id_usuario") ON DELETE SET NULL DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "reunion_asistente" ADD FOREIGN KEY ("id_reunion") REFERENCES "reunion" ("id_reunion") ON DELETE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
 
