@@ -755,6 +755,81 @@ async function verificar() {
       const grupo = await grupoService.crearGrupo(lider, { nombre: "G", idEvaluacion: String(vigente.idEvaluacion) });
       assert.equal(grupo.fechaLimite?.toISOString(), vigente.fechaCierre.toISOString());
     });
+    await caso("importar un curso no duplica, enlaza lo propio y se rechaza a quien ya no está en el grupo", async () => {
+      const cursoService = await import("../src/server/services/curso");
+      const { horaATime, finDeDiaLimaAUtc } = await import("../src/lib/dates");
+      const { crearEvaluacionSchema, actualizarCursoSchema } = await import("../src/lib/validation/curso");
+      const hora = (valor: string) => horaATime(valor);
+      const fuente = await db!.curso.create({
+        data: {
+          idUsuario: lider, nombre: "Curso original", codigo: "IMP-101", docente: "Docente", modalidad: "presencial",
+          horarios: { create: [
+            { diaSemana: 1, horaInicio: hora("08:00"), horaFin: hora("10:00") },
+            { diaSemana: 3, horaInicio: hora("08:00"), horaFin: hora("10:00") },
+          ] },
+          evaluaciones: { create: [
+            { nombre: "Parcial", fechaCierre: new Date("2099-12-30T04:59:00Z") },
+            { nombre: "Final", fechaCierre: new Date("2099-12-31T04:59:00Z") },
+          ] },
+        },
+        include: { evaluaciones: true },
+      });
+      const grupo = await grupoService.crearGrupo(lider, { nombre: "Grupo importable", idEvaluacion: String(fuente.evaluaciones[0].idEvaluacion) });
+      const [importador, conCursoPropio] = [await nuevoUsuario("ImportaCurso"), await nuevoUsuario("ImportaSobrePropio")];
+      await db!.grupoIntegrante.createMany({ data: [importador, conCursoPropio].map((persona) => (
+        { idGrupo: grupo.idGrupo, idUsuario: persona.idUsuario, rol: "miembro" as const, estadoInvitacion: "aceptada" as const }
+      )) });
+
+      // Importar dos veces deja una sola copia con sus 2 sesiones y 2 evaluaciones.
+      const primera = await cursoService.importarCursoDesdeGrupo(importador.idUsuario, grupo.idGrupo);
+      const segunda = await cursoService.importarCursoDesdeGrupo(importador.idUsuario, grupo.idGrupo);
+      assert.equal(primera.idCurso, segunda.idCurso);
+      assert.equal(await db!.curso.count({ where: { idUsuario: importador.idUsuario } }), 1);
+      assert.equal(await db!.horarioCurso.count({ where: { idCurso: primera.idCurso } }), 2);
+      assert.equal(await db!.evaluacion.count({ where: { idCurso: primera.idCurso } }), 2);
+      await assert.rejects(cursoService.importarCursoDesdeGrupo(lider, grupo.idGrupo), ErrorDeNegocio);
+      assert.equal(await cursoService.cambiosPendientesDeCursoImportado(primera.idCurso), null);
+
+      // Sobre un curso propio con el mismo código: se enlaza y no duplica la sesión ni la evaluación que coinciden.
+      const propio = await db!.curso.create({
+        data: {
+          idUsuario: conCursoPropio.idUsuario, nombre: "Mi versión", codigo: "imp-101",
+          horarios: { create: [{ diaSemana: 1, horaInicio: hora("08:00"), horaFin: hora("10:00") }] },
+          evaluaciones: { create: [{ nombre: "parcial", fechaCierre: new Date("2099-11-30T04:59:00Z") }] },
+        },
+      });
+      const enlazado = await cursoService.importarCursoDesdeGrupo(conCursoPropio.idUsuario, grupo.idGrupo);
+      assert.equal(enlazado.idCurso, propio.idCurso);
+      assert.equal(enlazado.nombre, "Curso original");
+      assert.equal(await db!.horarioCurso.count({ where: { idCurso: propio.idCurso } }), 2);
+      assert.equal(await db!.evaluacion.count({ where: { idCurso: propio.idCurso } }), 2);
+      assert.equal((await db!.evaluacion.findFirstOrThrow({ where: { idCurso: propio.idCurso, nombre: "parcial" } })).fechaCierre.toISOString(), "2099-11-30T04:59:00.000Z");
+
+      // En una copia importada se ignoran nombre/docente/modalidad al editar, y el código no se puede vaciar.
+      assert.equal(actualizarCursoSchema.safeParse({ nombre: "X", codigo: "", activo: true }).success, false);
+      const editado = await cursoService.actualizarCurso(importador.idUsuario, primera.idCurso, { nombre: "Otro nombre", codigo: "MI-COD", docente: "Otro", modalidad: undefined, activo: true });
+      assert.deepEqual([editado.nombre, editado.docente, editado.modalidad, editado.codigo], ["Curso original", "Docente", "presencial", "MI-COD"]);
+
+      // Quien ya no está en el grupo no recibe actualizaciones ni propagación, ni puede traerlas.
+      await db!.horarioCurso.create({ data: { idCurso: fuente.idCurso, diaSemana: 5, horaInicio: hora("08:00"), horaFin: hora("10:00") } });
+      assert.equal((await cursoService.cambiosPendientesDeCursoImportado(primera.idCurso))?.sesionesNuevas, 1);
+      await db!.grupoIntegrante.update({
+        where: { idGrupo_idUsuario: { idGrupo: grupo.idGrupo, idUsuario: importador.idUsuario } },
+        data: { estadoInvitacion: "retirado", fechaRetiro: new Date() },
+      });
+      assert.equal(await cursoService.cambiosPendientesDeCursoImportado(primera.idCurso), null);
+      await assert.rejects(cursoService.sincronizarCursoImportado(importador.idUsuario, primera.idCurso), ErrorDeNegocio);
+      await cursoService.actualizarCurso(lider, fuente.idCurso, { nombre: "Renombrado", codigo: "IMP-101", docente: "Docente", modalidad: "presencial", activo: true });
+      assert.equal((await db!.curso.findUniqueOrThrow({ where: { idCurso: primera.idCurso } })).nombre, "Curso original");
+      assert.equal((await db!.curso.findUniqueOrThrow({ where: { idCurso: propio.idCurso } })).nombre, "Renombrado");
+
+      // Fechas imposibles: el esquema las rechaza y la conversión no las acepta.
+      for (const fechaCierre of ["2026-02-31", "2026-13-45"]) {
+        assert.equal(crearEvaluacionSchema.safeParse({ nombre: "E", fechaCierre, requiereEntrega: true }).success, false, fechaCierre);
+        assert.throws(() => finDeDiaLimaAUtc(fechaCierre), ErrorDeNegocio);
+      }
+      assert.equal(crearEvaluacionSchema.safeParse({ nombre: "E", fechaCierre: "2026-02-28", requiereEntrega: true }).success, true);
+    });
     await caso("el historial de la Bandeja omite canceladas y conserva la salida de quien creó el grupo", async () => {
       const { obtenerBandeja, obtenerDetalleInvitacion } = await import("../src/server/services/notificacion");
       const persona = await nuevoUsuario("CanceladaBandeja");

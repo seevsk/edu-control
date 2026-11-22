@@ -177,15 +177,27 @@ export async function agregarEvaluacionAction(idCurso: number, formData: FormDat
     redirect(`/cursos/${idCurso}?nuevaEvaluacion=1&error=${encodeURIComponent(parseo.error.issues[0].message)}`);
   }
 
-  await cursoService.agregarEvaluacion(sesion.idUsuario, idCurso, parseo.data);
+  try {
+    await cursoService.agregarEvaluacion(sesion.idUsuario, idCurso, parseo.data);
+  } catch (error) {
+    redirect(`/cursos/${idCurso}?nuevaEvaluacion=1&error=${encodeURIComponent(mensajeParaUsuario(error, "No se pudo agregar la evaluación"))}`);
+  }
   revalidatePath(`/cursos/${idCurso}`);
+  revalidatePath("/calendario");
+  revalidatePath("/");
   redirect(`/cursos/${idCurso}?toast=${encodeURIComponent("Evaluación agregada")}`);
 }
 
 export async function eliminarEvaluacionAction(idCurso: number, idEvaluacion: number) {
   const sesion = await requerirSesion();
-  await cursoService.eliminarEvaluacion(sesion.idUsuario, idCurso, idEvaluacion);
+  try {
+    await cursoService.eliminarEvaluacion(sesion.idUsuario, idCurso, idEvaluacion);
+  } catch (error) {
+    redirect(`/cursos/${idCurso}?error=${encodeURIComponent(mensajeParaUsuario(error, "No se pudo quitar la evaluación"))}`);
+  }
   revalidatePath(`/cursos/${idCurso}`);
+  revalidatePath("/calendario");
+  revalidatePath("/");
   redirect(`/cursos/${idCurso}`);
 }
 

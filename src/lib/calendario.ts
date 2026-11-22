@@ -99,9 +99,9 @@ export function minutosDelDiaLima(fecha: Date): number {
   return hora * 60 + minuto;
 }
 
-const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "set", "oct", "nov", "dic"];
 
-/** "2026-09-28" -> "28 sep". */
+/** "2026-09-28" -> "28 set". */
 export function diaMesCorto(fechaISO: string): string {
   const [, m, d] = fechaISO.split("-").map(Number);
   return `${d} ${MESES[m - 1]}`;
@@ -116,7 +116,7 @@ const MESES_LARGOS = [
   "junio",
   "julio",
   "agosto",
-  "septiembre",
+  "setiembre",
   "octubre",
   "noviembre",
   "diciembre",
@@ -130,7 +130,7 @@ export function etiquetaMes(mesISO: string): string {
 }
 
 /**
- * "Desde el 5 hasta el 11 de octubre" / "Desde el 28 de septiembre hasta el 4 de octubre".
+ * "Desde el 5 hasta el 11 de octubre" / "Desde el 28 de setiembre hasta el 4 de octubre".
  * El año solo aparece si no es el año en curso.
  */
 export function etiquetaSemana(lunesISO: string, anioActual: number): string {

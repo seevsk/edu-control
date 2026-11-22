@@ -1,7 +1,9 @@
 import "./configurar-zod";
 import { z } from "zod";
+import { esFechaISOReal } from "@/lib/dates";
 
-const horaHHMM = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Hora invalida (HH:mm)");
+// La interfaz solo ofrece intervalos de 30 minutos; el servidor lo exige igual.
+const horaHHMM = z.string().regex(/^([01]\d|2[0-3]):(00|30)$/, "Hora invalida (HH:mm)");
 // Los cursos no dictan clase en domingo (7): ver src/lib/dates.ts DIAS_SEMANA_CURSO.
 const diaSemana = z.coerce.number().int().min(1, "Dia invalido").max(6, "Los cursos no se dictan en domingo");
 
@@ -9,8 +11,8 @@ const camposCurso = {
   nombre: z.string().trim().min(1, "El nombre es obligatorio").max(120),
   codigo: z.string().trim().max(30).optional().or(z.literal("")),
   docente: z.string().trim().max(120).optional().or(z.literal("")),
-  // "Sin especificar" llega como cadena vacía desde el formulario.
-  modalidad: z.enum(["presencial", "remoto"]).optional().or(z.literal("").transform(() => undefined)),
+  // "Sin especificar" llega como cadena vacía desde el formulario y se guarda como null.
+  modalidad: z.enum(["presencial", "remoto"]).optional().or(z.literal("").transform(() => null)),
 };
 
 const camposHoras = {
@@ -19,7 +21,7 @@ const camposHoras = {
 };
 
 const camposHorario = {
-  dias: z.array(diaSemana).min(1, "Elige al menos un día"),
+  dias: z.array(diaSemana).min(1, "Elige al menos un día").transform((dias) => [...new Set(dias)]),
   ...camposHoras,
 };
 
@@ -38,6 +40,7 @@ export const crearCursoSchema = z
 
 export const actualizarCursoSchema = z.object({
   ...camposCurso,
+  codigo: z.string().trim().min(1, "El código es obligatorio").max(30),
   activo: z.boolean(),
 });
 
@@ -49,7 +52,7 @@ export const actualizarHorarioCursoSchema = z
   .object({ diaSemana, ...camposHoras })
   .refine(rangoHorarioValido.check, rangoHorarioValido.params);
 
-const fechaISO = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha invalida");
+const fechaISO = z.string().refine(esFechaISOReal, "Fecha invalida");
 
 export const crearEvaluacionSchema = z
   .object({

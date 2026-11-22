@@ -24,7 +24,8 @@ export async function obtenerCalendarioEntre(idUsuario: number, desdeISO: string
       orderBy: [{ diaSemana: "asc" }, { horaInicio: "asc" }],
     }),
     prisma.evaluacion.findMany({
-      where: { curso: { idUsuario }, estado: { not: "descartada" }, fechaCierre: { gte: desde, lt: hasta } },
+      // Las evaluaciones de cursos inactivos se ocultan (como sus clases); siguen en el detalle del curso.
+      where: { curso: { idUsuario, activo: true }, estado: { not: "descartada" }, fechaCierre: { gte: desde, lt: hasta } },
       include: { curso: true },
       orderBy: { fechaCierre: "asc" },
     }),

@@ -1,12 +1,10 @@
 import "./configurar-zod";
 import { z } from "zod";
 
-export function esFechaISOReal(valor: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(valor)) return false;
-  const [anio, mes, dia] = valor.split("-").map(Number);
-  const fecha = new Date(Date.UTC(anio, mes - 1, dia));
-  return fecha.getUTCFullYear() === anio && fecha.getUTCMonth() === mes - 1 && fecha.getUTCDate() === dia;
-}
+import { esFechaISOReal } from "@/lib/dates";
+
+// Se conserva la exportación por compatibilidad con quienes ya la importaban de aquí.
+export { esFechaISOReal };
 
 const camposEditablesTarea = {
   titulo: z.string().trim().min(1, "El título es obligatorio").max(160),

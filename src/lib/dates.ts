@@ -1,3 +1,4 @@
+import { ErrorDeNegocio } from "./errores";
 import { fechaCorta, hora, horaDeTime } from "./formato-fecha";
 
 /** Convierte "HH:mm" a un DateTime de Prisma para una columna `time` (sin zona horaria: es solo la hora del dia). */
@@ -11,13 +12,27 @@ export function timeAHora(fecha: Date): string {
   return horaDeTime(fecha);
 }
 
+/** "YYYY-MM-DD" que existe en el calendario (rechaza 2026-02-31 y 2026-13-45). */
+export function esFechaISOReal(valor: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(valor)) return false;
+  const [anio, mes, dia] = valor.split("-").map(Number);
+  const fecha = new Date(Date.UTC(anio, mes - 1, dia));
+  return fecha.getUTCFullYear() === anio && fecha.getUTCMonth() === mes - 1 && fecha.getUTCDate() === dia;
+}
+
+function exigirFechaReal(fechaISO: string) {
+  if (!esFechaISOReal(fechaISO)) throw new ErrorDeNegocio("La fecha no es válida");
+}
+
 /** "2026-10-05" (America/Lima, sin hora) -> 23:59 hora Lima, como instante UTC. */
 export function finDeDiaLimaAUtc(fechaISO: string): Date {
+  exigirFechaReal(fechaISO);
   return new Date(`${fechaISO}T23:59:00-05:00`);
 }
 
 /** "2026-10-05" (America/Lima, sin hora) -> 00:00 hora Lima, como instante UTC. */
 export function inicioDeDiaLimaAUtc(fechaISO: string): Date {
+  exigirFechaReal(fechaISO);
   return new Date(`${fechaISO}T00:00:00-05:00`);
 }
 
