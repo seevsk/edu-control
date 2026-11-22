@@ -1021,6 +1021,53 @@ async function verificar() {
       );
       assert.equal(responderInvitacionSchema.safeParse({ idGrupo, respuesta: "rechazada" }).success, true);
     });
+    // Búsqueda de personas: nombre completo, sin tildes, visibilidad, compañeros primero y comodines.
+    const crearPersonaBusqueda = (clave: string, nombre: string, apellidos: string, perfil: { visibleEnBusqueda?: boolean } = {}, eliminado = false) =>
+      db!.usuario.create({ data: {
+        googleId: `busca-${clave}`, correo: `busca-${clave}@example.invalid`, nombre, apellidos,
+        eliminadoEn: eliminado ? new Date() : null, perfil: { create: perfil },
+      } });
+    const buscados = async (consulta: string) => (await grupoService.buscarUsuarios(lider, consulta)).map((u) => u.idUsuario);
+    const joseZq = await crearPersonaBusqueda("jose", "José", "Pérezzq");
+    await crearPersonaBusqueda("oculto", "Joselin", "Pérezzq", { visibleEnBusqueda: false });
+    await crearPersonaBusqueda("baja", "Joseba", "Pérezzq", {}, true);
+    await caso("la búsqueda entiende nombre completo y no distingue tildes ni mayúsculas", async () => {
+      assert.deepEqual(await buscados("José Pérezzq"), [joseZq.idUsuario]);
+      assert.deepEqual(await buscados("jose perezzq"), [joseZq.idUsuario]);
+      assert.deepEqual(await buscados("PEREZZQ jose"), [joseZq.idUsuario]);
+      assert.deepEqual(await buscados("jose otro"), []);
+    });
+    await caso("la búsqueda excluye ocultos, eliminados y al propio usuario, y nunca los trae por texto parcial", async () => {
+      assert.deepEqual(await buscados("perezzq"), [joseZq.idUsuario]);
+      assert.equal((await buscados("lider")).includes(lider), false);
+    });
+    await caso("la búsqueda por correo exige coincidencia exacta", async () => {
+      assert.deepEqual(await buscados("busca-jose@example.invalid"), [joseZq.idUsuario]);
+      assert.deepEqual(await buscados("BUSCA-JOSE@example.invalid"), [joseZq.idUsuario]);
+      assert.deepEqual(await buscados("busca-jose@example"), []);
+    });
+    await caso("los % y _ del texto no actúan como comodín", async () => {
+      assert.deepEqual(await buscados("%%%"), []);
+      assert.deepEqual(await buscados("jos_"), []);
+      assert.deepEqual(await buscados("pe%zzq"), []);
+      assert.deepEqual(await buscados("100%"), []);
+    });
+    await caso("los compañeros de grupo salen primero aunque haya más coincidencias que el límite", async () => {
+      const otros = [];
+      for (let i = 0; i < 10; i++) otros.push(await crearPersonaBusqueda(`ord-a${i}`, `Aaa${i}`, "Ordenzq"));
+      const companero = await crearPersonaBusqueda("ord-z", "Zzz", "Ordenzq");
+      const grupoCompaneros = await grupoService.crearGrupo(lider, { nombre: "Grupo de búsqueda" });
+      await db!.grupoIntegrante.create({ data: { idGrupo: grupoCompaneros.idGrupo, idUsuario: companero.idUsuario, rol: "miembro", estadoInvitacion: "aceptada" } });
+      const encontrados = await buscados("ordenzq");
+      assert.equal(encontrados.length, 8);
+      assert.equal(encontrados[0], companero.idUsuario);
+      // Quien solo tiene una invitación pendiente no es compañero.
+      await db!.grupoIntegrante.create({ data: { idGrupo: grupoCompaneros.idGrupo, idUsuario: otros[9].idUsuario, rol: "miembro", estadoInvitacion: "pendiente" } });
+      assert.equal((await buscados("ordenzq"))[0], companero.idUsuario);
+      const personas = await grupoService.buscarPersonas(lider, "ordenzq");
+      assert.equal(personas[0].idUsuario, companero.idUsuario);
+      assert.equal("correo" in personas[0], false);
+    });
     console.log(`${casos} casos de integración correctos`);
   } finally {
     await db?.$disconnect();
