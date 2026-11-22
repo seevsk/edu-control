@@ -17,4 +17,9 @@ export class SimuladoProveedor implements ProveedorVideo {
   async borrarSala(sala: string): Promise<void> {
     console.log(`[video] (simulado) sala borrada: ${sala}`);
   }
+
+  /** Sin servicio real no hay forma de saberlo. */
+  async participantesConectados(): Promise<number | null> {
+    return null;
+  }
 }

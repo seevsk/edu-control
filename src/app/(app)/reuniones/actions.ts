@@ -145,6 +145,23 @@ export async function finalizarReunionAction(idReunionCrudo: number) {
   redirect(con(`/reuniones/${idReunion.data}`, "toast", "Reunión finalizada"));
 }
 
+/**
+ * La llama la sala cuando quien sale cree ser la ultima persona: si el proveedor confirma que no
+ * queda nadie, la reunion termina. No redirige; la sala navega al detalle despues.
+ */
+export async function salidaDeSalaAction(idReunionCrudo: number): Promise<void> {
+  const sesion = await requerirSesion();
+  const idReunion = idReunionSchema.safeParse(idReunionCrudo);
+  if (!idReunion.success) return;
+
+  try {
+    const idGrupo = await reunionService.registrarSalida(sesion.idUsuario, idReunion.data);
+    revalidarReunion(idReunion.data, idGrupo);
+  } catch {
+    // Sin acceso o ya no existe: la sala navega igual y el detalle responde 404.
+  }
+}
+
 /** La llama el cliente de la sala al llegar el contador a cero; la pagina navega al detalle. */
 export async function cerrarSiVencioAction(idReunionCrudo: number): Promise<void> {
   const sesion = await requerirSesion();

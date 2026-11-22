@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import { ConnectionState, Track } from "livekit-client";
+import { ConnectionState, MediaDeviceFailure, RoomEvent, Track } from "livekit-client";
 import {
   DisconnectButton,
   GridLayout,
@@ -32,6 +32,50 @@ import { Skeleton } from "@/components/ui/skeleton";
 const TEMA_VIDEO = { "--lk-bg": "#101012", "--lk-bg2": "#1b1b1e", "--lk-border-radius": "12px", "--lk-grid-gap": "10px" } as CSSProperties;
 
 type Eleccion = Parameters<NonNullable<PreJoinProps["onSubmit"]>>[0];
+
+/** Lo que la sala necesita de la conexion: desconectar y saber cuantas personas mas hay dentro. */
+export interface AccionesSala {
+  salir: () => Promise<void>;
+  /** Ultimo conteo conocido de los demas participantes (no se pierde al desconectar). */
+  remotos: () => number;
+}
+
+// Errores del navegador al abrir la camara o el microfono. LiveKit los reenvia por `onError`, pero
+// no son fallos de conexion: la persona puede entrar igual y activar los dispositivos despues.
+const ERRORES_DE_DISPOSITIVO = new Set([
+  "NotFoundError",
+  "DevicesNotFoundError",
+  "NotAllowedError",
+  "PermissionDeniedError",
+  "SecurityError",
+  "NotReadableError",
+  "TrackStartError",
+  "OverconstrainedError",
+  "AbortError",
+]);
+
+function esFalloDeDispositivo(error: unknown) {
+  if (!(error instanceof Error)) return false;
+  return (
+    ERRORES_DE_DISPOSITIVO.has(error.name) ||
+    /getUserMedia|video source|audio source|permission denied|requested device not found/i.test(error.message)
+  );
+}
+
+function avisarFalloDeDispositivo(falla: MediaDeviceFailure | undefined) {
+  const mensajes: Record<MediaDeviceFailure, string> = {
+    [MediaDeviceFailure.DeviceInUse]:
+      "La cámara o el micrófono está en uso por otra aplicación (por ejemplo, una llamada de Meet). Entraste sin ellos: actívalos cuando se liberen.",
+    [MediaDeviceFailure.PermissionDenied]: "Permite el acceso a la cámara y al micrófono en tu navegador para que te vean y te escuchen.",
+    [MediaDeviceFailure.NotFound]: "No se encontró una cámara o un micrófono.",
+    [MediaDeviceFailure.Other]: "No se pudo usar la cámara o el micrófono.",
+  };
+  toast.error(mensajes[falla ?? MediaDeviceFailure.Other], { id: "falla-dispositivo", duration: 9000 });
+}
+
+function avisarError(error: Error) {
+  avisarFalloDeDispositivo(MediaDeviceFailure.getFailure(error));
+}
 
 /** Contenido de cada mosaico: video si hay cámara; si no, círculo de color con iniciales (como Avatar). Rótulo "Tú" o nombre de pila. */
 function ContenidoMosaico() {
@@ -81,12 +125,24 @@ function Mosaicos() {
   );
 }
 
-/** Entrega a la sala la función para desconectar el cliente antes de que el servidor borre la sala. */
-function RegistroSalida({ registrar }: { registrar?: (salir: (() => Promise<void>) | null) => void }) {
+/**
+ * Entrega a la sala la función para desconectar el cliente antes de que el servidor borre la sala,
+ * y el conteo de los demás participantes (al desconectar LiveKit vacía la lista, por eso se guarda).
+ */
+function RegistroSalida({ registrar }: { registrar?: (acciones: AccionesSala | null) => void }) {
   const sala = useRoomContext();
+  const remotos = useRef(0);
   useEffect(() => {
-    registrar?.(() => sala.disconnect());
-    return () => registrar?.(null);
+    const actualizar = () => {
+      if (sala.state === ConnectionState.Connected) remotos.current = sala.remoteParticipants.size;
+    };
+    actualizar();
+    sala.on(RoomEvent.Connected, actualizar).on(RoomEvent.ParticipantConnected, actualizar).on(RoomEvent.ParticipantDisconnected, actualizar);
+    registrar?.({ salir: () => sala.disconnect(), remotos: () => remotos.current });
+    return () => {
+      sala.off(RoomEvent.Connected, actualizar).off(RoomEvent.ParticipantConnected, actualizar).off(RoomEvent.ParticipantDisconnected, actualizar);
+      registrar?.(null);
+    };
   }, [sala, registrar]);
   return null;
 }
@@ -107,14 +163,14 @@ function Controles() {
   const movil = useEsMovil();
   return (
     <div className="flex shrink-0 flex-wrap items-center justify-center gap-2 p-2.5">
-      <TrackToggle source={Track.Source.Microphone} showIcon>
+      <TrackToggle source={Track.Source.Microphone} showIcon onDeviceError={avisarError}>
         <span className="max-md:sr-only">Micrófono</span>
       </TrackToggle>
-      <TrackToggle source={Track.Source.Camera} showIcon>
+      <TrackToggle source={Track.Source.Camera} showIcon onDeviceError={avisarError}>
         <span className="max-md:sr-only">Cámara</span>
       </TrackToggle>
       {movil ? null : (
-        <TrackToggle source={Track.Source.ScreenShare} showIcon>
+        <TrackToggle source={Track.Source.ScreenShare} showIcon onDeviceError={avisarError}>
           Compartir pantalla
         </TrackToggle>
       )}
@@ -142,7 +198,7 @@ export default function VideoLiveKit({
   token: string;
   alDesconectar: () => void;
   alError: () => void;
-  registrarSalida?: (salir: (() => Promise<void>) | null) => void;
+  registrarSalida?: (acciones: AccionesSala | null) => void;
 }) {
   const [eleccion, setEleccion] = useState<Eleccion | null>(null);
 
@@ -156,6 +212,9 @@ export default function VideoLiveKit({
           userLabel="Nombre"
           defaults={{ username: "participante" }}
           onValidate={() => true}
+          onError={(error) => {
+            if (esFalloDeDispositivo(error)) avisarError(error);
+          }}
           onSubmit={setEleccion}
           className="w-full max-w-[480px] [&_.lk-join-button]:w-full [&_.lk-username-container]:block [&_.lk-username-container_input]:hidden"
         />
@@ -174,8 +233,9 @@ export default function VideoLiveKit({
       audio={eleccion.audioEnabled ? { deviceId: eleccion.audioDeviceId || undefined } : false}
       video={eleccion.videoEnabled ? { deviceId: eleccion.videoDeviceId || undefined } : false}
       onDisconnected={alDesconectar}
-      onError={alError}
-      onMediaDeviceFailure={() => toast.error("No se pudo usar la cámara o el micrófono.", { id: "falla-dispositivo" })}
+      // Un fallo de cámara o micrófono (por ejemplo, ocupados por Meet) no es un fallo de conexión.
+      onError={(error) => (esFalloDeDispositivo(error) ? avisarError(error) : alError())}
+      onMediaDeviceFailure={avisarFalloDeDispositivo}
     >
       <div className="relative min-h-0 flex-1">
         <Mosaicos />

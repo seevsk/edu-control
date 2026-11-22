@@ -11,6 +11,7 @@ import { ACCION_MOVIL, ChipsFiltro, EncabezadoMovil, PaginaCompleta, VolverMovil
 import { Button } from "@/components/ui/button";
 import { EncabezadoSeccionReunion } from "@/components/ui-app/reuniones/encabezado-seccion";
 import { FilaReunion } from "@/components/ui-app/reuniones/fila-reunion";
+import { RefrescoEnVivo } from "@/components/ui-app/reuniones/refresco-en-vivo";
 import type { Respuesta } from "@/components/ui-app/reuniones/formato";
 import { SelectorGrupoReunion } from "@/components/ui-app/reuniones/selector-grupo-reunion";
 
@@ -98,6 +99,7 @@ export default async function ReunionesPage({
       />
       <header className="hidden items-center gap-3 border-b px-5 pt-5 pb-3.5 md:flex lg:px-8">
         <h1 className="flex-1 text-xl font-semibold">Reuniones</h1>
+        {enCurso.length > 0 ? <RefrescoEnVivo /> : null}
         {puedeProgramar ? (
           <>
             <SelectorGrupoReunion grupos={gruposReunirse} tamano="tactil" className="lg:hidden" />

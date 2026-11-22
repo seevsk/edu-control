@@ -2,23 +2,22 @@
 
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, CircleAlert, ExternalLink, MoreHorizontal, PhoneOff, RotateCw, X } from "lucide-react";
 import { toast } from "sonner";
 import { AVISO_CIERRE_MIN, minutosHasta } from "@/lib/estado-reunion";
 import { aOracion } from "@/lib/presentacion";
-import { cn } from "@/lib/utils";
-import { cerrarSiVencioAction, finalizarReunionAction } from "@/app/(app)/reuniones/actions";
+import { cerrarSiVencioAction, finalizarReunionAction, salidaDeSalaAction } from "@/app/(app)/reuniones/actions";
 import { CourseDot } from "@/components/ui-app/course-dot";
 import { DialogoConfirmarReunion } from "@/components/ui-app/reuniones/dialogo-confirmar-reunion";
 import { EstadoReunion } from "@/components/ui-app/reuniones/estado-reunion";
 import { PuntoEnCurso } from "@/components/ui-app/reuniones/punto-en-curso";
 import { useAhora } from "@/components/ui-app/reuniones/reloj";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BOTON_ESTADO, EnlaceEstado, MarcoEstadoSala } from "./marco-estado-sala";
+import type { AccionesSala } from "./video-livekit";
 
 export type CredencialesCliente = { tipo: "livekit"; serverUrl: string; token: string } | { tipo: "simulado" };
 
@@ -62,17 +61,29 @@ export function SalaReunion({
   const [error, setError] = useState(false);
   const [intento, setIntento] = useState(0);
   const conError = useRef(false);
-  const salir = useRef<(() => Promise<void>) | null>(null);
+  const acciones = useRef<AccionesSala | null>(null);
   // Se desconecta el cliente antes de pedir al servidor que cierre la sala (evita errores del canal de datos).
   const saliendo = useRef(false);
   const desconectarCliente = async () => {
     saliendo.current = true;
-    await salir.current?.();
+    await acciones.current?.salir();
   };
-  const registrarSalida = (fn: (() => Promise<void>) | null) => {
-    salir.current = fn;
+  const registrarSalida = (nuevas: AccionesSala | null) => {
+    acciones.current = nuevas;
   };
   const detalle = `/reuniones/${idReunion}`;
+
+  // Salida normal (Salir, volver o corte de la llamada). Si eras la última persona, el servidor
+  // comprueba que la sala quedó vacía y termina la reunión, para que no siga "en curso".
+  const saliendoDeSala = useRef(false);
+  async function salirDeLaSala() {
+    if (saliendoDeSala.current) return;
+    saliendoDeSala.current = true;
+    const eraUltima = acciones.current !== null && acciones.current.remotos() === 0;
+    await desconectarCliente().catch(() => {});
+    if (eraUltima) await salidaDeSalaAction(idReunion).catch(() => {});
+    router.push(detalle);
+  }
 
   const restante = minutosHasta(cierre, ahora);
   const porCerrar = ahora.getTime() >= cierre.getTime() - AVISO_CIERRE_MIN * MS_MIN;
@@ -98,7 +109,10 @@ export function SalaReunion({
 
   function abrirEnPestanaNueva() {
     window.open(`/reuniones/${idReunion}/sala`, "_blank", "noopener,noreferrer");
-    // La pestaña actual vuelve al detalle: así no queda conectada dos veces.
+    // La pestaña actual vuelve al detalle: así no queda conectada dos veces. No es una salida
+    // definitiva (la persona entra por la otra pestaña), por eso no se avisa al servidor.
+    saliendo.current = true;
+    saliendoDeSala.current = true;
     router.push(detalle);
   }
 
@@ -108,7 +122,7 @@ export function SalaReunion({
   }
 
   function alDesconectar() {
-    if (!conError.current && !saliendo.current) router.push(detalle);
+    if (!conError.current && !saliendo.current) void salirDeLaSala();
   }
 
   function reintentar() {
@@ -133,9 +147,9 @@ export function SalaReunion({
     <>
       <header className="flex shrink-0 items-center gap-1 border-b bg-background pr-1 pl-1 max-md:min-h-12 max-md:pt-[env(safe-area-inset-top)] md:grid md:h-[52px] md:grid-cols-[1fr_auto_1fr] md:gap-0 md:pr-3 md:pl-2">
         <div className="flex min-w-0 flex-1 items-center gap-2 md:flex-none">
-          <Link href={detalle} aria-label="Volver al detalle" className="flex size-11 shrink-0 items-center justify-center rounded-lg text-foreground hover:bg-secondary md:size-9">
+          <button type="button" onClick={() => void salirDeLaSala()} aria-label="Volver al detalle" className="flex size-11 shrink-0 items-center justify-center rounded-lg text-foreground hover:bg-secondary md:size-9">
             <ChevronLeft className="size-5" aria-hidden />
-          </Link>
+          </button>
           <h1 className="min-w-0 truncate text-[15px] font-semibold md:text-sm">{titulo}</h1>
           <span className="hidden min-w-0 items-center gap-2 text-[13px] text-muted-foreground md:inline-flex">
             {grupo.idCurso !== null ? <CourseDot idCurso={grupo.idCurso} className="size-[7px]" /> : null}
@@ -168,10 +182,10 @@ export function SalaReunion({
                 Finalizar para todos
               </Button>
             ) : null}
-            <Link href={detalle} className={cn(buttonVariants(), "h-8 text-[13px] font-semibold")}>
+            <Button type="button" onClick={() => void salirDeLaSala()} className="h-8 text-[13px] font-semibold">
               <PhoneOff aria-hidden />
               Salir
-            </Link>
+            </Button>
           </div>
           <div className="md:hidden">
             <DropdownMenu>
@@ -191,7 +205,7 @@ export function SalaReunion({
                     Finalizar para todos
                   </DropdownMenuItem>
                 ) : null}
-                <DropdownMenuItem onSelect={() => router.push(detalle)} className="h-[46px] text-[15px]">
+                <DropdownMenuItem onSelect={() => void salirDeLaSala()} className="h-[46px] text-[15px]">
                   <PhoneOff aria-hidden />
                   Salir
                 </DropdownMenuItem>

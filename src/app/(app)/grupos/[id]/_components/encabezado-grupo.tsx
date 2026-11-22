@@ -18,6 +18,7 @@ import { yaImportoCurso } from "@/server/services/curso";
 import { reunionEnCursoDelGrupo } from "@/server/services/reunion";
 import { EnlaceProgramarReunion } from "@/components/ui-app/reuniones/enlace-programar";
 import { FranjaEnCurso } from "@/components/ui-app/reuniones/franja-en-curso";
+import { RefrescoEnVivo } from "@/components/ui-app/reuniones/refresco-en-vivo";
 import { importarCursoAction } from "../../../cursos/actions";
 import type { obtenerGrupoDelUsuario } from "@/server/services/grupo";
 
@@ -195,6 +196,7 @@ export async function EncabezadoGrupo({
         <FranjaEnCurso reunion={franja} puedeUnirse={rolActual !== "observador"} />
       </div>
     ) : null}
+    {franja ? <RefrescoEnVivo /> : null}
     </>
   );
 }
