@@ -38,7 +38,10 @@ export function calcularMetricasPorIntegrante(
   idsIntegrantesElegibles: number[],
 ): MetricaIntegrante[] {
   const consideradas = vigentes(tareas);
-  const pesoTotal = consideradas.reduce((acc, t) => acc + t.peso, 0);
+  // La carga reparte solo lo que ya tiene responsable: una tarea sin asignar no es carga de nadie.
+  const pesoTotal = consideradas
+    .filter((t) => t.idAsignado !== null)
+    .reduce((acc, t) => acc + t.peso, 0);
 
   return idsIntegrantesElegibles.map((idUsuario) => {
     const asignadas = consideradas.filter((t) => t.idAsignado === idUsuario);

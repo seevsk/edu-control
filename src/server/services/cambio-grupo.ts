@@ -13,6 +13,8 @@ function esConflictoDeEscritura(error: unknown): boolean {
   return causa?.kind === "TransactionWriteConflict";
 }
 
+export const MENSAJE_CONFLICTO_GRUPO = "El grupo cambió mientras guardabas. Actualiza la página e intenta de nuevo";
+
 /** Permisos, valores anteriores y escrituras deben ver el mismo estado del grupo. */
 export async function ejecutarCambioDeGrupo<T>(
   cambio: (tx: Prisma.TransactionClient) => Promise<T>,
@@ -25,7 +27,7 @@ export async function ejecutarCambioDeGrupo<T>(
     });
   } catch (error) {
     if (esConflictoDeEscritura(error)) {
-      throw new ErrorDeNegocio("El grupo cambió mientras guardabas. Actualiza la página e intenta de nuevo");
+      throw new ErrorDeNegocio(MENSAJE_CONFLICTO_GRUPO);
     }
     throw error;
   }

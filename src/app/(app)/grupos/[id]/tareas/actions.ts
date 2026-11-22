@@ -99,6 +99,29 @@ export async function reasignarTareaAction(
   redirect(ruta);
 }
 
+/** "Tomar tarea": el integrante se asigna a si mismo una tarea pendiente sin responsable. */
+export async function tomarTareaAction(idGrupo: number, idTarea: number, destino: DestinoTarea, filtros: FiltrosTarea) {
+  const sesion = await requerirSesion();
+  const contexto = contextoTareaSchema.safeParse({ idGrupo, idTarea, destino });
+  if (!contexto.success) redirect("/grupos");
+  const filtrosValidados = filtrosTareaSchema.safeParse(filtros);
+  const ruta = rutaTarea(
+    contexto.data.idGrupo,
+    contexto.data.idTarea,
+    contexto.data.destino,
+    filtrosValidados.success ? filtrosValidados.data : {},
+  );
+
+  try {
+    await tareaService.tomarTarea(sesion.idUsuario, contexto.data.idGrupo, contexto.data.idTarea);
+  } catch (error) {
+    redirigirErrorTarea(ruta, mensajeParaUsuario(error, "No se pudo tomar la tarea"));
+  }
+
+  revalidarTarea(idGrupo);
+  redirect(conParametro(ruta, "toast", "Tarea tomada"));
+}
+
 export async function cambiarEstadoTareaAction(
   idGrupo: number,
   idTarea: number,

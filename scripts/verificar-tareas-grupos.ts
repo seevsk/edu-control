@@ -189,9 +189,79 @@ async function verificar() {
         await assert.rejects(tareaService.reasignarTarea(lider, idGrupo, tarea.idTarea, String(asignado)), ErrorDeNegocio);
       }
     });
-    await caso("crear exige responsable y fecha, y una tarea desasignada no puede empezar", async () => {
+    const grupoLibre = await crearGrupo();
+    await caso("crear sin responsable es válido, no notifica y no puede empezar sin dueño", async () => {
       const { crearTareaSchema } = await import("../src/lib/validation/tarea");
       assert.equal(crearTareaSchema.safeParse({ titulo: "Incompleta", peso: 1 }).success, false);
+      assert.equal(crearTareaSchema.safeParse({ titulo: "Libre", peso: 1, fechaLimite: fechaLimitePrueba }).success, true);
+      assert.equal(crearTareaSchema.safeParse({ titulo: "Libre", peso: 1, idAsignado: "", fechaLimite: fechaLimitePrueba }).success, true);
+      const antes = await db!.notificacion.count({ where: { tipo: "tarea_asignada" } });
+      const libre = await tareaService.crearTarea(lider, grupoLibre, { titulo: "Sin dueño", peso: 1, idAsignado: "", fechaLimite: fechaLimitePrueba });
+      assert.deepEqual([libre.estado, libre.idAsignado], ["pendiente", null]);
+      assert.equal(await db!.notificacion.count({ where: { tipo: "tarea_asignada" } }), antes);
+      assert.equal(await db!.tareaHistorial.count({ where: { idTarea: libre.idTarea, accion: { in: ["reasignada", "vista"] } } }), 0);
+      for (const actor of [lider, ana]) {
+        await assert.rejects(tareaService.cambiarEstadoTarea(actor, grupoLibre, libre.idTarea, "en_progreso"), ErrorDeNegocio);
+      }
+      // Con responsable distinto del actor se notifica, como siempre.
+      await tareaService.crearTarea(lider, grupoLibre, { titulo: "Con dueño", peso: 1, idAsignado: String(ana), fechaLimite: fechaLimitePrueba });
+      assert.equal(await db!.notificacion.count({ where: { tipo: "tarea_asignada" } }), antes + 1);
+    });
+    await caso("tomar tarea: historial, vista, sin avisar al actor; otros estados y observadores rechazados", async () => {
+      const libre = await tareaService.crearTarea(lider, grupoLibre, { titulo: "Para tomar", peso: 2, fechaLimite: fechaLimitePrueba });
+      for (const actor of [observador, invitado, externo]) {
+        await assert.rejects(tareaService.tomarTarea(actor, grupoLibre, libre.idTarea), ErrorDeNegocio);
+      }
+      assert.equal((await db!.tarea.findUniqueOrThrow({ where: { idTarea: libre.idTarea } })).idAsignado, null);
+      const antes = await db!.notificacion.count({ where: { tipo: "tarea_asignada" } });
+      const tomada = await tareaService.tomarTarea(luis, grupoLibre, libre.idTarea);
+      assert.equal(tomada.idAsignado, luis);
+      assert.equal(await db!.notificacion.count({ where: { tipo: "tarea_asignada" } }), antes);
+      const historial = await db!.tareaHistorial.findMany({ where: { idTarea: libre.idTarea }, orderBy: { idHistorial: "asc" } });
+      assert.deepEqual(historial.map((h) => [h.accion, h.idUsuario, h.valorAnterior, h.valorNuevo]), [
+        ["creada", lider, null, null],
+        ["reasignada", luis, null, String(luis)],
+        ["vista", luis, null, null],
+      ]);
+      // Ya tiene dueño: nadie más puede tomarla, ni su dueño otra vez.
+      await assert.rejects(tareaService.tomarTarea(ana, grupoLibre, libre.idTarea), /Otra persona ya tomó esta tarea/);
+      await assert.rejects(tareaService.tomarTarea(luis, grupoLibre, libre.idTarea), ErrorDeNegocio);
+      // Solo las pendientes: una descartada sin responsable no se toma.
+      const descartada = await tareaService.crearTarea(lider, grupoLibre, { titulo: "Descartada libre", peso: 1, fechaLimite: fechaLimitePrueba });
+      await tareaService.cambiarEstadoTarea(lider, grupoLibre, descartada.idTarea, "descartada", "Ya no hace falta");
+      await assert.rejects(tareaService.tomarTarea(ana, grupoLibre, descartada.idTarea), ErrorDeNegocio);
+    });
+    await caso("dos tomas simultáneas: solo una gana y la otra ve que ya la tomaron", async () => {
+      const libre = await tareaService.crearTarea(lider, grupoLibre, { titulo: "Carrera", peso: 1, fechaLimite: fechaLimitePrueba });
+      const resultados = await Promise.allSettled([
+        tareaService.tomarTarea(ana, grupoLibre, libre.idTarea),
+        tareaService.tomarTarea(luis, grupoLibre, libre.idTarea),
+      ]);
+      assert.equal(resultados.filter((r) => r.status === "fulfilled").length, 1);
+      const perdedor = resultados.find((r) => r.status === "rejected") as PromiseRejectedResult;
+      assert.ok(perdedor.reason instanceof ErrorDeNegocio);
+      assert.match(perdedor.reason.message, /Otra persona ya tomó esta tarea/);
+      const final = await db!.tarea.findUniqueOrThrow({ where: { idTarea: libre.idTarea } });
+      assert.ok(final.idAsignado === ana || final.idAsignado === luis);
+      assert.equal(await db!.tareaHistorial.count({ where: { idTarea: libre.idTarea, accion: "reasignada" } }), 1);
+    });
+    await caso("la carga por integrante no cuenta tareas sin asignar y el avance sí", async () => {
+      const { calcularMetricasPorIntegrante, calcularAvanceGrupo } = await import("../src/lib/metricas");
+      const base = { estado: "pendiente", fechaLimite: null };
+      const tareas = [
+        { ...base, idTarea: 1, peso: 2, idAsignado: 1 },
+        { ...base, idTarea: 2, peso: 2, idAsignado: 2 },
+        { ...base, idTarea: 3, peso: 3, idAsignado: null },
+        { ...base, idTarea: 4, peso: 3, idAsignado: null, estado: "completada" },
+      ];
+      const [m1, m2] = calcularMetricasPorIntegrante(tareas, [1, 2]);
+      assert.equal(m1.carga, 0.5);
+      assert.equal(m2.carga, 0.5);
+      assert.equal(calcularMetricasPorIntegrante([{ ...base, idTarea: 5, peso: 3, idAsignado: null }], [1])[0].carga, 0);
+      assert.equal(calcularAvanceGrupo(tareas), 3 / 10);
+    });
+    await caso("crear sin fecha límite sigue siendo obligatorio y una tarea desasignada no puede empezar", async () => {
+      await assert.rejects(tareaService.crearTarea(lider, idGrupo, { titulo: "Sin fecha", peso: 1, idAsignado: "", fechaLimite: "" }), ErrorDeNegocio);
       const sinAsignar = await tareaService.crearTarea(ana, idGrupo, {
         titulo: "Pendiente de asignación", peso: 1, idAsignado: String(ana), fechaLimite: fechaLimitePrueba,
       });

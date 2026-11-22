@@ -20,10 +20,11 @@ const camposEditablesTarea = {
 
 export const crearTareaSchema = z.object({
   ...camposEditablesTarea,
+  // Opcional: "" (o ausente) crea la tarea sin responsable.
   idAsignado: z.string()
-    .min(1, "Selecciona un responsable")
     .regex(/^[1-9]\d*$/, "Selecciona un responsable válido")
-    .refine((valor) => Number(valor) <= 2147483647, "Selecciona un responsable válido"),
+    .refine((valor) => Number(valor) <= 2147483647, "Selecciona un responsable válido")
+    .optional().or(z.literal("")),
 });
 
 export const editarTareaSchema = z.object(camposEditablesTarea);
@@ -58,7 +59,8 @@ export const cambiarEstadoTareaSchema = contextoTareaSchema.extend({
 export const filtrosTareaSchema = z.object({
   q: z.string().trim().max(160, "La búsqueda admite hasta 160 caracteres").optional().default(""),
   estado: z.enum(ESTADOS_TAREA).optional().or(z.literal("")),
-  asignado: idRegistroSchema.optional().or(z.literal("")),
+  // "sin" = tareas sin responsable.
+  asignado: idRegistroSchema.optional().or(z.literal("sin")).or(z.literal("")),
   foco: z.enum(["abiertas", "mias", "sin_asignar", "vencidas"]).optional().or(z.literal("")),
   vista: z.enum(["tablero", "lista"]).optional(),
 });

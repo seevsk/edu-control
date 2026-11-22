@@ -272,7 +272,8 @@ Reglas de arquitectura:
 
 - Las tareas pertenecen siempre a un grupo. `id_asignado` debe ser un integrante `aceptada` que no sea observador (o `NULL` si está sin asignar).
 - `peso`: 1 a 3, lo define el grupo al crear la tarea.
-- **Restricciones adicionales (confirmadas por el usuario, 2026-11-02):** al crear una tarea, el responsable y la fecha límite son obligatorios. La fecha no puede estar en el pasado ni superar `grupo.fecha_limite`. Después de crearla puede quedar sin responsable por una reasignación o por el retiro de un integrante, pero necesita responsable antes de pasar a `en_progreso`. Una tarea `en_revision` o `completada` no se reasigna. Una tarea `en_progreso` solo la puede reasignar el líder y, al hacerlo, vuelve a `pendiente`; se registran tanto la reasignación como el cambio de estado en el historial. Las tareas `pendiente` sí pueden reasignarlas líder y miembros.
+- **Restricciones adicionales (confirmadas por el usuario, 2026-11-02; responsable opcional desde 2026-11-22):** al crear una tarea la fecha límite es obligatoria y el responsable es **opcional** (por defecto "Sin asignar"; reemplaza la regla de 2026-11-02 que lo exigía). La fecha no puede estar en el pasado ni superar `grupo.fecha_limite`. Una tarea sin responsable (desde la creación, por una reasignación o por el retiro de un integrante) solo puede estar `pendiente`: necesita responsable antes de pasar a `en_progreso`. Una tarea `en_revision` o `completada` no se reasigna. Una tarea `en_progreso` solo la puede reasignar el líder y, al hacerlo, vuelve a `pendiente`; se registran tanto la reasignación como el cambio de estado en el historial. Las tareas `pendiente` sí pueden reasignarlas líder y miembros.
+- **Tomar tarea (confirmado, 2026-11-22; `tomarTarea` en `src/server/services/tarea.ts`):** un integrante aceptado no observador de un grupo activo puede asignarse a sí mismo, con un clic, una tarea `pendiente` sin responsable. Es una reasignación normal: historial `reasignada` (anterior `NULL`) más `vista` (quien se la asigna a sí mismo la tiene vista) y no se notifica al propio actor. Si dos personas la toman a la vez, la transacción deja ganar a una sola y la otra recibe "Otra persona ya tomó esta tarea". En el detalle aparece como el botón principal "Tomar tarea", y el filtro de responsable del tablero y la lista ofrece "Sin asignar".
 - Un grupo no puede pasar a `finalizado` mientras tenga tareas abiertas (`pendiente`, `en_progreso` o `en_revision`). Las `completada` y `descartada` están cerradas.
 - Estados: `pendiente` → `en_progreso` → `en_revision` → `completada`, más `descartada` (tarea que ya no se hará, como "Removed" en Azure o "Won't Do" en Jira). Nunca se borran tareas.
 
@@ -310,7 +311,7 @@ Reglas de arquitectura:
 ### 8.5 Métricas del grupo (siempre calculadas, nunca guardadas)
 
 - **Avance del grupo** = suma del `peso` de tareas `completada` ÷ suma del `peso` de todas las tareas. Sin tareas, muestra "sin tareas" en lugar de 0 %.
-- **Carga de un integrante** = suma del `peso` que se le asignó ÷ suma del `peso` total. Sirve para detectar que el líder le cargó todo a dos personas.
+- **Carga de un integrante** = suma del `peso` que se le asignó ÷ suma del `peso` **asignado** (las tareas sin responsable no son carga de nadie; el avance del grupo sí las incluye). Sirve para detectar que el líder le cargó todo a dos personas.
 - **Cumplimiento de un integrante** = suma del `peso` completado ÷ suma del `peso` asignado.
 - **Puntualidad** = tareas entregadas a tiempo ÷ tareas entregadas con fecha límite. La entrega se mide con la **primera vez que la tarea pasó a `en_revision` desde que se le asignó al responsable actual** según `tarea_historial` (no con `fecha_terminada`, que se borra al devolverla), para no penalizar al asignado si el revisor tarda. Se compara con la **fecha límite vigente cuando se le asignó** (confirmado, 2026-11-09): reprogramar después no borra el atraso. Opcional: cuántas veces se devolvió cada tarea.
 - Excluye a los observadores de todas las métricas.
@@ -332,7 +333,7 @@ Reglas de arquitectura:
 |---|---|---|---|
 | Invitan a un grupo | `invitacion_grupo` | El invitado | Sí |
 | Responden una invitación | `invitacion_respondida` | Quien invitó | No |
-| Asignan o reasignan una tarea | `tarea_asignada` | El nuevo asignado | Sí |
+| Asignan o reasignan una tarea (al crearla con responsable o después; no al crearla sin responsable ni al tomarla uno mismo, 2026-11-22) | `tarea_asignada` | El nuevo asignado | Sí |
 | Una tarea pasa a `en_revision` | `tarea_en_revision` | Integrantes aceptados que no sean observadores ni el asignado | Sí |
 | Devuelven una tarea a `en_progreso` | `tarea_devuelta` | El asignado | Sí |
 | Una tarea queda `completada` | `tarea_completada` | El asignado | No |
