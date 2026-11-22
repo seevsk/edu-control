@@ -1,7 +1,7 @@
 import "./configurar-zod";
 import { z } from "zod";
 
-function esFechaISOReal(valor: string) {
+export function esFechaISOReal(valor: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(valor)) return false;
   const [anio, mes, dia] = valor.split("-").map(Number);
   const fecha = new Date(Date.UTC(anio, mes - 1, dia));

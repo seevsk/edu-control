@@ -23,6 +23,15 @@ export async function listarEvaluacionesDelUsuario(idUsuario: number) {
   });
 }
 
+/** Evaluaciones que un grupo nuevo puede tomar como origen: las que todavía no cierran. */
+export async function listarEvaluacionesParaGrupo(idUsuario: number) {
+  return prisma.evaluacion.findMany({
+    where: { curso: { idUsuario }, fechaCierre: { gte: new Date() } },
+    include: { curso: true },
+    orderBy: { fechaCierre: "asc" },
+  });
+}
+
 /** Para el "Inicio": evaluaciones propias que todavia no cierran, sin depender de ningun grupo. */
 export async function listarEvaluacionesProximas(idUsuario: number, limite = 8) {
   return prisma.evaluacion.findMany({

@@ -90,9 +90,14 @@ export async function obtenerBandeja(idUsuario: number) {
       },
       orderBy: { fechaInvitacion: "desc" },
     }),
-    // Invitaciones respondidas y salidas (no incluye los grupos que creó).
+    // Invitaciones respondidas y salidas. No incluye los grupos que creó (salvo su propia salida) ni las
+    // invitaciones canceladas antes de responderlas.
     prisma.grupoIntegrante.findMany({
-      where: { idUsuario, estadoInvitacion: { not: "pendiente" }, grupo: { NOT: { idCreador: idUsuario } } },
+      where: {
+        idUsuario,
+        estadoInvitacion: { notIn: ["pendiente", "cancelada"] },
+        OR: [{ grupo: { idCreador: { not: idUsuario } } }, { estadoInvitacion: "retirado" }],
+      },
       select: {
         idGrupo: true,
         estadoInvitacion: true,
@@ -252,7 +257,8 @@ export async function obtenerDetalleInvitacion(idUsuario: number, idGrupo: numbe
       },
     },
   });
-  if (!registro) return null;
+  // Una invitación cancelada nunca llegó a ser del invitado: no se le muestra nada del grupo.
+  if (!registro || registro.estadoInvitacion === "cancelada") return null;
   const aceptado = registro.estadoInvitacion === "aceptada";
   return {
     ...registro,
