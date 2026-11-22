@@ -14,12 +14,13 @@ export function valorHistorialConMotivo(estado: string, accion: AccionConMotivo,
 
 export function leerValorEstadoHistorial(valor: string | null): { estado: string | null; motivo: string | null } {
   if (!valor) return { estado: valor, motivo: null };
+  // El motivo es texto libre y podría contener otro separador: manda el que aparece primero.
+  let mejor: { indice: number; separador: string } | null = null;
   for (const separador of Object.values(SEPARADORES_MOTIVO)) {
     const indice = valor.indexOf(separador);
-    if (indice !== -1) {
-      return { estado: valor.slice(0, indice), motivo: valor.slice(indice + separador.length) };
-    }
+    if (indice !== -1 && (!mejor || indice < mejor.indice)) mejor = { indice, separador };
   }
+  if (mejor) return { estado: valor.slice(0, mejor.indice), motivo: valor.slice(mejor.indice + mejor.separador.length) };
   return { estado: valor, motivo: null };
 }
 

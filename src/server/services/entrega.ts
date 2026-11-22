@@ -62,6 +62,8 @@ export async function enviarEntrega(
         }
       }
 
+      // Una entrega nueva reemplaza a cualquier anterior que siguiera esperando revisión.
+      await tx.entrega.updateMany({ where: { idTarea, resultado: "en_revision" }, data: { resultado: "devuelta" } });
       await tx.entrega.create({
         data: {
           idTarea,

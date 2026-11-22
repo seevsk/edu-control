@@ -8,6 +8,7 @@ import { listarTareasDelGrupo, obtenerTareaDelGrupo } from "@/server/services/ta
 import { calcularAvanceGrupo } from "@/lib/metricas";
 import { ESTADOS_TAREA_ORDEN, type EstadoTarea } from "@/lib/estado-tarea";
 import { nombreCorto } from "@/lib/nombres";
+import { evaluarEntrega } from "@/lib/tiempos-tarea";
 import { fechaEnZonaLimaISO } from "@/lib/calendario";
 import { filtrosTareaSchema, idRegistroSchema } from "@/lib/validation/tarea";
 import { PaginaCompleta } from "@/components/ui-app/page-header";
@@ -110,6 +111,7 @@ export default async function GrupoTareasPage({
     asignado: tarea.asignado ? { idUsuario: tarea.asignado.idUsuario, nombre: tarea.asignado.nombre, apellidos: tarea.asignado.apellidos, fotoUrl: tarea.asignado.fotoUrl } : null,
     nota: tarea.estado === "en_revision" && puedeGestionar && datos.rolActual === "lider" ? "Te toca revisar" : undefined,
     adjuntos: tarea.entregas[0]?._count.archivos ?? 0,
+    conAtraso: tarea.estado === "completada" && evaluarEntrega(tarea, tarea.historial)?.aTiempo === false,
   }));
   const responsableFiltrado = asignables.find((integrante) => integrante.idUsuario === asignado);
 
