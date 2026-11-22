@@ -42,6 +42,7 @@ async function verificar() {
     const grupoService = await import("../src/server/services/grupo");
     const tareaService = await import("../src/server/services/tarea");
     const entregaService = await import("../src/server/services/entrega");
+    const perfilService = await import("../src/server/services/perfil");
     const enviar = (actor: number, idTarea: number, archivos: { nombre: string; datos: Uint8Array<ArrayBuffer> }[] = []) =>
       entregaService.enviarEntrega(actor, { idGrupo, idTarea, titulo: "Entrega", descripcion: "Listo para revisar", enlace: "" }, archivos);
     const { crearNotificacion } = await import("../src/server/notifications/crear-notificacion");
@@ -126,6 +127,7 @@ async function verificar() {
         asunto: "Tarea en revisión",
         idGrupo,
       });
+      assert.ok(silenciada);
       assert.equal(silenciada.estadoCorreo, "no_aplica");
 
       await grupoService.actualizarPreferenciaCorreoActividad(ana, idGrupo, true);
@@ -137,6 +139,7 @@ async function verificar() {
         asunto: "Tarea en revisión",
         idGrupo,
       });
+      assert.ok(habilitada);
       assert.equal(
         (await db!.notificacion.findUniqueOrThrow({
           where: { idNotificacion: habilitada.idNotificacion },
@@ -534,6 +537,120 @@ async function verificar() {
       await assert.rejects(grupoService.invitarIntegrante(lider, idGrupo, persona.idUsuario), ErrorDeNegocio);
       await assert.rejects(grupoService.cancelarInvitacion(lider, idGrupo, persona.idUsuario), ErrorDeNegocio);
     });
+    const nuevoUsuario = (nombreUsuario: string) => db!.usuario.create({ data: {
+      googleId: `prueba-${nombreUsuario}`, correo: `${nombreUsuario.toLowerCase()}@example.invalid`, nombre: nombreUsuario, perfil: { create: {} },
+    } });
+    const motivoLargo = "Falta revisar el informe completo";
+    const entregar = (actor: number, grupo: number, idTarea: number) =>
+      entregaService.enviarEntrega(actor, { idGrupo: grupo, idTarea, titulo: "Entrega", descripcion: "Listo para revisar", enlace: "" }, []);
+    const leerTarea = (idTarea: number) => db!.tarea.findUniqueOrThrow({ where: { idTarea }, include: { historial: true, entregas: true } });
+    await caso("al salir, las tareas en progreso vuelven a pendiente y las de revisión conservan a su autor", async () => {
+      const grupo = await crearGrupo();
+      const crear = (titulo: string) => tareaService.crearTarea(ana, grupo, { titulo, peso: 1, idAsignado: String(ana), fechaLimite: fechaLimitePrueba });
+      const pendiente = await crear("Pendiente");
+      const enProgreso = await crear("En progreso");
+      const enRevision = await crear("En revisión");
+      const aprobable = await crear("Aprobable");
+      await tareaService.cambiarEstadoTarea(ana, grupo, enProgreso.idTarea, "en_progreso");
+      for (const tarea of [enRevision, aprobable]) {
+        await tareaService.cambiarEstadoTarea(ana, grupo, tarea.idTarea, "en_progreso");
+        await entregar(ana, grupo, tarea.idTarea);
+      }
+      await grupoService.salirDelGrupo(ana, grupo);
+
+      const p = await leerTarea(pendiente.idTarea);
+      assert.deepEqual([p.estado, p.idAsignado], ["pendiente", null]);
+      const e = await leerTarea(enProgreso.idTarea);
+      assert.deepEqual([e.estado, e.idAsignado, e.fechaTerminada], ["pendiente", null, null]);
+      assert.ok(e.historial.some((cambio) => cambio.accion === "reasignada" && cambio.valorAnterior === String(ana) && cambio.valorNuevo === null));
+      assert.ok(e.historial.some((cambio) => cambio.accion === "estado" && cambio.valorAnterior === "en_progreso" && cambio.valorNuevo === "pendiente"));
+      const r = await leerTarea(enRevision.idTarea);
+      assert.deepEqual([r.estado, r.idAsignado, r.entregas.map((entrega) => entrega.resultado)], ["en_revision", ana, ["en_revision"]]);
+
+      // Devolver una tarea cuyo autor ya salió la deja pendiente y sin responsable, nunca en progreso sin dueño.
+      await tareaService.cambiarEstadoTarea(lider, grupo, enRevision.idTarea, "en_progreso", motivoLargo);
+      const devuelta = await leerTarea(enRevision.idTarea);
+      assert.deepEqual([devuelta.estado, devuelta.idAsignado, devuelta.entregas.map((entrega) => entrega.resultado)], ["pendiente", null, ["devuelta"]]);
+      assert.ok(devuelta.historial.some((cambio) => cambio.accion === "reasignada" && cambio.valorAnterior === String(ana) && cambio.valorNuevo === null));
+      await tareaService.reasignarTarea(lider, grupo, enRevision.idTarea, String(luis));
+
+      // Aprobarla es posible, no avisa a quien salió, y reabrirla la deja pendiente sin responsable.
+      const avisosAntes = await db!.notificacion.count({ where: { idUsuario: ana, tipo: "tarea_completada" } });
+      await tareaService.cambiarEstadoTarea(lider, grupo, aprobable.idTarea, "completada");
+      const aprobada = await leerTarea(aprobable.idTarea);
+      assert.deepEqual([aprobada.estado, aprobada.idAsignado, aprobada.entregas.map((entrega) => entrega.resultado)], ["completada", ana, ["aprobada"]]);
+      assert.equal(await db!.notificacion.count({ where: { idUsuario: ana, tipo: "tarea_completada" } }), avisosAntes);
+      await tareaService.cambiarEstadoTarea(lider, grupo, aprobable.idTarea, "en_progreso", motivoLargo);
+      const reabierta = await leerTarea(aprobable.idTarea);
+      assert.deepEqual([reabierta.estado, reabierta.idAsignado], ["pendiente", null]);
+    });
+    await caso("eliminar la cuenta se bloquea si lidera un grupo activo con otros integrantes", async () => {
+      const lider2 = await nuevoUsuario("LiderBloqueado");
+      const grupoA = await grupoService.crearGrupo(lider2.idUsuario, { nombre: "Grupo A" });
+      const grupoB = await grupoService.crearGrupo(lider2.idUsuario, { nombre: "Grupo B" });
+      for (const grupo of [grupoA, grupoB]) {
+        await db!.grupoIntegrante.create({ data: { idGrupo: grupo.idGrupo, idUsuario: ana, rol: "miembro", estadoInvitacion: "aceptada" } });
+      }
+      await assert.rejects(
+        perfilService.eliminarCuenta(lider2.idUsuario),
+        (error) => error instanceof ErrorDeNegocio && error.message === "Cede el liderazgo en: Grupo A, Grupo B",
+      );
+      assert.equal((await db!.usuario.findUniqueOrThrow({ where: { idUsuario: lider2.idUsuario } })).eliminadoEn, null);
+      assert.equal(await db!.perfil.count({ where: { idUsuario: lider2.idUsuario } }), 1);
+      assert.equal((await db!.grupoIntegrante.findUniqueOrThrow({ where: { idGrupo_idUsuario: { idGrupo: grupoA.idGrupo, idUsuario: lider2.idUsuario } } })).estadoInvitacion, "aceptada");
+    });
+    await caso("eliminar la cuenta sale de los grupos, libera tareas, cancela invitaciones y es idempotente", async () => {
+      const saliente = await nuevoUsuario("Saliente");
+      const idSaliente = saliente.idUsuario;
+      const grupo = await crearGrupo();
+      const otro = await crearGrupo();
+      await db!.grupoIntegrante.create({ data: { idGrupo: grupo, idUsuario: idSaliente, rol: "miembro", estadoInvitacion: "aceptada" } });
+      await db!.grupoIntegrante.create({ data: { idGrupo: otro, idUsuario: idSaliente, rol: "miembro", estadoInvitacion: "pendiente", idInvitador: lider } });
+      const tarea = await tareaService.crearTarea(lider, grupo, { titulo: "Del saliente", peso: 1, idAsignado: String(idSaliente), fechaLimite: fechaLimitePrueba });
+      await tareaService.cambiarEstadoTarea(lider, grupo, tarea.idTarea, "en_progreso");
+      await db!.bloqueOcupado.create({ data: { idUsuario: idSaliente, tipo: "personal", diaSemana: 1, horaInicio: new Date("1970-01-01T10:00:00Z"), horaFin: new Date("1970-01-01T11:00:00Z") } });
+
+      // Un lider sin otros integrantes que puedan liderar no bloquea: el grupo queda como esta.
+      const solitario = await nuevoUsuario("Solitario");
+      const grupoSolo = await grupoService.crearGrupo(solitario.idUsuario, { nombre: "Solo" });
+      await perfilService.eliminarCuenta(solitario.idUsuario);
+      assert.ok((await db!.usuario.findUniqueOrThrow({ where: { idUsuario: solitario.idUsuario } })).eliminadoEn);
+      assert.equal((await db!.grupo.findUniqueOrThrow({ where: { idGrupo: grupoSolo.idGrupo } })).estado, "activo");
+
+      await perfilService.eliminarCuenta(idSaliente);
+      await perfilService.eliminarCuenta(idSaliente);
+      const eliminado = await db!.usuario.findUniqueOrThrow({ where: { idUsuario: idSaliente } });
+      assert.ok(eliminado.eliminadoEn);
+      assert.equal(eliminado.nombre, "Cuenta eliminada");
+      assert.equal(await db!.perfil.count({ where: { idUsuario: idSaliente } }), 0);
+      assert.equal(await db!.bloqueOcupado.count({ where: { idUsuario: idSaliente } }), 0);
+      const membresia = await db!.grupoIntegrante.findUniqueOrThrow({ where: { idGrupo_idUsuario: { idGrupo: grupo, idUsuario: idSaliente } } });
+      assert.deepEqual([membresia.estadoInvitacion, membresia.retiroVoluntario, membresia.fechaRetiro !== null], ["retirado", true, true]);
+      assert.equal((await db!.grupoIntegrante.findUniqueOrThrow({ where: { idGrupo_idUsuario: { idGrupo: otro, idUsuario: idSaliente } } })).estadoInvitacion, "cancelada");
+      const liberada = await leerTarea(tarea.idTarea);
+      assert.deepEqual([liberada.estado, liberada.idAsignado], ["pendiente", null]);
+
+      // Una cuenta eliminada no recibe avisos.
+      const avisos = await db!.notificacion.count({ where: { idUsuario: idSaliente } });
+      assert.equal(await crearNotificacion({ idUsuario: idSaliente, tipo: "tarea_asignada", mensaje: "Hola", enlace: "/", asunto: "Hola" }), null);
+      assert.equal(await db!.notificacion.count({ where: { idUsuario: idSaliente } }), avisos);
+    });
+    await caso("finalizar un grupo cancela sus invitaciones pendientes", async () => {
+      const grupo = await crearGrupo();
+      await grupoService.actualizarGrupo(lider, grupo, { nombre: "Grupo cerrado", estado: "finalizado" });
+      const fila = await db!.grupoIntegrante.findUniqueOrThrow({ where: { idGrupo_idUsuario: { idGrupo: grupo, idUsuario: invitado } } });
+      assert.equal(fila.estadoInvitacion, "cancelada");
+    });
+    await caso("no se avisa la respuesta a una invitación a quien ya salió del grupo", async () => {
+      const grupo = await crearGrupo();
+      const persona = await nuevoUsuario("Respondedor");
+      await db!.grupoIntegrante.updateMany({ data: { fechaInvitacion: new Date(Date.now() - 2 * 60 * 60 * 1000) } });
+      await grupoService.invitarIntegrante(lider, grupo, persona.idUsuario);
+      const antes = await db!.notificacion.count({ where: { idUsuario: lider, tipo: "invitacion_respondida" } });
+      await grupoService.salirDelGrupo(lider, grupo, luis);
+      await grupoService.responderInvitacion(persona.idUsuario, grupo, "aceptada");
+      assert.equal(await db!.notificacion.count({ where: { idUsuario: lider, tipo: "invitacion_respondida" } }), antes);
+    });
     const abierta = await tareaService.crearTarea(ana, idGrupo, { titulo: "Consulta posterior", peso: 1, idAsignado: String(ana), fechaLimite: fechaLimitePrueba });
     await caso("solo el líder puede finalizar el grupo", async () => {
       await assert.rejects(grupoService.actualizarGrupo(ana, idGrupo, { nombre: "Grupo", estado: "finalizado" }), ErrorDeNegocio);
@@ -564,7 +681,7 @@ async function verificar() {
       assert.deepEqual(await db!.grupo.findUniqueOrThrow({ where: { idGrupo } }), antes);
       assert.equal(await db!.tareaHistorial.count(), historial);
       assert.equal(await db!.notificacion.count(), notificaciones);
-      assert.equal((await db!.grupoIntegrante.findUniqueOrThrow({ where: { idGrupo_idUsuario: { idGrupo, idUsuario: invitado } } })).estadoInvitacion, "pendiente");
+      assert.equal((await db!.grupoIntegrante.findUniqueOrThrow({ where: { idGrupo_idUsuario: { idGrupo, idUsuario: invitado } } })).estadoInvitacion, "cancelada");
     });
     await caso("finalizado conserva el acceso de lectura al grupo, tareas e historial", async () => {
       assert.equal((await grupoService.obtenerGrupoDelUsuario(observador, idGrupo)).grupo.estado, "finalizado");

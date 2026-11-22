@@ -512,7 +512,7 @@ export async function cambiarEstadoTarea(
   nuevoEstado: EstadoTarea,
   motivo = "",
 ) {
-  const { tarea, accion, motivoValidado } = await ejecutarCambioDeGrupo(async (tx) => {
+  const { tarea, accion, motivoValidado, asignadoPuedeRecibir } = await ejecutarCambioDeGrupo(async (tx) => {
     const integrante = await requerirIntegranteQuePuedeModificar(idActor, idGrupo, tx);
     const tarea = await tx.tarea.findFirst({ where: { idTarea, idGrupo } });
     if (!tarea) throw new ErrorDeNegocio("Tarea no encontrada");
@@ -533,12 +533,13 @@ export async function cambiarEstadoTarea(
       if (!parseo.success) throw new ErrorDeNegocio(parseo.error.issues[0].message);
       motivoValidado = parseo.data;
     }
-    // Al reabrir o restaurar, si el responsable ya no puede recibir tareas (se retiro o es
-    // observador), la tarea vuelve a Pendiente sin asignar para que el lider la reasigne.
+    // Al devolver, reabrir o restaurar, si el responsable ya no puede recibir tareas (se retiro, es
+    // observador o no hay), la tarea vuelve a Pendiente sin asignar para que el lider la reasigne:
+    // nunca queda en progreso sin responsable.
+    const asignadoPuedeRecibir = tarea.idAsignado !== null && (await esAsignable(idGrupo, tarea.idAsignado, tx));
     const vuelveSinResponsable =
-      (accion === "reabrir" || estadoAnterior === "descartada") &&
-      tarea.idAsignado !== null &&
-      !(await esAsignable(idGrupo, tarea.idAsignado, tx));
+      (accion === "reabrir" || accion === "devolver" || estadoAnterior === "descartada") &&
+      !asignadoPuedeRecibir;
     const idAsignado = vuelveSinResponsable ? null : tarea.idAsignado;
     const estadoFinal: EstadoTarea = vuelveSinResponsable ? "pendiente" : nuevoEstado;
     const fechaTerminada =
@@ -578,7 +579,7 @@ export async function cambiarEstadoTarea(
         valorNuevo: accion ? valorHistorialConMotivo(estadoFinal, accion, motivoValidado) : estadoFinal,
       },
     });
-    if (idAsignado !== tarea.idAsignado) {
+    if (tarea.idAsignado !== null && idAsignado !== tarea.idAsignado) {
       await tx.tareaHistorial.create({
         data: {
           idTarea,
@@ -589,7 +590,7 @@ export async function cambiarEstadoTarea(
         },
       });
     }
-    return { tarea: { ...tarea, idAsignado }, accion, motivoValidado };
+    return { tarea: { ...tarea, idAsignado }, accion, motivoValidado, asignadoPuedeRecibir };
   });
 
   const asignado = tarea.idAsignado;
@@ -598,7 +599,8 @@ export async function cambiarEstadoTarea(
     await notificarAutoaprobacion(idGrupo, idTarea, tarea.titulo, idActor);
     return;
   }
-  if (!asignado || asignado === idActor) return;
+  // Quien ya salió del grupo (dejó la tarea en revisión) no recibe avisos.
+  if (!asignado || asignado === idActor || !asignadoPuedeRecibir) return;
   if (accion === "devolver") {
     await crearNotificacion({
       idUsuario: asignado,

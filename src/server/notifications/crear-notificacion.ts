@@ -24,6 +24,10 @@ export async function crearNotificacion(datos: {
 }) {
   const config = EVENTOS_NOTIFICACION[datos.tipo];
 
+  // Una cuenta eliminada no recibe avisos ni correos.
+  const destino = await prisma.usuario.findUnique({ where: { idUsuario: datos.idUsuario }, select: { eliminadoEn: true } });
+  if (!destino || destino.eliminadoEn) return null;
+
   let estadoCorreo: "no_aplica" | "pendiente" = "no_aplica";
   if (config.correo) {
     if (config.actividad && datos.idGrupo) {

@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { requerirSesion } from "@/server/auth/session";
+import { cerrarSesion, requerirSesion } from "@/server/auth/session";
 import { actualizarPerfilSchema, eliminarCuentaSchema } from "@/lib/validation/perfil";
 import { mensajeParaUsuario } from "@/lib/errores";
 import * as perfilService from "@/server/services/perfil";
@@ -53,9 +53,14 @@ export async function eliminarCuentaAction(formData: FormData) {
   const parseo = eliminarCuentaSchema.safeParse(leerFormData(formData));
 
   if (!parseo.success) {
-    redirect(`/perfil?error=${encodeURIComponent(parseo.error.issues[0].message)}`);
+    redirect(`/perfil?errorCuenta=${encodeURIComponent(parseo.error.issues[0].message)}`);
   }
 
-  await perfilService.eliminarCuenta(sesion.idUsuario);
+  try {
+    await perfilService.eliminarCuenta(sesion.idUsuario);
+  } catch (error) {
+    redirect(`/perfil?errorCuenta=${encodeURIComponent(mensajeParaUsuario(error))}`);
+  }
+  await cerrarSesion();
   redirect("/login");
 }

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { CalendarDays, ChevronRight, LogOut, Palette, Pencil, Plus, Search } from "lucide-react";
 import { requerirSesion } from "@/server/auth/session";
 import { obtenerPerfilCompleto } from "@/server/services/perfil";
@@ -46,7 +47,8 @@ export default async function TuPage() {
     listarCursos(sesion.idUsuario, true),
     listarMisReuniones(sesion.idUsuario),
   ]);
-  const perfil = usuario.perfil!;
+  if (!usuario.perfil) redirect("/api/auth/sesion-invalida");
+  const perfil = usuario.perfil;
   const resumen = [perfil.carrera, perfil.ciclo ? `${perfil.ciclo}.º ciclo` : null].filter(Boolean).join(" · ") || (perfil.tipoCuenta === "profesor" ? "Profesor" : "Estudiante");
   const proximas = reuniones.proximas.length;
 
