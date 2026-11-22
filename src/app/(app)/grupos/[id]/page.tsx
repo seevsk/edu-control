@@ -80,7 +80,7 @@ export default async function GrupoTareasPage({
     idTareaAbierta.success ? obtenerTareaDelGrupo(sesion.idUsuario, idGrupo, idTareaAbierta.data).catch(() => null) : Promise.resolve(null),
   ]);
   const visibles = (estado === "descartada" ? descartadas : todas).filter(
-    (tarea) => (!estado || tarea.estado === estado) && (!asignado || tarea.idAsignado === asignado),
+    (tarea) => (!estado || tarea.estado === estado) && (!asignado || tarea.idAsignado === (asignado === "sin" ? null : asignado)),
   );
 
   const ahora = new Date();
@@ -164,7 +164,12 @@ export default async function GrupoTareasPage({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className={asignado ? "h-7" : "h-7 border-dashed text-muted-foreground"}>
-              {responsableFiltrado ? (
+              {asignado === "sin" ? (
+                <>
+                  <UserAvatar usuario={null} tamano="xs" />
+                  Sin asignar
+                </>
+              ) : responsableFiltrado ? (
                 <>
                   <UserAvatar usuario={responsableFiltrado.usuario} tamano="xs" />
                   {nombreCorto(responsableFiltrado.usuario.nombre, responsableFiltrado.usuario.apellidos)}
@@ -174,6 +179,12 @@ export default async function GrupoTareasPage({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
+            <DropdownMenuItem asChild>
+              <Link href={href({ asignado: "sin" })} scroll={false}>
+                <UserAvatar usuario={null} tamano="xs" />
+                Sin asignar
+              </Link>
+            </DropdownMenuItem>
             {asignables.map((integrante) => (
               <DropdownMenuItem key={integrante.idUsuario} asChild>
                 <Link href={href({ asignado: String(integrante.idUsuario) })} scroll={false}>
@@ -224,6 +235,12 @@ export default async function GrupoTareasPage({
             ))}
             <DropdownMenuSeparator />
             <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Responsable</DropdownMenuLabel>
+            <DropdownMenuItem asChild className="min-h-10">
+              <Link href={href({ asignado: "sin" })} scroll={false}>
+                <UserAvatar usuario={null} tamano="xs" />
+                Sin asignar
+              </Link>
+            </DropdownMenuItem>
             {asignables.map((integrante) => (
               <DropdownMenuItem key={integrante.idUsuario} asChild className="min-h-10">
                 <Link href={href({ asignado: String(integrante.idUsuario) })} scroll={false}>
@@ -342,9 +359,11 @@ export default async function GrupoTareasPage({
               Responsable
               <CampoSelect
                 name="idAsignado"
-                required
-                placeholder="Elige a quién le toca"
-                opciones={asignables.map((integrante) => ({ valor: String(integrante.idUsuario), texto: nombreCorto(integrante.usuario.nombre, integrante.usuario.apellidos) }))}
+                defaultValue=""
+                opciones={[
+                  { valor: "", texto: "Sin asignar" },
+                  ...asignables.map((integrante) => ({ valor: String(integrante.idUsuario), texto: nombreCorto(integrante.usuario.nombre, integrante.usuario.apellidos) })),
+                ]}
               />
             </label>
             <div className="grid gap-4 sm:grid-cols-2">

@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 const TAMANOS = { xs: "size-5 text-[9px]", sm: "size-[22px] text-[10px]", md: "size-6 text-[11px]", lg: "size-8 text-xs" } as const;
 
-/** Avatar con iniciales tenidas por usuario; "?" cuando no hay responsable. */
+/** Avatar con iniciales tenidas por usuario; circulo punteado vacio cuando no hay responsable. */
 export function UserAvatar({
   usuario,
   tamano = "sm",
@@ -16,8 +16,13 @@ export function UserAvatar({
 }) {
   if (!usuario) {
     return (
-      <Avatar className={cn(TAMANOS[tamano], className)} aria-label="Sin asignar">
-        <AvatarFallback className="bg-secondary font-medium text-muted-foreground">?</AvatarFallback>
+      <Avatar
+        className={cn(TAMANOS[tamano], "border border-dashed border-muted-foreground/50 bg-transparent", className)}
+        title="Sin asignar"
+        role="img"
+        aria-label="Sin asignar"
+      >
+        <AvatarFallback className="bg-transparent" />
       </Avatar>
     );
   }

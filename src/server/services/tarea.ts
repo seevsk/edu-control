@@ -15,7 +15,9 @@ import { valorHistorialConMotivo } from "@/lib/tarea-historial";
 import { ESTADOS_TAREA_ABIERTOS, estaAbierta, type AccionConMotivo, type EstadoTarea } from "@/lib/estado-tarea";
 import type { z } from "zod";
 import type { Prisma } from "../../../generated/prisma/client";
-import { ejecutarCambioDeGrupo } from "./cambio-grupo";
+import { ejecutarCambioDeGrupo, MENSAJE_CONFLICTO_GRUPO } from "./cambio-grupo";
+
+const MENSAJE_TAREA_YA_TOMADA = "Otra persona ya tomó esta tarea";
 
 type RolDb = "lider" | "miembro" | "observador";
 
@@ -179,7 +181,7 @@ export async function listarTareasDelGrupo(
   const condiciones = [
     // Las descartadas solo aparecen cuando se filtran explicitamente.
     estado ? { estado } : { estado: { not: "descartada" as const } },
-    asignado ? { idAsignado: asignado } : {},
+    asignado === "sin" ? { idAsignado: null } : asignado ? { idAsignado: asignado } : {},
     q
       ? {
           OR: [
@@ -271,12 +273,12 @@ export async function crearTarea(
   idGrupo: number,
   datos: z.infer<typeof crearTareaSchema>,
 ) {
-  if (!datos.idAsignado) throw new ErrorDeNegocio("Selecciona un responsable");
   if (!datos.fechaLimite) throw new ErrorDeNegocio("La fecha límite es obligatoria");
-  const idAsignado = Number(datos.idAsignado);
+  // El responsable es opcional: sin él la tarea queda "Sin asignar" hasta que alguien la tome o el líder la asigne.
+  const idAsignado = datos.idAsignado ? Number(datos.idAsignado) : null;
   const tarea = await ejecutarCambioDeGrupo(async (tx) => {
     const integrante = await requerirIntegranteQuePuedeModificar(idActor, idGrupo, tx);
-    await validarAsignable(idGrupo, idAsignado, tx);
+    if (idAsignado !== null) await validarAsignable(idGrupo, idAsignado, tx);
     const fechaLimite = finDeDiaLimaAUtc(datos.fechaLimite);
     validarFechaLimiteTarea(fechaLimite, integrante.grupo.fechaLimite);
     return tx.tarea.create({
@@ -309,6 +311,38 @@ export async function crearTarea(
   }
 
   return tarea;
+}
+
+/**
+ * "Tomar tarea": un integrante se asigna a si mismo una tarea pendiente sin responsable.
+ * Es una reasignacion normal (historial `reasignada` + `vista`, sin notificar al propio actor).
+ * Si dos personas la toman a la vez, la transaccion serializable deja ganar a una sola.
+ */
+export async function tomarTarea(idActor: number, idGrupo: number, idTarea: number) {
+  const intentar = () =>
+    ejecutarCambioDeGrupo(async (tx) => {
+      await requerirIntegranteQuePuedeModificar(idActor, idGrupo, tx);
+      const tarea = await tx.tarea.findFirst({ where: { idTarea, idGrupo } });
+      if (!tarea) throw new ErrorDeNegocio("Tarea no encontrada");
+      if (tarea.idAsignado === idActor) throw new ErrorDeNegocio("Esta tarea ya es tuya");
+      if (tarea.idAsignado !== null) throw new ErrorDeNegocio(MENSAJE_TAREA_YA_TOMADA);
+      if (tarea.estado !== "pendiente") throw new ErrorDeNegocio("Solo se pueden tomar tareas pendientes");
+      // Condicion en el propio UPDATE: aun sin conflicto serializable, solo una toma puede ganar.
+      const { count } = await tx.tarea.updateMany({ where: { idTarea, idAsignado: null }, data: { idAsignado: idActor } });
+      if (count === 0) throw new ErrorDeNegocio(MENSAJE_TAREA_YA_TOMADA);
+      await tx.tareaHistorial.create({
+        data: { idTarea, idUsuario: idActor, accion: "reasignada", valorAnterior: null, valorNuevo: String(idActor) },
+      });
+      await tx.tareaHistorial.create({ data: { idTarea, idUsuario: idActor, accion: "vista" } });
+      return { ...tarea, idAsignado: idActor };
+    });
+  try {
+    return await intentar();
+  } catch (error) {
+    // El perdedor de una toma simultanea recibe el conflicto del grupo: se reintenta una vez y ve que ya tiene dueño.
+    if (error instanceof ErrorDeNegocio && error.message === MENSAJE_CONFLICTO_GRUPO) return intentar();
+    throw error;
+  }
 }
 
 /** Edicion de una tarea abierta: el lider o quien la creo. Peso y fecha limite quedan en el historial. */
