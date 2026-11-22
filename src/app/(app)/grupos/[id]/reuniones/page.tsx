@@ -14,6 +14,7 @@ import { FilaReunion } from "@/components/ui-app/reuniones/fila-reunion";
 import type { Respuesta } from "@/components/ui-app/reuniones/formato";
 import { MarcoGrupo } from "../_components/marco-grupo";
 import { HojaProgramarReunion } from "@/components/ui-app/reuniones/hoja-programar-reunion";
+import { RefrescoEnVivo } from "@/components/ui-app/reuniones/refresco-en-vivo";
 import { FormularioReunion } from "@/app/(app)/reuniones/nueva/formulario-reunion";
 import { cargarDatosProgramar, inicialesDeParametros } from "@/app/(app)/reuniones/nueva/datos-programar";
 
@@ -90,6 +91,7 @@ export default async function ReunionesGrupoPage({
       superponer={puedeParticipar ? <FabReunirse idGrupo={idGrupo} enCurso={enCursoGrupo.length > 0} /> : null}
     >
       <Toast mensaje={toast} />
+      {enCursoGrupo.length > 0 ? <RefrescoEnVivo /> : null}
       {datosHoja ? (
         <HojaProgramarReunion cerrarEn={`/grupos/${idGrupo}/reuniones`}>
           <FormularioReunion

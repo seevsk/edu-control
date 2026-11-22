@@ -16,6 +16,7 @@ import { BotonUnirse } from "@/components/ui-app/reuniones/boton-unirse";
 import { DialogoConfirmarReunion } from "@/components/ui-app/reuniones/dialogo-confirmar-reunion";
 import { entraron, nombreAsistente, rangoReunion, type Asistente } from "@/components/ui-app/reuniones/formato";
 import { ListaPersonas, type PersonaLista } from "@/components/ui-app/reuniones/lista-personas";
+import { RefrescoEnVivo } from "@/components/ui-app/reuniones/refresco-en-vivo";
 import { useAhora } from "@/components/ui-app/reuniones/reloj";
 import { SelectorAsistencia } from "@/components/ui-app/reuniones/selector-asistencia";
 import { Button } from "@/components/ui/button";
@@ -178,6 +179,7 @@ export function DetalleReunion({ datos }: { datos: DatosDetalle }) {
 
   return (
     <PaginaCompleta>
+      {reunion.videollamada && activo ? <RefrescoEnVivo /> : null}
       <Migas items={[{ href: "/reuniones", texto: "Reuniones" }, { href: `/grupos/${grupo.idGrupo}`, texto: aOracion(grupo.nombre) }, { texto: reunion.titulo }]} />
       <div className={cn("mx-auto flex w-full flex-col gap-4 px-4 pt-1.5 pb-12 md:max-w-[600px] md:gap-5 md:p-7 lg:max-w-[760px] lg:gap-[22px] lg:p-8", barraMovil && "max-md:pb-44")}>
         <div className="-mx-2 order-0 flex h-11 items-center md:hidden">

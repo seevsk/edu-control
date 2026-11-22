@@ -9,6 +9,7 @@ import { AvataresApilados } from "@/components/ui-app/reuniones/avatares-apilado
 import { BotonUnirse } from "@/components/ui-app/reuniones/boton-unirse";
 import { EstadoReunion } from "@/components/ui-app/reuniones/estado-reunion";
 import { duracionEntre } from "@/components/ui-app/reuniones/formato";
+import { RefrescoEnVivo } from "@/components/ui-app/reuniones/refresco-en-vivo";
 
 type Persona = { idUsuario: number; nombre: string; apellidos: string | null; fotoUrl: string | null };
 
@@ -78,6 +79,7 @@ export function DetalleReunionIniciada({
   const iniciador = entradas[0]?.usuario ?? null;
   return (
     <div className="flex max-w-[620px] flex-col gap-[18px]">
+      {terminada ? null : <RefrescoEnVivo />}
       <Encabezado
         chip={terminada ? <EstadoReunion estado="terminada" /> : <EstadoReunion estado={estado === "por_cerrar" ? "por_cerrar" : "en_curso"} minutos={0} />}
         titulo="Reunión iniciada"
