@@ -1,6 +1,7 @@
 import type { DatosEmail, EmailSender, ResultadoEnvio } from "./email-sender";
 
 const RESEND_EMAILS_URL = "https://api.resend.com/emails";
+const TIEMPO_MAXIMO_MS = 8000;
 
 interface ResendEmailSenderConfig {
   apiKey: string;
@@ -39,6 +40,8 @@ export class ResendEmailSender implements EmailSender {
           subject: datos.asunto,
           text: cuerpo,
         }),
+        // Sin tope, un Resend colgado dejaria la accion del usuario esperando indefinidamente.
+        signal: AbortSignal.timeout(TIEMPO_MAXIMO_MS),
       });
 
       if (!respuesta.ok) {
@@ -49,8 +52,9 @@ export class ResendEmailSender implements EmailSender {
       }
 
       return { ok: true };
-    } catch {
-      console.error(`[correo] No se pudo enviar la notificacion #${datos.idNotificacion}`);
+    } catch (error) {
+      const agotado = error instanceof Error && error.name === "TimeoutError";
+      console.error(`[correo] ${agotado ? "Tiempo agotado al enviar" : "No se pudo enviar"} la notificacion #${datos.idNotificacion}`);
       return { ok: false };
     }
   }

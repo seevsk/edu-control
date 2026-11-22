@@ -16,10 +16,11 @@ export const metadata: Metadata = {
 
 const mensajesError: Record<string, string> = {
   google: "No pudimos completar el inicio de sesión con Google. Intenta de nuevo.",
+  sesion_invalida: "Tu sesión expiró. Vuelve a iniciar sesión.",
   sesion_expirada: "El inicio de sesión tardó demasiado y expiró. Intenta de nuevo.",
 };
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const { error } = await searchParams;
-  return <LoginC error={error ? mensajesError[error] : undefined} fuenteGoogle={roboto.className} />;
+  return <LoginC error={error && Object.hasOwn(mensajesError, error) ? mensajesError[error] : undefined} fuenteGoogle={roboto.className} />;
 }

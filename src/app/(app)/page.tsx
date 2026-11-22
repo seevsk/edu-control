@@ -14,6 +14,7 @@ import { TaskRow, type FilaTarea } from "@/components/ui-app/task-row";
 import { CourseDot } from "@/components/ui-app/course-dot";
 import { Toast } from "@/components/toast";
 import { cookies } from "next/headers";
+import { nombrePila } from "@/lib/nombres";
 import { obtenerPerfilCompleto } from "@/server/services/perfil";
 import { Bienvenida } from "./_components/bienvenida";
 import { COOKIE_BIENVENIDA } from "./_components/bienvenida-cookie";
@@ -161,7 +162,7 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
   // Guía de primer ingreso: visible hasta completar los tres pasos o hasta que el usuario la oculte.
   const perfil = usuario.perfil;
   const datosBienvenida = {
-    nombre: usuario.nombre.split(" ")[0] || usuario.nombre,
+    nombre: nombrePila(usuario.nombre) || usuario.nombre,
     perfilCompleto: Boolean(perfil?.institucion && perfil.carrera && perfil.ciclo),
     visibleEnBusqueda: perfil?.visibleEnBusqueda ?? true,
     cursosConHorario: cursos.filter((curso) => curso.horarios.length > 0).length,

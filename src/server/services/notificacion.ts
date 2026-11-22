@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { prisma } from "@/server/db/client";
 import { puedeReabrirse } from "@/lib/estado-reunion";
 
@@ -9,8 +10,33 @@ export async function listarNotificaciones(idUsuario: number, limite = 30) {
   });
 }
 
+/**
+ * Lo que muestra la insignia de la Bandeja: avisos sin leer (apilados por tarea) más invitaciones
+ * pendientes con aviso sin leer. Es la misma cuenta de la página, porque sale de obtenerBandeja.
+ */
+export function contarSinLeerBandeja(bandeja: {
+  elementos: { leida: boolean }[];
+  invitacionesPendientes: { avisoLeido: boolean }[];
+}) {
+  return (
+    bandeja.elementos.filter((elemento) => !elemento.leida).length +
+    bandeja.invitacionesPendientes.filter((pendiente) => !pendiente.avisoLeido).length
+  );
+}
+
 export async function contarNotificacionesNoLeidas(idUsuario: number) {
-  return prisma.notificacion.count({ where: { idUsuario, leida: false } });
+  return contarSinLeerBandeja(await obtenerBandeja(idUsuario));
+}
+
+/** Un correo "pendiente" tarda segundos; pasados 10 min el proceso murió antes de registrar el resultado. */
+const CORREO_PENDIENTE_MAX_MS = 10 * 60_000;
+
+/** Reconciliación perezosa (sin cron): al abrir la Bandeja, los correos olvidados pasan a fallido. */
+async function cerrarCorreosPendientes(idUsuario: number) {
+  await prisma.notificacion.updateMany({
+    where: { idUsuario, estadoCorreo: "pendiente", fechaCreacion: { lt: new Date(Date.now() - CORREO_PENDIENTE_MAX_MS) } },
+    data: { estadoCorreo: "fallido" },
+  });
 }
 
 export async function marcarNotificacionLeida(idUsuario: number, idNotificacion: number) {
@@ -73,7 +99,11 @@ function leerEnlace(enlace: string | null): Destino {
  * enlace que generó el servidor, sin columnas nuevas. Las de una misma tarea se apilan en un solo
  * elemento. Absorbe el antiguo módulo Invitaciones: pendientes por responder e historial.
  */
-export async function obtenerBandeja(idUsuario: number) {
+// cache: el layout (insignia) y la página comparten una sola consulta por petición.
+export const obtenerBandeja = cache(obtenerBandejaSinCache);
+
+async function obtenerBandejaSinCache(idUsuario: number) {
+  await cerrarCorreosPendientes(idUsuario).catch(() => undefined);
   const [notificaciones, pendientes, historial] = await Promise.all([
     prisma.notificacion.findMany({
       where: { idUsuario },

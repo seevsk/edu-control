@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Bell, BookOpen, CalendarDays, CheckCheck, CheckCircle2, ChevronLeft, Clock, LogOut, Mail, Search, UserMinus, Video, XCircle } from "lucide-react";
 import { requerirSesion } from "@/server/auth/session";
-import { obtenerBandeja, obtenerDetalleInvitacion, obtenerReunionParaBandeja } from "@/server/services/notificacion";
+import { contarSinLeerBandeja, obtenerBandeja, obtenerDetalleInvitacion, obtenerReunionParaBandeja } from "@/server/services/notificacion";
 import { obtenerTareaDelGrupo } from "@/server/services/tarea";
 import { obtenerGrupoDelUsuario } from "@/server/services/grupo";
 import { obtenerEvaluacionDelUsuario } from "@/server/services/curso";
@@ -102,7 +102,7 @@ export default async function BandejaPage({ searchParams }: { searchParams: Prom
   const filtro: Filtro = consulta.filtro === "sin-leer" || consulta.filtro === "invitaciones" ? consulta.filtro : "todo";
   const ahora = new Date();
   const { elementos, invitacionesPendientes, historialInvitaciones } = await obtenerBandeja(sesion.idUsuario);
-  const sinLeer = elementos.filter((elemento) => !elemento.leida).length + invitacionesPendientes.filter((pendiente) => !pendiente.avisoLeido).length;
+  const sinLeer = contarSinLeerBandeja({ elementos, invitacionesPendientes });
 
   const visibles = filtro === "sin-leer" ? elementos.filter((elemento) => !elemento.leida) : filtro === "invitaciones" ? [] : elementos;
   const seleccionado = elementos.find((elemento) => elemento.clave === consulta.sel) ?? null;
@@ -376,7 +376,7 @@ export default async function BandejaPage({ searchParams }: { searchParams: Prom
               ) : reunion && seleccionado?.tipo === "reunion_finalizada" ? (
                 <DetalleReunionFinalizada reunion={reunion} grupo={contextoGrupo} idUsuario={sesion.idUsuario} puedeUnirse={reunion.videollamada && grupoDelAviso?.rolActual !== "observador"} />
               ) : reunion && seleccionado ? (
-                <DetalleReunion reunion={reunion} grupo={contextoGrupo} idUsuario={sesion.idUsuario} ahora={ahora} />
+                <DetalleReunion reunion={reunion} grupo={contextoGrupo} idUsuario={sesion.idUsuario} ahora={ahora} terminada={Boolean(reunion.finalizadaEn) || reunion.fin <= ahora} />
               ) : evaluacion ? (
                 <DetalleEvaluacionAviso evaluacion={evaluacion} ahora={ahora} />
               ) : seleccionado?.tipo === "invitacion_respondida" && grupoDelAviso ? (
@@ -428,7 +428,12 @@ export default async function BandejaPage({ searchParams }: { searchParams: Prom
                   <Cabecera icono={<IconoTipo tipo={seleccionado.tipo} />} titulo={resumen?.titulo ?? "Aviso"} contexto={contextoGrupo} />
                   <p className="text-sm text-muted-foreground">{seleccionado.mensaje}</p>
                   <p className="text-xs text-subtle-foreground">{fechaCorta(seleccionado.fecha, { ahora, conHora: true })}</p>
-                  {seleccionado.enlace ? <Button size="sm" className="w-fit" asChild><Link href={seleccionado.enlace}>Abrir</Link></Button> : null}
+                  {/* Si el recurso ya no existe o ya no es accesible (reunión cancelada, grupo del que saliste), no se ofrece un enlace que termine en 404. */}
+                  {seleccionado.enlace && !["/grupos", "/reuniones", "/cursos"].some((base) => seleccionado.enlace?.startsWith(base)) ? (
+                    <Button size="sm" className="w-fit" asChild><Link href={seleccionado.enlace}>Abrir</Link></Button>
+                  ) : (
+                    <p className="text-[13px] font-medium text-subtle-foreground">Ya no disponible</p>
+                  )}
                 </div>
               ) : (
                 <p className="text-[13px] text-subtle-foreground">Esta invitación ya no está disponible.</p>

@@ -214,7 +214,7 @@ export interface ReunionDetalle {
   asistentes: { respuesta: keyof typeof RESPUESTA_REUNION; usuario: Persona }[];
 }
 
-export function DetalleReunion({ reunion, grupo, idUsuario, ahora }: { reunion: ReunionDetalle; grupo: ReactNode; idUsuario: number; ahora: Date }) {
+export function DetalleReunion({ reunion, grupo, idUsuario, ahora, terminada = false }: { reunion: ReunionDetalle; grupo: ReactNode; idUsuario: number; ahora: Date; terminada?: boolean }) {
   const propia = reunion.asistentes.find((asistente) => asistente.usuario.idUsuario === idUsuario);
   const confirmados = reunion.asistentes.filter((asistente) => asistente.respuesta === "asistire").length;
   return (
@@ -223,7 +223,7 @@ export function DetalleReunion({ reunion, grupo, idUsuario, ahora }: { reunion: 
         icono={<CalendarDays className="size-5 text-cat-reunion" aria-hidden />}
         titulo={reunion.titulo}
         contexto={grupo}
-        accion={<Button size="sm" asChild><Link href={`/reuniones/${reunion.idReunion}`}>{propia?.respuesta === "pendiente" ? "Confirmar asistencia" : "Ver detalle"}</Link></Button>}
+        accion={<Button size="sm" asChild><Link href={`/reuniones/${reunion.idReunion}`}>{propia?.respuesta === "pendiente" && !terminada ? "Confirmar asistencia" : "Ver detalle"}</Link></Button>}
       />
       <QuePaso persona={reunion.creador} accion="programó una reunión" fecha={reunion.fechaCreacion} ahora={ahora} idUsuarioActual={idUsuario} />
       <dl className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-x-6 gap-y-4 border-y py-4">

@@ -1,5 +1,5 @@
 import { prisma } from "@/server/db/client";
-import { crearNotificacion } from "@/server/notifications/crear-notificacion";
+import { crearNotificacion, notificarVarios } from "@/server/notifications/crear-notificacion";
 import { plantillasNotificacion } from "@/server/notifications/templates";
 import { finDeDiaLimaAUtc } from "@/lib/dates";
 import { diaYMes } from "@/lib/formato-fecha";
@@ -516,29 +516,30 @@ export async function notificarTareaEnRevision(idGrupo: number, idTarea: number,
   const destinos = await prisma.grupoIntegrante.findMany({
     where: { idGrupo, estadoInvitacion: "aceptada", rol: { not: "observador" } },
   });
-  for (const destino of destinos) {
-    if (destino.idUsuario === idAsignado) continue;
-    await crearNotificacion({
-      idUsuario: destino.idUsuario,
-      tipo: "tarea_en_revision",
-      idGrupo,
-      ...plantillasNotificacion.tareaEnRevision(titulo, idGrupo, idTarea),
-    });
-  }
+  await notificarVarios(
+    destinos
+      .filter((destino) => destino.idUsuario !== idAsignado)
+      .map((destino) => ({
+        idUsuario: destino.idUsuario,
+        tipo: "tarea_en_revision" as const,
+        idGrupo,
+        ...plantillasNotificacion.tareaEnRevision(titulo, idGrupo, idTarea),
+      })),
+  );
 }
 
 async function notificarAutoaprobacion(idGrupo: number, idTarea: number, titulo: string, idLider: number) {
   const destinos = await prisma.grupoIntegrante.findMany({
     where: { idGrupo, estadoInvitacion: "aceptada", rol: { not: "observador" }, idUsuario: { not: idLider } },
   });
-  for (const destino of destinos) {
-    await crearNotificacion({
+  await notificarVarios(
+    destinos.map((destino) => ({
       idUsuario: destino.idUsuario,
-      tipo: "tarea_completada",
+      tipo: "tarea_completada" as const,
       idGrupo,
       ...plantillasNotificacion.tareaAutoaprobada(titulo, idGrupo, idTarea),
-    });
-  }
+    })),
+  );
 }
 
 export async function cambiarEstadoTarea(
