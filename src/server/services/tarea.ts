@@ -3,6 +3,7 @@ import { crearNotificacion } from "@/server/notifications/crear-notificacion";
 import { plantillasNotificacion } from "@/server/notifications/templates";
 import { finDeDiaLimaAUtc } from "@/lib/dates";
 import { diaYMes } from "@/lib/formato-fecha";
+import { fechaEnZonaLimaISO } from "@/lib/calendario";
 import { ErrorDeNegocio } from "@/lib/errores";
 import {
   filtrosTareaSchema,
@@ -111,7 +112,8 @@ export function accionConMotivo(estadoActual: EstadoTarea, nuevoEstado: EstadoTa
 export function validarFechaLimiteTarea(fechaLimite: Date | null, fechaLimiteGrupo: Date | null, ahora = new Date()) {
   if (!fechaLimite) return;
   if (fechaLimite < ahora) throw new ErrorDeNegocio("La fecha límite de la tarea no puede estar en el pasado");
-  if (fechaLimiteGrupo && fechaLimite > fechaLimiteGrupo) {
+  // Se compara por día en Lima: la fecha de la tarea es "fin del día" y el grupo puede vencer a media jornada.
+  if (fechaLimiteGrupo && fechaEnZonaLimaISO(fechaLimite) > fechaEnZonaLimaISO(fechaLimiteGrupo)) {
     throw new ErrorDeNegocio("La fecha límite de la tarea no puede superar la fecha límite del grupo");
   }
 }
@@ -553,11 +555,19 @@ export async function cambiarEstadoTarea(
     // Aprobar o devolver cierra la entrega vigente. Una tarea que llego a revision antes de existir
     // las entregas no tiene ninguna: el estado cambia igual.
     if (estadoAnterior === "en_revision" && (estadoFinal === "completada" || accion === "devolver")) {
-      const vigente = await tx.entrega.findFirst({
+      const pendientes = await tx.entrega.findMany({
         where: { idTarea, resultado: "en_revision" },
-        orderBy: { fechaEnvio: "desc" },
+        orderBy: [{ fechaEnvio: "desc" }, { idEntrega: "desc" }],
         select: { idEntrega: true },
       });
+      const [vigente, ...obsoletas] = pendientes;
+      // Ninguna entrega anterior debe quedar "En revisión" si la tarea ya se resolvió.
+      if (obsoletas.length > 0) {
+        await tx.entrega.updateMany({
+          where: { idEntrega: { in: obsoletas.map((entrega) => entrega.idEntrega) } },
+          data: { resultado: "devuelta" },
+        });
+      }
       if (vigente) {
         await tx.entrega.update({
           where: { idEntrega: vigente.idEntrega },

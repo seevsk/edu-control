@@ -31,3 +31,12 @@ export function DueChip({ fecha, cerrada = false, ahora, className }: { fecha: D
     </time>
   );
 }
+
+/** Tarea completada después de su fecha límite vigente; mismo estilo que "Vencida", más suave. */
+export function EtiquetaAtraso({ className }: { className?: string }) {
+  return (
+    <span className={cn("inline-flex shrink-0 items-center rounded-full border border-vencida/20 px-2 py-0.5 text-xs whitespace-nowrap text-vencida/75", className)}>
+      Entregada con atraso
+    </span>
+  );
+}

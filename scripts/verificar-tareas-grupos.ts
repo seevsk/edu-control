@@ -223,6 +223,53 @@ async function verificar() {
         ErrorDeNegocio,
       );
     });
+    await caso("la fecha de una tarea puede caer el mismo día que el límite del grupo (por día en Lima)", async () => {
+      const ahora = new Date("2026-11-02T17:00:00.000Z");
+      const finDelDia = new Date("2026-11-05T04:59:00.000Z"); // 4 nov 23:59 en Lima
+      const grupoAMediaTarde = new Date("2026-11-04T20:00:00.000Z"); // 4 nov 3:00pm en Lima
+      assert.doesNotThrow(() => tareaService.validarFechaLimiteTarea(finDelDia, grupoAMediaTarde, ahora));
+      assert.throws(
+        () => tareaService.validarFechaLimiteTarea(new Date("2026-11-06T04:59:00.000Z"), grupoAMediaTarde, ahora),
+        ErrorDeNegocio,
+      );
+    });
+    await caso("al aprobar, devolver o reenviar ninguna entrega anterior queda en revisión", async () => {
+      const t = await tareaService.crearTarea(ana, idGrupo, { titulo: "Entregas viejas", peso: 1, idAsignado: String(ana), fechaLimite: fechaLimitePrueba });
+      const enRevision = () => db!.entrega.findMany({ where: { idTarea: t.idTarea, resultado: "en_revision" }, orderBy: { idEntrega: "asc" } });
+      const vieja = () => db!.entrega.create({ data: { idTarea: t.idTarea, idAutor: ana, titulo: "Vieja", fechaEnvio: new Date("2020-01-01T00:00:00.000Z") } });
+      await tareaService.cambiarEstadoTarea(ana, idGrupo, t.idTarea, "en_progreso");
+      await vieja(); // dato heredado que quedó "en revisión"
+      await enviar(ana, t.idTarea);
+      const vigentes = await enRevision();
+      assert.equal(vigentes.length, 1, "enviar deja una sola entrega en revisión");
+      assert.equal(vigentes[0].titulo, "Entrega");
+      await vieja();
+      await tareaService.cambiarEstadoTarea(lider, idGrupo, t.idTarea, "en_progreso", "Falta la conclusión");
+      assert.equal((await enRevision()).length, 0, "devolver cierra todas");
+      await tareaService.cambiarEstadoTarea(ana, idGrupo, t.idTarea, "en_progreso").catch(() => undefined);
+      await vieja();
+      await enviar(ana, t.idTarea);
+      await vieja();
+      await tareaService.cambiarEstadoTarea(lider, idGrupo, t.idTarea, "completada");
+      assert.equal((await enRevision()).length, 0, "aprobar cierra todas");
+      assert.equal(await db!.entrega.count({ where: { idTarea: t.idTarea, resultado: "aprobada" } }), 1);
+    });
+    await caso("el motivo del historial usa el separador que aparece primero", async () => {
+      const { leerValorEstadoHistorial, valorHistorialConMotivo } = await import("../src/lib/tarea-historial");
+      const motivo = "Se pasó de plazo\n\nMotivo de descarte: otra cosa";
+      const leido = leerValorEstadoHistorial(valorHistorialConMotivo("en_progreso", "devolver", motivo));
+      assert.equal(leido.estado, "en_progreso");
+      assert.equal(leido.motivo, motivo);
+    });
+    await caso("el enlace de una entrega exige una URL con host", async () => {
+      const { entregaSchema } = await import("../src/lib/validation/entrega");
+      const base = { idGrupo: "1", idTarea: "1", titulo: "T" };
+      assert.equal(entregaSchema.safeParse({ ...base, enlace: "https://drive.google.com/x" }).success, true);
+      assert.equal(entregaSchema.safeParse({ ...base, enlace: "" }).success, true);
+      for (const malo of ["https://", "http:// espacio", "javascript:alert(1)"]) {
+        assert.equal(entregaSchema.safeParse({ ...base, enlace: malo }).success, false, malo);
+      }
+    });
     await caso("dos cambios de estado simultáneos producen un único cambio y su historial", async () => {
       const resultados = await Promise.allSettled([
         tareaService.cambiarEstadoTarea(ana, idGrupo, tarea.idTarea, "en_progreso"),

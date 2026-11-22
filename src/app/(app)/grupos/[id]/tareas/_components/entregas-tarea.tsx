@@ -19,8 +19,9 @@ function dominio(enlace: string) {
   }
 }
 
-function TarjetaEntrega({ entrega, estadoTarea }: { entrega: Entrega; estadoTarea: string }) {
-  const resultado = resultadoVisible(entrega.resultado as ResultadoEntrega, estadoTarea);
+function TarjetaEntrega({ entrega, estadoTarea, vigente = true }: { entrega: Entrega; estadoTarea: string; vigente?: boolean }) {
+  // Una entrega anterior nunca espera revisión (datos viejos pueden haberla dejado así).
+  const resultado = vigente || entrega.resultado !== "en_revision" ? resultadoVisible(entrega.resultado as ResultadoEntrega, estadoTarea) : null;
   const autoaprobada = esAutoaprobada(entrega);
   return (
     <article className="flex flex-col gap-3 rounded-lg border bg-card p-3.5 text-card-foreground">
@@ -134,7 +135,7 @@ export function EntregasTarea({
           </summary>
           <div className="mt-3 flex flex-col gap-3">
             {anteriores.map((entrega) => (
-              <TarjetaEntrega key={entrega.idEntrega} entrega={entrega} estadoTarea={tarea.estado} />
+              <TarjetaEntrega key={entrega.idEntrega} entrega={entrega} estadoTarea={tarea.estado} vigente={false} />
             ))}
           </div>
         </details>
