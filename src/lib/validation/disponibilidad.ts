@@ -1,7 +1,8 @@
 import "./configurar-zod";
 import { z } from "zod";
 
-const horaHHMM = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Hora inválida");
+// La interfaz solo ofrece intervalos de 30 minutos; el servidor lo exige igual.
+const horaHHMM = z.string().regex(/^([01]\d|2[0-3]):(00|30)$/, "Hora inválida");
 const dia = z.coerce.number().int().min(1, "Día inválido").max(7, "Día inválido");
 
 const camposComunes = {
@@ -24,7 +25,7 @@ const rangoHorarioValido = {
 
 /** Al crear se pueden marcar varios dias: se guarda un bloque por dia. */
 export const crearBloqueOcupadoSchema = z
-  .object({ ...camposComunes, dias: z.array(dia).min(1, "Elige al menos un día") })
+  .object({ ...camposComunes, dias: z.array(dia).min(1, "Elige al menos un día").transform((dias) => [...new Set(dias)]) })
   .refine(rangoHorarioValido.check, rangoHorarioValido.params);
 
 /** Al editar, el bloque es una sola fila: un solo dia. */

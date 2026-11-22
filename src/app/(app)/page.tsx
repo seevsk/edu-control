@@ -112,7 +112,7 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
         dia: etiquetaDia(fechaISO),
         hora: timeAHora(horario.horaInicio),
         titulo: aOracion(horario.curso.nombre),
-        tipo: `Clase · ${horario.curso.modalidad === "presencial" ? "presencial" : "remota"}`,
+        tipo: horario.curso.modalidad ? `Clase · ${horario.curso.modalidad === "presencial" ? "presencial" : "remota"}` : "Clase",
         color: colorCurso(horario.curso.idCurso),
         href: `/cursos/${horario.curso.idCurso}`,
       });

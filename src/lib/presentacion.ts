@@ -35,3 +35,11 @@ export function iniciales(nombre: string, apellidos?: string | null): string {
   const segunda = (apellidos ?? "").trim().charAt(0) || nombre.trim().split(/\s+/)[1]?.charAt(0) || "";
   return `${primera}${segunda}`.toLocaleUpperCase("es-PE") || "?";
 }
+
+/** Aviso del dialogo al quitar una evaluacion o un curso: cuantos grupos quedan desvinculados (vacio si ninguno). */
+export function avisoGruposDesvinculados(cantidad: number, objeto: "evaluación" | "curso"): string {
+  if (cantidad <= 0) return "";
+  return cantidad === 1
+    ? ` 1 grupo dejará de estar vinculado a ${objeto === "curso" ? "este curso" : "esta evaluación"}.`
+    : ` ${cantidad} grupos dejarán de estar vinculados a ${objeto === "curso" ? "este curso" : "esta evaluación"}.`;
+}

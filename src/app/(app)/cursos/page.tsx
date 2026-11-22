@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { MoreHorizontal, Plus } from "lucide-react";
 import { requerirSesion } from "@/server/auth/session";
-import { listarCursos, listarCursosImportables } from "@/server/services/curso";
+import { gruposVinculadosPorCurso, listarCursos, listarCursosImportables } from "@/server/services/curso";
 import { listarMisGrupos } from "@/server/services/grupo";
 import { timeAHora } from "@/lib/dates";
 import { DIAS_CORTOS, DIAS_LARGOS, diasHasta } from "@/lib/calendario";
-import { aOracion } from "@/lib/presentacion";
+import { aOracion, avisoGruposDesvinculados } from "@/lib/presentacion";
 import { formatoTitulo } from "@/lib/nombres";
 import { crearCursoAction, alternarActivoCursoAction, eliminarCursoAction, importarCursoAction, sincronizarCursoAction } from "./actions";
 import { SubmitButton } from "@/components/submit-button";
@@ -43,11 +43,12 @@ export default async function CursosPage({
   const { error, toast, vista, nuevo } = await searchParams;
   const verInactivos = vista === "inactivos";
   const ahora = new Date();
-  const [cursosActivos, cursosInactivos, importables, grupos] = await Promise.all([
+  const [cursosActivos, cursosInactivos, importables, grupos, vinculados] = await Promise.all([
     listarCursos(sesion.idUsuario, true),
     listarCursos(sesion.idUsuario, false),
     listarCursosImportables(sesion.idUsuario),
     listarMisGrupos(sesion.idUsuario),
+    gruposVinculadosPorCurso(sesion.idUsuario),
   ]);
   const cursos = verInactivos ? cursosInactivos : cursosActivos;
   const cerrarEn = verInactivos ? "/cursos?vista=inactivos" : "/cursos";
@@ -87,7 +88,7 @@ export default async function CursosPage({
             <DropdownMenuSeparator />
             <form action={eliminarCursoAction.bind(null, curso.idCurso)}>
               <BotonConfirmacion
-                mensaje={`¿Eliminar ${nombre}? También se eliminarán sus horarios y evaluaciones.`}
+                mensaje={`¿Eliminar ${nombre}? También se eliminarán sus horarios y evaluaciones.${avisoGruposDesvinculados(vinculados.porCurso.get(curso.idCurso) ?? 0, "curso")}`}
                 className="w-full rounded-sm px-2 py-1.5 text-left text-sm text-destructive hover:bg-destructive/10"
               >
                 Eliminar
@@ -138,7 +139,7 @@ export default async function CursosPage({
             Disponibles desde tus grupos <span className="font-normal text-subtle-foreground">{importables.length}</span>
           </h2>
           <ul>
-            {importables.map(({ cursoFuente, idGrupo, idCursoLocal, hayActualizaciones }) => (
+            {importables.map(({ cursoFuente, idGrupo, idCursoLocal, hayActualizaciones, confirmacion }) => (
               <li key={cursoFuente.idCurso} className="flex min-h-11 items-center gap-3 border-t px-4 text-[13px] sm:px-8">
                 <CourseDot idCurso={cursoFuente.idCurso} />
                 <span className="min-w-0 flex-1 truncate">
@@ -146,9 +147,15 @@ export default async function CursosPage({
                   <span className="ml-2 text-xs text-subtle-foreground">{[cursoFuente.codigo, cursoFuente.docente].filter(Boolean).join(" · ")}</span>
                 </span>
                 <form action={idCursoLocal && hayActualizaciones ? sincronizarCursoAction.bind(null, idCursoLocal) : importarCursoAction.bind(null, idGrupo, "/cursos")}>
-                  <SubmitButton className="h-7 rounded-md border border-input px-2.5 text-[13px] hover:bg-accent" pendingText="Guardando...">
-                    {idCursoLocal && hayActualizaciones ? "Traer actualizaciones" : "Importar"}
-                  </SubmitButton>
+                  {idCursoLocal && hayActualizaciones && confirmacion ? (
+                    <BotonConfirmacion mensaje={confirmacion} className="h-7 rounded-md border border-input px-2.5 text-[13px] hover:bg-accent">
+                      Traer actualizaciones
+                    </BotonConfirmacion>
+                  ) : (
+                    <SubmitButton className="h-7 rounded-md border border-input px-2.5 text-[13px] hover:bg-accent" pendingText="Guardando...">
+                      Importar
+                    </SubmitButton>
+                  )}
                 </form>
               </li>
             ))}
