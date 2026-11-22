@@ -374,7 +374,7 @@ export default async function BandejaPage({ searchParams }: { searchParams: Prom
               ) : reunion && seleccionado?.tipo === "reunion_iniciada" ? (
                 <DetalleReunionIniciada reunion={reunion} grupo={contextoGrupo} idUsuario={sesion.idUsuario} ahora={ahora} puedeUnirse={reunion.videollamada && grupoDelAviso?.rolActual !== "observador"} />
               ) : reunion && seleccionado?.tipo === "reunion_finalizada" ? (
-                <DetalleReunionFinalizada reunion={reunion} grupo={contextoGrupo} idUsuario={sesion.idUsuario} />
+                <DetalleReunionFinalizada reunion={reunion} grupo={contextoGrupo} idUsuario={sesion.idUsuario} puedeUnirse={reunion.videollamada && grupoDelAviso?.rolActual !== "observador"} />
               ) : reunion && seleccionado ? (
                 <DetalleReunion reunion={reunion} grupo={contextoGrupo} idUsuario={sesion.idUsuario} ahora={ahora} />
               ) : evaluacion ? (
