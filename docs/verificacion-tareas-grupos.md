@@ -52,6 +52,10 @@ Abre la URL impresa. El sufijo `/__qa/2` muestra al responsable y `/__qa/3` al r
 agrega `?vista=tablero` o `?vista=detalle` para cambiar la vista. Presiona Enter en la terminal
 al terminar. El acceso de prueba solo existe en el proxy local de este script, sobre la base temporal.
 
+## Salidas, cuenta eliminada y grupos finalizados (2026-11-22)
+
+`npm run verificar:tareas-grupos` también cubre: al salir, las tareas `en_progreso` vuelven a `pendiente` sin responsable y las `en_revision` conservan a su autor; devolver, aprobar y reabrir una tarea cuyo autor salió; eliminar la cuenta bloqueada por liderazgo y permitida (salida de grupos, tareas liberadas, invitaciones canceladas, idempotencia, sin avisos); finalizar un grupo con invitaciones pendientes; y que no se avise la respuesta a una invitación a quien ya salió.
+
 ## Entregas de tarea (2026-11-18)
 
 `npm run verificar:tareas-grupos` también cubre las entregas: contenido mínimo, tipos y firma de archivo,

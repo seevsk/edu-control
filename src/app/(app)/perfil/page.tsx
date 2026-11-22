@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { BookOpen, Briefcase, Clock, Lock, Pencil } from "lucide-react";
 import { requerirSesion } from "@/server/auth/session";
 import { obtenerPerfilCompleto } from "@/server/services/perfil";
@@ -36,11 +37,12 @@ function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactN
   );
 }
 
-export default async function PerfilPage({ searchParams }: { searchParams: Promise<{ error?: string; toast?: string; editar?: string }> }) {
+export default async function PerfilPage({ searchParams }: { searchParams: Promise<{ error?: string; errorCuenta?: string; toast?: string; editar?: string }> }) {
   const sesion = await requerirSesion();
-  const { error, toast, editar } = await searchParams;
+  const { error, errorCuenta, toast, editar } = await searchParams;
   const [usuario, grupos] = await Promise.all([obtenerPerfilCompleto(sesion.idUsuario), listarMisGrupos(sesion.idUsuario)]);
-  const perfil = usuario.perfil!;
+  if (!usuario.perfil) redirect("/api/auth/sesion-invalida");
+  const perfil = usuario.perfil;
   const nombreCompleto = formatoTitulo(`${usuario.nombre} ${usuario.apellidos ?? ""}`);
   const tipo = perfil.tipoCuenta === "profesor" ? "Profesor" : "Estudiante";
   const resumen = [tipo, perfil.carrera, perfil.ciclo ? `${perfil.ciclo}.º ciclo` : null].filter(Boolean).join(" · ");
@@ -114,6 +116,7 @@ export default async function PerfilPage({ searchParams }: { searchParams: Promi
                 <p className="mt-0.5 text-[13px] text-subtle-foreground">Se borran tu nombre, correo y foto. Tus tareas se conservan para no romper los grupos. No se puede deshacer.</p>
               </div>
               <EliminarCuenta />
+              {errorCuenta ? <p role="alert" className="w-full rounded-md bg-destructive/10 px-3 py-2 text-[13px] text-destructive">{errorCuenta}</p> : null}
             </section>
           </div>
 
