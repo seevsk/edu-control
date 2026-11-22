@@ -2,6 +2,7 @@ import { metadataDeGrupo } from "../_components/metadata";
 import { notFound } from "next/navigation";
 import { requerirSesion } from "@/server/auth/session";
 import { obtenerGrupoDelUsuario } from "@/server/services/grupo";
+import { fechaEnZonaLimaISO } from "@/lib/calendario";
 import { SubmitButton } from "@/components/submit-button";
 import { CampoSelect } from "@/components/ui-app/campo-select";
 import { Toast } from "@/components/toast";
@@ -55,6 +56,10 @@ export default async function ConfiguracionGrupoPage({
           <label className={CAMPO}>
             Enlace del trabajo
             <Input name="enlaceTrabajo" type="url" placeholder="https://" defaultValue={grupo.enlaceTrabajo ?? ""} />
+          </label>
+          <label className={CAMPO}>
+            Fecha límite
+            <Input name="fechaLimite" type="date" defaultValue={grupo.fechaLimite ? fechaEnZonaLimaISO(grupo.fechaLimite) : ""} className="w-fit" />
           </label>
           <label className={CAMPO}>
             Estado

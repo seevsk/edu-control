@@ -2,6 +2,8 @@ import { prisma } from "@/server/db/client";
 import { crearNotificacion } from "@/server/notifications/crear-notificacion";
 import { plantillasNotificacion } from "@/server/notifications/templates";
 import { ErrorDeNegocio } from "@/lib/errores";
+import { finDeDiaLimaAUtc } from "@/lib/dates";
+import { fechaEnZonaLimaISO } from "@/lib/calendario";
 import { ESTADOS_TAREA_ABIERTOS } from "@/lib/estado-tarea";
 import { nombreCorto } from "@/lib/nombres";
 import type { Prisma } from "../../../generated/prisma/client";
@@ -31,7 +33,12 @@ export async function listarMisGrupos(idUsuario: number) {
 export async function listarHistorialInvitaciones(idUsuario: number) {
   return prisma.grupoIntegrante.findMany({
     // Una invitación cancelada antes de responderla no entra al historial de quien la recibió.
-    where: { idUsuario, estadoInvitacion: { notIn: ["pendiente", "cancelada"] }, grupo: { NOT: { idCreador: idUsuario } } },
+    where: {
+      idUsuario,
+      estadoInvitacion: { notIn: ["pendiente", "cancelada"] },
+      // Los grupos que creó no cuentan, salvo su propia salida.
+      OR: [{ grupo: { idCreador: { not: idUsuario } } }, { estadoInvitacion: "retirado" }],
+    },
     include: {
       invitador: { select: { idUsuario: true, nombre: true, apellidos: true, fotoUrl: true } },
       grupo: { select: { idGrupo: true, nombre: true, estado: true, evaluacion: { select: { nombre: true, curso: { select: { idCurso: true, nombre: true } } } } } },
@@ -91,10 +98,10 @@ export async function crearGrupo(idUsuario: number, datos: z.infer<typeof crearG
     const evaluacion = await prisma.evaluacion.findFirst({
       where: { idEvaluacion: Number(datos.idEvaluacion), curso: { idUsuario } },
     });
-    if (evaluacion) {
-      idEvaluacion = evaluacion.idEvaluacion;
-      fechaLimite = evaluacion.fechaCierre;
-    }
+    if (!evaluacion) throw new ErrorDeNegocio("La evaluación elegida no existe");
+    if (evaluacion.fechaCierre < new Date()) throw new ErrorDeNegocio("Esa evaluación ya cerró, elige una vigente");
+    idEvaluacion = evaluacion.idEvaluacion;
+    fechaLimite = evaluacion.fechaCierre;
   }
 
   return prisma.grupo.create({
@@ -118,7 +125,7 @@ export async function actualizarGrupo(
   datos: z.infer<typeof actualizarGrupoSchema>,
 ) {
   return ejecutarCambioDeGrupo(async (tx) => {
-    await requerirLiderDelGrupo(idUsuario, idGrupo, tx);
+    const grupo = await requerirLiderDelGrupo(idUsuario, idGrupo, tx);
     if (datos.estado === "finalizado") {
       const tareasAbiertas = await tx.tarea.count({
         where: { idGrupo, estado: { in: [...ESTADOS_TAREA_ABIERTOS] } },
@@ -136,9 +143,25 @@ export async function actualizarGrupo(
         data: { estadoInvitacion: "cancelada" },
       });
     }
+    let fechaLimite: Date | undefined;
+    if (datos.fechaLimite) {
+      const nueva = finDeDiaLimaAUtc(datos.fechaLimite);
+      // Si el día no cambia no se vuelve a validar: se pueden guardar otros campos con una fecha ya vencida.
+      if (!grupo.fechaLimite || fechaEnZonaLimaISO(grupo.fechaLimite) !== datos.fechaLimite) {
+        if (nueva < new Date()) throw new ErrorDeNegocio("La fecha límite del grupo no puede estar en el pasado");
+        const posteriores = await tx.tarea.count({
+          where: { idGrupo, estado: { in: [...ESTADOS_TAREA_ABIERTOS] }, fechaLimite: { gt: nueva } },
+        });
+        if (posteriores > 0) {
+          throw new ErrorDeNegocio(`Hay ${posteriores} ${posteriores === 1 ? "tarea" : "tareas"} con fecha posterior`);
+        }
+        fechaLimite = nueva;
+      }
+    }
     return tx.grupo.update({
       where: { idGrupo },
       data: {
+        ...(fechaLimite ? { fechaLimite } : {}),
         nombre: datos.nombre,
         descripcion: datos.descripcion || null,
         enlaceTrabajo: datos.enlaceTrabajo || null,
@@ -214,13 +237,20 @@ export async function buscarPersonas(idUsuarioActual: number, consulta: string) 
     .sort((a, b) => Number(b.gruposEnComun > 0) - Number(a.gruposEnComun > 0));
 }
 
-export async function invitarIntegrante(idActor: number, idGrupo: number, idUsuarioInvitado: number) {
+export async function invitarIntegrante(
+  idActor: number,
+  idGrupo: number,
+  idUsuarioInvitado: number,
+  rol: "miembro" | "observador" = "miembro",
+) {
   const { grupo, integrante } = await ejecutarCambioDeGrupo(async (tx) => {
     const grupo = await requerirLiderDelGrupo(idActor, idGrupo, tx);
 
+    // Solo cuentan las invitaciones que envió esta persona; la fila de quien creó el grupo no es una invitación.
     const invitacionesUltimaHora = await tx.grupoIntegrante.count({
       where: {
-        grupo: { idCreador: idActor },
+        idInvitador: idActor,
+        idUsuario: { not: idActor },
         fechaInvitacion: { gte: new Date(Date.now() - 60 * 60 * 1000) },
       },
     });
@@ -228,12 +258,17 @@ export async function invitarIntegrante(idActor: number, idGrupo: number, idUsua
       throw new ErrorDeNegocio("Llegaste al límite de invitaciones por hora, intenta más tarde");
     }
 
-    const invitado = await tx.usuario.findUnique({ where: { idUsuario: idUsuarioInvitado } });
-    if (!invitado || invitado.eliminadoEn) throw new ErrorDeNegocio("Usuario no encontrado");
-
+    const invitado = await tx.usuario.findUnique({
+      where: { idUsuario: idUsuarioInvitado },
+      select: { eliminadoEn: true, perfil: { select: { visibleEnBusqueda: true } } },
+    });
     const previa = await tx.grupoIntegrante.findUnique({
       where: { idGrupo_idUsuario: { idGrupo, idUsuario: idUsuarioInvitado } },
     });
+    // Mismo mensaje para inexistente, eliminado u oculto: no se revela quién existe.
+    if (!invitado || invitado.eliminadoEn || (!previa && !invitado.perfil?.visibleEnBusqueda)) {
+      throw new ErrorDeNegocio("Usuario no encontrado");
+    }
     // Quien rechazó o cuya invitación se canceló puede ser invitado otra vez (reabre su misma fila);
     // quien ya está, tiene una pendiente, salió o fue retirado, no.
     if (previa && previa.estadoInvitacion !== "rechazada" && previa.estadoInvitacion !== "cancelada") {
@@ -243,10 +278,10 @@ export async function invitarIntegrante(idActor: number, idGrupo: number, idUsua
     const integrante = previa
       ? await tx.grupoIntegrante.update({
           where: { idGrupo_idUsuario: { idGrupo, idUsuario: idUsuarioInvitado } },
-          data: { estadoInvitacion: "pendiente", rol: "miembro", fechaInvitacion: new Date(), fechaRespuesta: null, idInvitador: idActor },
+          data: { estadoInvitacion: "pendiente", rol, fechaInvitacion: new Date(), fechaRespuesta: null, idInvitador: idActor },
         })
       : await tx.grupoIntegrante.create({
-          data: { idGrupo, idUsuario: idUsuarioInvitado, rol: "miembro", estadoInvitacion: "pendiente", idInvitador: idActor },
+          data: { idGrupo, idUsuario: idUsuarioInvitado, rol, estadoInvitacion: "pendiente", idInvitador: idActor },
         });
     return { grupo, integrante };
   });
@@ -359,6 +394,27 @@ async function desasignarTareasAbiertas(tx: Prisma.TransactionClient, idGrupo: n
     }
   }
   await tx.tareaHistorial.createMany({ data: historial });
+}
+
+/**
+ * El líder cambia a un integrante aceptado entre miembro y observador. Al pasar a observador se le
+ * desasignan sus tareas abiertas (un observador no recibe tareas). El líder no cambia de rol aquí.
+ */
+export async function cambiarRolIntegrante(idActor: number, idGrupo: number, idUsuarioObjetivo: number, rol: "miembro" | "observador") {
+  await ejecutarCambioDeGrupo(async (tx) => {
+    await requerirLiderDelGrupo(idActor, idGrupo, tx);
+    const objetivo = await tx.grupoIntegrante.findUnique({
+      where: { idGrupo_idUsuario: { idGrupo, idUsuario: idUsuarioObjetivo } },
+    });
+    if (!objetivo || objetivo.estadoInvitacion !== "aceptada") throw new ErrorDeNegocio("Esa persona no es integrante del grupo");
+    if (objetivo.rol === "lider") throw new ErrorDeNegocio("El rol del líder no se puede cambiar");
+    if (objetivo.rol === rol) return;
+    await tx.grupoIntegrante.update({
+      where: { idGrupo_idUsuario: { idGrupo, idUsuario: idUsuarioObjetivo } },
+      data: { rol },
+    });
+    if (rol === "observador") await desasignarTareasAbiertas(tx, idGrupo, idUsuarioObjetivo, idActor);
+  });
 }
 
 /**

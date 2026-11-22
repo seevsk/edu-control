@@ -11,7 +11,8 @@ import { Toast } from "@/components/toast";
 import { UserAvatar } from "@/components/ui-app/user-avatar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { actualizarPreferenciaCorreoActividadAction, cancelarInvitacionAction, invitarIntegranteAction, retirarIntegranteAction, salirDelGrupoAction } from "../../actions";
+import { CampoSelect } from "@/components/ui-app/campo-select";
+import { actualizarPreferenciaCorreoActividadAction, cambiarRolIntegranteAction, cancelarInvitacionAction, invitarIntegranteAction, retirarIntegranteAction, salirDelGrupoAction } from "../../actions";
 import { MarcoGrupo } from "../_components/marco-grupo";
 
 const ETIQUETAS_INVITACION: Record<string, string> = {
@@ -124,14 +125,32 @@ export default async function IntegrantesGrupoPage({
                             </BotonConfirmacion>
                           </form>
                         ) : integrante.rol !== "lider" && integrante.estadoInvitacion === "aceptada" ? (
-                          <form action={retirarIntegranteAction.bind(null, idGrupo, integrante.idUsuario)}>
-                            <BotonConfirmacion
-                              mensaje={`¿Retirar a ${nombre} del grupo? Sus tareas abiertas quedarán sin asignar.`}
-                              className="rounded-md px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/10"
-                            >
-                              Retirar
-                            </BotonConfirmacion>
-                          </form>
+                          <div className="flex items-center justify-end gap-1">
+                            {integrante.rol === "miembro" ? (
+                              <form action={cambiarRolIntegranteAction.bind(null, idGrupo, integrante.idUsuario, "observador")}>
+                                <BotonConfirmacion
+                                  mensaje={`¿Pasar a ${nombre} a observador? Sus tareas abiertas quedarán sin asignar y solo podrá ver el grupo.`}
+                                  className="min-h-8 rounded-md px-2.5 py-1 text-xs font-medium hover:bg-accent"
+                                >
+                                  Hacer observador
+                                </BotonConfirmacion>
+                              </form>
+                            ) : (
+                              <form action={cambiarRolIntegranteAction.bind(null, idGrupo, integrante.idUsuario, "miembro")}>
+                                <SubmitButton pendingText="Guardando..." className="min-h-8 rounded-md px-2.5 py-1 text-xs font-medium hover:bg-accent">
+                                  Hacer miembro
+                                </SubmitButton>
+                              </form>
+                            )}
+                            <form action={retirarIntegranteAction.bind(null, idGrupo, integrante.idUsuario)}>
+                              <BotonConfirmacion
+                                mensaje={`¿Retirar a ${nombre} del grupo? Sus tareas abiertas quedarán sin asignar.`}
+                                className="min-h-8 rounded-md px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/10"
+                              >
+                                Retirar
+                              </BotonConfirmacion>
+                            </form>
+                          </div>
                         ) : null}
                       </td>
                     ) : null}
@@ -163,8 +182,14 @@ export default async function IntegrantesGrupoPage({
                   {idsYaEnGrupo.has(persona.idUsuario) ? (
                     <span className="text-xs text-subtle-foreground">Ya está en el grupo o fue invitado</span>
                   ) : (
-                    <form action={invitarIntegranteAction.bind(null, idGrupo)}>
+                    <form action={invitarIntegranteAction.bind(null, idGrupo)} className="flex items-center gap-2">
                       <input type="hidden" name="idUsuario" value={persona.idUsuario} />
+                      <CampoSelect
+                        name="rol"
+                        defaultValue="miembro"
+                        className="h-8 w-[118px]"
+                        opciones={[{ valor: "miembro", texto: "Miembro" }, { valor: "observador", texto: "Observador" }]}
+                      />
                       <Button type="submit" size="sm" variant="outline">Invitar</Button>
                     </form>
                   )}

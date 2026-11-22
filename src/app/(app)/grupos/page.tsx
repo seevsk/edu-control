@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { requerirSesion } from "@/server/auth/session";
 import { listarMisGrupos } from "@/server/services/grupo";
-import { listarEvaluacionesDelUsuario } from "@/server/services/curso";
+import { listarEvaluacionesParaGrupo } from "@/server/services/curso";
 import { crearGrupoAction } from "./actions";
 import { SubmitButton } from "@/components/submit-button";
 import { CampoSelect } from "@/components/ui-app/campo-select";
@@ -33,7 +33,7 @@ export default async function GruposPage({
   const { error, toast, vista, nuevo } = await searchParams;
   const [grupos, evaluaciones] = await Promise.all([
     listarMisGrupos(sesion.idUsuario),
-    listarEvaluacionesDelUsuario(sesion.idUsuario),
+    listarEvaluacionesParaGrupo(sesion.idUsuario),
   ]);
   const verFinalizados = vista === "finalizados";
   const activos = grupos.filter((grupo) => grupo.estado === "activo");
