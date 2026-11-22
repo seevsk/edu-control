@@ -110,7 +110,7 @@ export function DetalleReunion({ datos }: { datos: DatosDetalle }) {
   const activo = salaAbierta(estado);
   const puedeUnirse = !observador;
   const puedeCancelar = datos.puedeCancelarBase && !reunion.iniciadaEn && (estado === "programada" || estado === "sala_abierta");
-  const puedeResponder = !observador && !reunion.iniciadaEn && !terminada;
+  const puedeResponder = !observador && !terminada;
   const { apertura } = ventanaSala(reunion.inicio, reunion.fin);
 
   const mia = reunion.asistentes.find((a) => a.idUsuario === idUsuario)?.respuesta ?? "pendiente";
@@ -145,6 +145,12 @@ export function DetalleReunion({ datos }: { datos: DatosDetalle }) {
   } else if (reunion.iniciadaEn) {
     asistencia = (
       <div>
+        {puedeResponder ? (
+          <div className="mb-3 flex flex-wrap items-center gap-3 max-md:flex-col max-md:items-stretch">
+            <h3 className="text-[13px] font-semibold text-muted-foreground">Asistencia</h3>
+            <SelectorAsistencia idReunion={reunion.idReunion} valor={mia} grande />
+          </div>
+        ) : null}
         <Titulo texto="Entraron" cantidad={entradas.length} />
         <ListaPersonas personas={entradas.map((a) => persona(a, true))} idUsuarioActual={idUsuario} />
       </div>

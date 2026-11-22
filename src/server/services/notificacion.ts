@@ -1,4 +1,5 @@
 import { prisma } from "@/server/db/client";
+import { puedeReabrirse } from "@/lib/estado-reunion";
 
 export async function listarNotificaciones(idUsuario: number, limite = 30) {
   return prisma.notificacion.findMany({
@@ -267,7 +268,7 @@ export async function obtenerReunionParaBandeja(idUsuario: number, idGrupo: numb
   const miembro = await prisma.grupoIntegrante.findFirst({ where: { idGrupo, idUsuario, estadoInvitacion: "aceptada" }, select: { idUsuario: true } });
   if (!miembro) return null;
   const margen = 5 * 60_000;
-  return prisma.reunion.findFirst({
+  const reunion = await prisma.reunion.findFirst({
     where: idReunion
       ? { idReunion, idGrupo }
       : {
@@ -276,9 +277,22 @@ export async function obtenerReunionParaBandeja(idUsuario: number, idGrupo: numb
           fechaCreacion: { gte: new Date(fechaAviso.getTime() - margen), lte: new Date(fechaAviso.getTime() + margen) },
         },
     include: {
+      grupo: { select: { estado: true } },
       creador: { select: PERSONA },
       finalizador: { select: PERSONA },
-      asistentes: { select: { respuesta: true, fechaEntrada: true, usuario: { select: PERSONA } } },
+      asistentes: { select: { idUsuario: true, respuesta: true, fechaEntrada: true, usuario: { select: PERSONA } } },
     },
   });
+  if (!reunion) return null;
+  // Cerrada sola por sala vacia y dentro de la ventana: el panel ofrece Unirse en vez de "terminó".
+  const vigentes = await prisma.grupoIntegrante.findMany({
+    where: { idGrupo, estadoInvitacion: "aceptada", rol: { not: "observador" } },
+    select: { idUsuario: true },
+  });
+  const ids = new Set(vigentes.map((v) => v.idUsuario));
+  return {
+    ...reunion,
+    asistentes: reunion.asistentes.filter((a) => ids.has(a.idUsuario)),
+    reabrible: reunion.grupo.estado === "activo" && puedeReabrirse(reunion, new Date()),
+  };
 }

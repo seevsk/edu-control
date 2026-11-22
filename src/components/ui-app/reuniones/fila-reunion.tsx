@@ -89,7 +89,7 @@ export function FilaReunion({
   const iniciador = quienInicio(reunion.asistentes);
   const gente = terminada && esVideo ? entradas : reunion.asistentes.filter((a) => a.respuesta === "asistire");
   const conteo = conteoAsistencia(reunion, terminada);
-  const puedeResponder = puedeUnirse && !terminada && !reunion.iniciadaEn;
+  const puedeResponder = puedeUnirse && !terminada;
   const unirseVisible = puedeUnirse && esVideo && !terminada && (variante === "modulo" || abierta);
   const fechaISO = fechaEnZonaLimaISO(reunion.inicio);
   const lugarVisible = esVideo || !reunion.enlace ? reunion.lugar : null;

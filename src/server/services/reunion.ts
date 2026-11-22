@@ -6,9 +6,13 @@ import { duracionMinutos, hora } from "@/lib/formato-fecha";
 import {
   APERTURA_MIN,
   CIERRE_MIN,
-  DURACION_INMEDIATA_MIN,
   GRACIA_SALA_VACIA_MIN,
+  accionSalaVacia,
+  comoVigente,
   estadoReunion,
+  intervaloOcupado,
+  puedeReabrirse,
+  rangoReunirseAhora,
   salaAbierta,
   ventanaSala,
 } from "@/lib/estado-reunion";
@@ -56,6 +60,17 @@ function participantesDe(idGrupo: number, db: Pick<Prisma.TransactionClient, "gr
     where: { idGrupo, estadoInvitacion: "aceptada", rol: { not: "observador" } },
     select: { idUsuario: true },
   });
+}
+
+/** Deja en cada reunion solo los asistentes que siguen aceptados y no son observadores en su grupo. */
+async function soloParticipantes<T extends { idGrupo: number; asistentes: { idUsuario: number }[] }>(reuniones: T[]): Promise<T[]> {
+  if (reuniones.length === 0) return reuniones;
+  const vigentes = await prisma.grupoIntegrante.findMany({
+    where: { idGrupo: { in: [...new Set(reuniones.map((r) => r.idGrupo))] }, estadoInvitacion: "aceptada", rol: { not: "observador" } },
+    select: { idGrupo: true, idUsuario: true },
+  });
+  const claves = new Set(vigentes.map((v) => `${v.idGrupo}:${v.idUsuario}`));
+  return reuniones.map((r) => ({ ...r, asistentes: r.asistentes.filter((a) => claves.has(`${r.idGrupo}:${a.idUsuario}`)) }));
 }
 
 function nombreDe(usuario: { nombre: string; apellidos: string | null }) {
@@ -161,7 +176,11 @@ export async function listarMisReuniones(idUsuario: number) {
   ]);
 
   const porId = new Map([...vigentes, ...recientes].map((r) => [r.idReunion, r]));
-  const todas = [...porId.values()].map((reunion) => ({ ...sinSala(reunion), estado: estadoReunion(reunion, ahora) }));
+  const filtradas = await soloParticipantes([...porId.values()]);
+  const todas = filtradas.map((original) => {
+    const reunion = comoVigente(original, ahora, original.grupo.estado === "activo");
+    return { ...sinSala(reunion), estado: estadoReunion(reunion, ahora) };
+  });
 
   const proximas = todas.filter((r) => r.estado === "programada").sort((a, b) => a.inicio.getTime() - b.inicio.getTime());
   const enCurso = todas.filter((r) => salaAbierta(r.estado)).sort((a, b) => a.inicio.getTime() - b.inicio.getTime());
@@ -195,7 +214,7 @@ export async function crearReunion(idUsuario: number, idGrupo: number, datos: z.
 
   const inicio = new Date(`${datos.fecha}T${datos.horaInicio}:00-05:00`);
   const fin = new Date(`${datos.fecha}T${datos.horaFin}:00-05:00`);
-  if (fin <= new Date()) throw new ErrorDeNegocio("La reunión ya habría terminado: elige una fecha futura");
+  if (inicio <= new Date()) throw new ErrorDeNegocio("La reunión debe empezar en el futuro: elige una fecha y hora posteriores");
 
   const participantes = await participantesDe(idGrupo);
 
@@ -270,11 +289,11 @@ export async function reunirseAhora(
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(4247, ${idGrupo})`;
 
     const ahora = new Date();
-    const existente = await tx.reunion.findFirst({
+    // Incluye las cerradas solas por sala vacia que aun se pueden reabrir: se entra a esa, no se crea otra.
+    const candidatas = await tx.reunion.findMany({
       where: {
         idGrupo,
         videollamada: true,
-        finalizadaEn: null,
         inicio: { lte: new Date(ahora.getTime() + APERTURA_MIN * MS_MIN) },
         fin: { gt: new Date(ahora.getTime() - CIERRE_MIN * MS_MIN) },
       },
@@ -289,13 +308,14 @@ export async function reunirseAhora(
       },
       orderBy: { inicio: "desc" },
     });
+    const existente = candidatas.find((r) => !r.finalizadaEn || puedeReabrirse(r, ahora));
     if (existente) {
       const quien = existente.asistentes[0]?.usuario ?? existente.creador;
       return { idReunion: existente.idReunion, yaExistia: true, iniciador: nombreDe(quien) };
     }
 
-    const inicio = new Date(Math.floor(ahora.getTime() / MS_MIN) * MS_MIN);
-    const fin = new Date(inicio.getTime() + DURACION_INMEDIATA_MIN * MS_MIN);
+    // 1 h, recortada a 23:59 (Lima) para no cruzar la medianoche.
+    const { inicio, fin } = rangoReunirseAhora(ahora);
     const creada = await tx.reunion.create({
       data: {
         idGrupo,
@@ -330,13 +350,29 @@ async function avisarParticipantes(
  * la marca como iniciada y avisa al resto. Devuelve el grupo para revalidar.
  */
 export async function registrarEntrada(idUsuario: number, idReunion: number) {
-  const reunion = await prisma.reunion.findUnique({ where: { idReunion }, include: { grupo: { select: { nombre: true } } } });
+  const reunion = await prisma.reunion.findUnique({ where: { idReunion }, include: { grupo: { select: { nombre: true, estado: true } } } });
   if (!reunion) throw new ErrorDeNegocio("Esa reunión ya no existe");
   await requerirParticipante(idUsuario, reunion.idGrupo);
   if (!reunion.videollamada) throw new ErrorDeNegocio("Esta reunión no tiene videollamada");
-  if (!salaAbierta(estadoReunion(reunion, new Date()))) throw new ErrorDeNegocio("La sala no está abierta");
+  // Un grupo finalizado es de solo lectura: no se entrega token.
+  if (reunion.grupo.estado !== "activo") throw new ErrorDeNegocio("El grupo está finalizado");
 
   const entrada = new Date();
+  // Cerrada sola por sala vacia y aun dentro de la ventana: se reabre (como Meet o Zoom).
+  let reabierta = false;
+  if (puedeReabrirse(reunion, entrada)) {
+    const { apertura, cierre } = ventanaSala(reunion.inicio, reunion.fin);
+    const sala = await proveedorVideo.crearSala({ nombre: reunion.salaUrl ?? nombreSala(idReunion), abre: apertura, cierra: cierre });
+    const { count } = await prisma.reunion.updateMany({
+      // Condicion atomica: solo una llamada la reabre; si un moderador la finalizo entre tanto, no.
+      where: { idReunion, finalizadaEn: reunion.finalizadaEn, idFinalizador: null },
+      data: { finalizadaEn: null, salaUrl: sala, iniciadaEn: entrada },
+    });
+    reabierta = count === 1;
+  } else if (!salaAbierta(estadoReunion(reunion, entrada))) {
+    throw new ErrorDeNegocio("La sala no está abierta");
+  }
+
   // Primero se asegura la fila (sin tocar fechaEntrada) y luego se fija solo si aun es null.
   await prisma.reunionAsistente.upsert({
     where: { idReunion_idUsuario: { idReunion, idUsuario } },
@@ -353,7 +389,13 @@ export async function registrarEntrada(idUsuario: number, idReunion: number) {
     where: { idReunion, iniciadaEn: null },
     data: { iniciadaEn: entrada },
   });
-  if (count === 1) {
+  // Criterio idempotente: tras reabrir se avisa siempre (hubo un "terminó" en medio); si no, solo
+  // cuando nunca se envio un aviso de inicio para esta reunion (iniciadaEn pudo limpiarse antes de la hora).
+  const yaAvisada =
+    !reabierta && count === 1
+      ? (await prisma.notificacion.count({ where: { tipo: "reunion_iniciada", enlace: `/reuniones/${idReunion}` } })) > 0
+      : false;
+  if ((reabierta || count === 1) && !yaAvisada) {
     const persona = await prisma.usuario.findUnique({
       where: { idUsuario },
       select: { nombre: true, apellidos: true },
@@ -391,7 +433,7 @@ export async function datosDeSala(idUsuario: number, idReunion: number): Promise
   const reunion = await prisma.reunion.findUnique({
     where: { idReunion },
     include: {
-      grupo: { select: { nombre: true } },
+      grupo: { select: { nombre: true, estado: true } },
       asistentes: { where: { idUsuario }, select: { fechaEntrada: true } },
     },
   });
@@ -401,7 +443,7 @@ export async function datosDeSala(idUsuario: number, idReunion: number): Promise
   if (!integrante || integrante.rol === "observador") return null;
 
   const estado = estadoReunion(reunion, new Date());
-  if (!salaAbierta(estado)) return { tipo: "cerrada", estado };
+  if (!salaAbierta(estado) || reunion.grupo.estado !== "activo") return { tipo: "cerrada", estado };
   if (!reunion.asistentes[0]?.fechaEntrada) return { tipo: "requiere_unirse", idReunion };
 
   const usuario = await prisma.usuario.findUnique({ where: { idUsuario }, select: { nombre: true, apellidos: true } });
@@ -431,8 +473,9 @@ async function marcarFinalizada(
   if (count !== 1) return false;
 
   if (reunion.iniciadaEn) {
+    const participantes = (await participantesDe(reunion.idGrupo)).map((p) => p.idUsuario);
     const entraron = await prisma.reunionAsistente.count({
-      where: { idReunion: reunion.idReunion, fechaEntrada: { not: null } },
+      where: { idReunion: reunion.idReunion, fechaEntrada: { not: null }, idUsuario: { in: participantes } },
     });
     const minutos = Math.max(1, Math.round((finalizadaEn.getTime() - reunion.iniciadaEn.getTime()) / MS_MIN));
     let finalizador: string | null = null;
@@ -461,6 +504,9 @@ export async function finalizarReunion(idUsuario: number, idReunion: number) {
   if (!esModerador(reunion, integrante)) {
     throw new ErrorDeNegocio("Solo el líder o quien creó la reunión puede finalizarla");
   }
+
+  if (!reunion.videollamada) throw new ErrorDeNegocio("Esta reunión no tiene videollamada");
+  if (!salaAbierta(estadoReunion(reunion, new Date()))) throw new ErrorDeNegocio("La sala no está abierta");
 
   const cerrada = await marcarFinalizada(reunion, new Date(), idUsuario);
   if (cerrada && reunion.salaUrl) {
@@ -506,6 +552,22 @@ export async function cerrarReunionesVencidas(idsGrupo: number[], idReunion?: nu
   await cerrarSalasVacias(idsGrupo, idReunion);
 }
 
+/** Sala confirmada vacia: antes del inicio solo se limpia `iniciadaEn`; despues, la reunion termina. */
+async function resolverSalaVacia(
+  reunion: Parameters<typeof marcarFinalizada>[0] & { inicio: Date; fin: Date; videollamada: boolean; finalizadaEn: Date | null; salaUrl: string | null },
+  ahora: Date,
+) {
+  const accion = accionSalaVacia(reunion, ahora);
+  if (accion === "limpiar_inicio") {
+    await prisma.reunion.updateMany({ where: { idReunion: reunion.idReunion, finalizadaEn: null }, data: { iniciadaEn: null } });
+    return;
+  }
+  if (accion !== "finalizar") return;
+  const cierre = ventanaSala(reunion.inicio, reunion.fin).cierre;
+  const cerrada = await marcarFinalizada(reunion, ahora < cierre ? ahora : cierre, null);
+  if (cerrada) await cerrarSalaSinFallar(reunion.salaUrl);
+}
+
 /**
  * Una reunion iniciada cuya sala quedo sin nadie (todos salieron, cerraron la pestana o perdieron
  * la conexion) deja de estar "en curso". Se detecta preguntando al proveedor, sin cron ni webhooks
@@ -537,9 +599,7 @@ async function cerrarSalasVacias(idsGrupo: number[], idReunion?: number) {
     const conectados = await proveedorVideo.participantesConectados(reunion.salaUrl);
     if (conectados !== 0) continue;
 
-    const cierre = ventanaSala(reunion.inicio, reunion.fin).cierre;
-    const cerrada = await marcarFinalizada(reunion, ahora < cierre ? ahora : cierre, null);
-    if (cerrada) await cerrarSalaSinFallar(reunion.salaUrl);
+    await resolverSalaVacia(reunion, ahora);
   }
 }
 
@@ -573,10 +633,7 @@ export async function registrarSalida(idUsuario: number, idReunion: number) {
     await esperar(1500);
     conectados = await proveedorVideo.participantesConectados(reunion.salaUrl);
   }
-  if (conectados === 0) {
-    const cerrada = await marcarFinalizada(reunion, new Date(), null);
-    if (cerrada) await cerrarSalaSinFallar(reunion.salaUrl);
-  }
+  if (conectados === 0) await resolverSalaVacia(reunion, new Date());
   return reunion.idGrupo;
 }
 
@@ -588,8 +645,7 @@ export async function responderReunion(
   const reunion = await prisma.reunion.findUnique({ where: { idReunion } });
   if (!reunion) throw new ErrorDeNegocio("Esa reunión ya no existe");
   await requerirParticipante(idUsuario, reunion.idGrupo);
-  if (reunion.iniciadaEn) throw new ErrorDeNegocio("La reunión ya empezó");
-  if (reunion.fin < new Date()) throw new ErrorDeNegocio("Esa reunión ya pasó");
+  if (estadoReunion(reunion, new Date()) === "terminada") throw new ErrorDeNegocio("Esa reunión ya terminó");
 
   // upsert: quien se unio al grupo despues de programarla tambien puede responder.
   await prisma.reunionAsistente.upsert({
@@ -651,11 +707,14 @@ export async function obtenerReunion(idUsuario: number, idReunion: number) {
   });
   if (!reunion) return null;
 
+  const ahora = new Date();
+  const [conParticipantes] = await soloParticipantes([reunion]);
+  const vigente = comoVigente(conParticipantes, ahora, reunion.grupo.estado === "activo");
   return {
-    reunion: sinSala(reunion),
+    reunion: sinSala(vigente),
     rol: integrante.rol,
-    moderador: esModerador(reunion, { rol: integrante.rol, idUsuario }),
-    estado: estadoReunion(reunion, new Date()),
+    moderador: esModerador(vigente, { rol: integrante.rol, idUsuario }),
+    estado: estadoReunion(vigente, ahora),
   };
 }
 
@@ -672,21 +731,22 @@ export async function reunionEnCursoDelGrupo(idUsuario: number, idGrupo: number)
     where: {
       idGrupo,
       videollamada: true,
-      finalizadaEn: null,
       inicio: { lte: new Date(ahora.getTime() + APERTURA_MIN * MS_MIN) },
       fin: { gt: new Date(ahora.getTime() - CIERRE_MIN * MS_MIN) },
     },
-    include: { grupo: { select: { nombre: true } } },
+    include: { grupo: { select: { nombre: true, estado: true } } },
     orderBy: { inicio: "desc" },
   });
-  const activa = candidatas.find((r) => salaAbierta(estadoReunion(r, ahora)));
+  // Las reabribles (cerradas solas por sala vacia) siguen ofreciendo "Unirse".
+  const vigentes = candidatas.map((r) => comoVigente(r, ahora, r.grupo.estado === "activo"));
+  const activa = vigentes.find((r) => salaAbierta(estadoReunion(r, ahora)));
   if (!activa) return null;
   return { ...sinSala(activa), estado: estadoReunion(activa, ahora), rol: integrante.rol };
 }
 
 /** Reuniones de mis grupos (donde participo) dentro de un rango, para el Calendario. */
 export async function reunionesDelUsuarioEntre(idUsuario: number, desde: Date, hasta: Date) {
-  return prisma.reunion.findMany({
+  const reuniones = await prisma.reunion.findMany({
     where: {
       inicio: { lt: hasta },
       fin: { gt: desde },
@@ -707,15 +767,25 @@ export async function reunionesDelUsuarioEntre(idUsuario: number, desde: Date, h
     },
     orderBy: { inicio: "asc" },
   });
+  return ocupadasHasta(reuniones, desde);
+}
+
+/** Recorta cada reunion a lo que realmente ocupo (cerrada antes de su fin) y descarta las que no ocuparon nada. */
+function ocupadasHasta<T extends { inicio: Date; fin: Date; finalizadaEn: Date | null }>(reuniones: T[], desde: Date): T[] {
+  return reuniones.flatMap((reunion) => {
+    const intervalo = intervaloOcupado(reunion);
+    return intervalo && intervalo.fin > desde ? [{ ...reunion, fin: intervalo.fin }] : [];
+  });
 }
 
 /** Reuniones puntuales del grupo para bloquear sus sugerencias de disponibilidad. */
 export async function reunionesDelGrupoEntre(idUsuario: number, idGrupo: number, desde: Date, hasta: Date) {
   await requerirParticipante(idUsuario, idGrupo);
   await cerrarReunionesVencidas([idGrupo]);
-  return prisma.reunion.findMany({
+  const reuniones = await prisma.reunion.findMany({
     where: { idGrupo, inicio: { lt: hasta }, fin: { gt: desde } },
-    select: { idReunion: true, titulo: true, inicio: true, fin: true, lugar: true },
+    select: { idReunion: true, titulo: true, inicio: true, fin: true, lugar: true, finalizadaEn: true },
     orderBy: { inicio: "asc" },
   });
+  return ocupadasHasta(reuniones, desde);
 }
