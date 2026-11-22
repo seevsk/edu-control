@@ -17,4 +17,9 @@ export interface ProveedorVideo {
   cerrarSala(sala: string): Promise<void>;
   /** Igual que cerrarSala (reunion cancelada). */
   borrarSala(sala: string): Promise<void>;
+  /**
+   * Cuantas personas estan conectadas ahora a la sala (0 si la sala ya no existe). `null` si el
+   * proveedor no puede saberlo: quien llama no debe decidir nada a partir de un `null`.
+   */
+  participantesConectados(sala: string): Promise<number | null>;
 }

@@ -6,6 +6,8 @@ export const APERTURA_MIN = 10;
 export const CIERRE_MIN = 15;
 export const AVISO_CIERRE_MIN = 5;
 export const DURACION_INMEDIATA_MIN = 60;
+/** Cuanto espera el cierre perezoso antes de dar por abandonada una sala vacia (alguien puede estar entrando). */
+export const GRACIA_SALA_VACIA_MIN = 5;
 
 const MS_MIN = 60_000;
 

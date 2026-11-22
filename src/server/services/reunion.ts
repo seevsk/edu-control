@@ -7,6 +7,7 @@ import {
   APERTURA_MIN,
   CIERRE_MIN,
   DURACION_INMEDIATA_MIN,
+  GRACIA_SALA_VACIA_MIN,
   estadoReunion,
   salaAbierta,
   ventanaSala,
@@ -261,6 +262,9 @@ export async function reunirseAhora(
 
   const participantes = await participantesDe(idGrupo);
 
+  // Si la reunion anterior quedo abandonada (sala vacia), se cierra y se crea una nueva.
+  await cerrarSalasVacias([idGrupo]);
+
   return transaccionConSala(async (tx, registrarSala) => {
     // Serializa por grupo: dos clics simultaneos no crean dos reuniones.
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(4247, ${idGrupo})`;
@@ -469,7 +473,20 @@ export async function finalizarReunion(idUsuario: number, idReunion: number) {
   return reunion.idGrupo;
 }
 
-/** Cierre perezoso (no hay cron): finaliza con la hora de cierre de la sala las que ya vencieron. */
+/** Cierra la sala en el proveedor sin fallar: si no se puede, vence sola. */
+async function cerrarSalaSinFallar(salaUrl: string | null) {
+  if (!salaUrl) return;
+  try {
+    await proveedorVideo.cerrarSala(salaUrl);
+  } catch {
+    console.error("[video] No se pudo cerrar la sala; vencera sola");
+  }
+}
+
+/**
+ * Cierre perezoso (no hay cron): finaliza con la hora de cierre de la sala las que ya vencieron y
+ * las que quedaron vacias (ver `cerrarSalasVacias`).
+ */
 export async function cerrarReunionesVencidas(idsGrupo: number[], idReunion?: number) {
   if (idsGrupo.length === 0) return;
   const vencidas = await prisma.reunion.findMany({
@@ -484,13 +501,45 @@ export async function cerrarReunionesVencidas(idsGrupo: number[], idReunion?: nu
   });
   for (const reunion of vencidas) {
     const cerrada = await marcarFinalizada(reunion, ventanaSala(reunion.inicio, reunion.fin).cierre, null);
-    if (cerrada && reunion.salaUrl) {
-      try {
-        await proveedorVideo.cerrarSala(reunion.salaUrl);
-      } catch {
-        console.error("[video] No se pudo cerrar la sala; vencera sola");
-      }
-    }
+    if (cerrada) await cerrarSalaSinFallar(reunion.salaUrl);
+  }
+  await cerrarSalasVacias(idsGrupo, idReunion);
+}
+
+/**
+ * Una reunion iniciada cuya sala quedo sin nadie (todos salieron, cerraron la pestana o perdieron
+ * la conexion) deja de estar "en curso". Se detecta preguntando al proveedor, sin cron ni webhooks
+ * (Render free se duerme). La gracia evita cerrar la sala que alguien esta abriendo en este momento.
+ */
+async function cerrarSalasVacias(idsGrupo: number[], idReunion?: number) {
+  if (idsGrupo.length === 0) return;
+  const ahora = new Date();
+  const limite = new Date(ahora.getTime() - GRACIA_SALA_VACIA_MIN * MS_MIN);
+  const candidatas = await prisma.reunion.findMany({
+    where: {
+      ...(idReunion === undefined ? {} : { idReunion }),
+      idGrupo: { in: idsGrupo },
+      videollamada: true,
+      finalizadaEn: null,
+      salaUrl: { not: null },
+      iniciadaEn: { not: null, lte: limite },
+    },
+    include: { grupo: { select: { nombre: true } }, asistentes: { select: { fechaEntrada: true } } },
+  });
+
+  for (const reunion of candidatas) {
+    // Las vencidas ya las cerro el cierre por horario.
+    if (!salaAbierta(estadoReunion(reunion, ahora))) continue;
+    const ultimaEntrada = Math.max(0, ...reunion.asistentes.map((a) => a.fechaEntrada?.getTime() ?? 0));
+    if (ultimaEntrada > limite.getTime()) continue;
+    if (!reunion.salaUrl) continue;
+
+    const conectados = await proveedorVideo.participantesConectados(reunion.salaUrl);
+    if (conectados !== 0) continue;
+
+    const cierre = ventanaSala(reunion.inicio, reunion.fin).cierre;
+    const cerrada = await marcarFinalizada(reunion, ahora < cierre ? ahora : cierre, null);
+    if (cerrada) await cerrarSalaSinFallar(reunion.salaUrl);
   }
 }
 
@@ -500,6 +549,34 @@ export async function cerrarSiVencio(idUsuario: number, idReunion: number) {
   if (!reunion) throw new ErrorDeNegocio("Esa reunión ya no existe");
   await requerirParticipante(idUsuario, reunion.idGrupo);
   await cerrarReunionesVencidas([reunion.idGrupo], idReunion);
+  return reunion.idGrupo;
+}
+
+const esperar = (ms: number) => new Promise<void>((resolver) => setTimeout(resolver, ms));
+
+/**
+ * La sala la llama cuando quien sale cree ser la ultima persona: si el proveedor confirma que ya
+ * no queda nadie, la reunion termina (sin esperar a que pase la gracia del cierre perezoso).
+ * Devuelve el grupo para revalidar. Nunca falla por un problema del proveedor.
+ */
+export async function registrarSalida(idUsuario: number, idReunion: number) {
+  const reunion = await prisma.reunion.findUnique({ where: { idReunion }, include: { grupo: { select: { nombre: true } } } });
+  if (!reunion) throw new ErrorDeNegocio("Esa reunión ya no existe");
+  await requerirParticipante(idUsuario, reunion.idGrupo);
+
+  const abierta = reunion.videollamada && reunion.salaUrl && reunion.iniciadaEn && !reunion.finalizadaEn && salaAbierta(estadoReunion(reunion, new Date()));
+  if (!abierta || !reunion.salaUrl) return reunion.idGrupo;
+
+  let conectados = await proveedorVideo.participantesConectados(reunion.salaUrl);
+  // El proveedor puede tardar un instante en registrar la salida de quien acaba de irse.
+  if (conectados !== null && conectados > 0) {
+    await esperar(1500);
+    conectados = await proveedorVideo.participantesConectados(reunion.salaUrl);
+  }
+  if (conectados === 0) {
+    const cerrada = await marcarFinalizada(reunion, new Date(), null);
+    if (cerrada) await cerrarSalaSinFallar(reunion.salaUrl);
+  }
   return reunion.idGrupo;
 }
 
@@ -586,6 +663,9 @@ export async function obtenerReunion(idUsuario: number, idReunion: number) {
 export async function reunionEnCursoDelGrupo(idUsuario: number, idGrupo: number) {
   const integrante = await integranteAceptado(idUsuario, idGrupo);
   if (!integrante) return null;
+
+  // Una sala que quedo vacia no debe seguir ofreciendo "Unirse".
+  await cerrarSalasVacias([idGrupo]);
 
   const ahora = new Date();
   const candidatas = await prisma.reunion.findMany({

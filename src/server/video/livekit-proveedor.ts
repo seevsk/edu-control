@@ -26,10 +26,16 @@ async function firmar(
   return jwt.setExpirationTime(Math.floor(opciones.hasta.getTime() / MS_SEG)).sign(new TextEncoder().encode(c.apiSecret));
 }
 
-/** Llama a RoomService (Twirp sobre HTTP). Devuelve el codigo HTTP; nunca registra secretos. */
-async function llamarRoomService(metodo: "CreateRoom" | "DeleteRoom", cuerpo: Record<string, unknown>) {
+/** Llama a RoomService (Twirp sobre HTTP). Devuelve el codigo HTTP y el cuerpo; nunca registra secretos. */
+async function llamarRoomServiceConCuerpo(
+  metodo: "CreateRoom" | "DeleteRoom" | "ListParticipants",
+  cuerpo: Record<string, unknown>,
+  sala?: string,
+) {
   const c = credenciales();
-  const token = await firmar(c, { video: { roomCreate: true } }, { hasta: new Date(Date.now() + 60 * MS_SEG) });
+  // roomAdmin + room permiten listar los participantes de esa sala; roomCreate crea y borra salas.
+  const permisos = sala ? { roomCreate: true, roomAdmin: true, room: sala } : { roomCreate: true };
+  const token = await firmar(c, { video: permisos }, { hasta: new Date(Date.now() + 60 * MS_SEG) });
   const host = c.url.replace(/^wss:\/\//, "https://");
   const respuesta = await fetch(`${host}/twirp/livekit.RoomService/${metodo}`, {
     method: "POST",
@@ -37,7 +43,12 @@ async function llamarRoomService(metodo: "CreateRoom" | "DeleteRoom", cuerpo: Re
     body: JSON.stringify(cuerpo),
     signal: AbortSignal.timeout(10_000),
   });
-  return respuesta.status;
+  const texto = await respuesta.text().catch(() => "");
+  return { estado: respuesta.status, texto };
+}
+
+async function llamarRoomService(metodo: "CreateRoom" | "DeleteRoom", cuerpo: Record<string, unknown>) {
+  return (await llamarRoomServiceConCuerpo(metodo, cuerpo)).estado;
 }
 
 async function cerrar(sala: string) {
@@ -98,5 +109,22 @@ export class LiveKitProveedor implements ProveedorVideo {
 
   borrarSala(sala: string) {
     return cerrar(sala);
+  }
+
+  async participantesConectados(sala: string): Promise<number | null> {
+    try {
+      const { estado, texto } = await llamarRoomServiceConCuerpo("ListParticipants", { room: sala }, sala);
+      // Twirp responde 404 (not_found) si la sala ya no existe: nadie esta conectado.
+      if (estado === 404) return 0;
+      if (estado !== 200) {
+        console.error(`[video] LiveKit ListParticipants respondio ${estado}`);
+        return null;
+      }
+      const datos = JSON.parse(texto) as { participants?: unknown[] };
+      return Array.isArray(datos.participants) ? datos.participants.length : 0;
+    } catch {
+      console.error("[video] LiveKit ListParticipants no respondio");
+      return null;
+    }
   }
 }
