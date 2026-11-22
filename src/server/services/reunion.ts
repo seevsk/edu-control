@@ -16,7 +16,7 @@ import {
   salaAbierta,
   ventanaSala,
 } from "@/lib/estado-reunion";
-import { crearNotificacion } from "@/server/notifications/crear-notificacion";
+import { notificarVarios, type DatosNotificacion } from "@/server/notifications/crear-notificacion";
 import { plantillasNotificacion } from "@/server/notifications/templates";
 import { proveedorVideo, type CredencialesSala } from "@/server/video";
 import type { crearReunionSchema } from "@/lib/validation/reunion";
@@ -255,15 +255,16 @@ export async function crearReunion(idUsuario: number, idGrupo: number, datos: z.
   const cuando = `${etiquetaFechaLarga(datos.fecha).toLowerCase()}, ${etiquetaMinutos(
     Number(datos.horaInicio.slice(0, 2)) * 60 + Number(datos.horaInicio.slice(3)),
   )}`;
-  for (const participante of participantes) {
-    if (participante.idUsuario === idUsuario) continue;
-    await crearNotificacion({
-      idUsuario: participante.idUsuario,
-      tipo: "reunion_programada",
-      idGrupo,
-      ...plantillasNotificacion.reunionProgramada(datos.titulo, grupo.nombre, idGrupo, reunion.idReunion, cuando),
-    });
-  }
+  await notificarVarios(
+    participantes
+      .filter((participante) => participante.idUsuario !== idUsuario)
+      .map((participante) => ({
+        idUsuario: participante.idUsuario,
+        tipo: "reunion_programada" as const,
+        idGrupo,
+        ...plantillasNotificacion.reunionProgramada(datos.titulo, grupo.nombre, idGrupo, reunion.idReunion, cuando),
+      })),
+  );
 
   return reunion;
 }
@@ -336,13 +337,12 @@ export async function reunirseAhora(
 async function avisarParticipantes(
   idGrupo: number,
   excluir: number | null,
-  crear: (idUsuario: number) => Parameters<typeof crearNotificacion>[0],
+  crear: (idUsuario: number) => DatosNotificacion,
 ) {
   const participantes = await participantesDe(idGrupo);
-  for (const participante of participantes) {
-    if (participante.idUsuario === excluir) continue;
-    await crearNotificacion(crear(participante.idUsuario));
-  }
+  await notificarVarios(
+    participantes.filter((participante) => participante.idUsuario !== excluir).map((participante) => crear(participante.idUsuario)),
+  );
 }
 
 /**

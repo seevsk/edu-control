@@ -6,6 +6,7 @@ import * as notificacionService from "@/server/services/notificacion";
 
 export async function marcarNotificacionLeidaAction(idNotificacion: number) {
   const sesion = await requerirSesion();
+  if (!Number.isInteger(idNotificacion) || idNotificacion <= 0) return;
   await notificacionService.marcarNotificacionLeida(sesion.idUsuario, idNotificacion);
   revalidatePath("/notificaciones");
 }
