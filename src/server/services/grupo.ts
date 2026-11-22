@@ -6,13 +6,14 @@ import { finDeDiaLimaAUtc } from "@/lib/dates";
 import { fechaEnZonaLimaISO } from "@/lib/calendario";
 import { ESTADOS_TAREA_ABIERTOS } from "@/lib/estado-tarea";
 import { nombreCorto } from "@/lib/nombres";
-import type { Prisma } from "../../../generated/prisma/client";
+import { Prisma } from "../../../generated/prisma/client";
 import { ejecutarCambioDeGrupo } from "./cambio-grupo";
 import type { crearGrupoSchema, actualizarGrupoSchema } from "@/lib/validation/grupo";
 import type { z } from "zod";
 
 const LIMITE_RESULTADOS_BUSQUEDA = 8;
 const MIN_CARACTERES_BUSQUEDA = 3;
+const MAX_PALABRAS_BUSQUEDA = 4;
 const LIMITE_INVITACIONES_POR_HORA = 20;
 
 export async function listarMisGrupos(idUsuario: number) {
@@ -171,31 +172,73 @@ export async function actualizarGrupo(
   });
 }
 
-/** No se muestran datos de disponibilidad: solo nombre, correo y a que otros grupos ya pertenece no se expone. */
-export async function buscarUsuarios(idUsuarioActual: number, consulta: string) {
+/** Minúsculas y sin tildes, igual que el translate() de la consulta SQL (sin extensión unaccent). */
+export function normalizarTextoBusqueda(texto: string) {
+  return texto.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
+
+/** Escapa los comodines de LIKE para que un % o _ escrito por la persona se busque como texto. */
+function escaparLike(texto: string) {
+  return texto.replace(/[\\%_]/g, "\\$&");
+}
+
+function sqlNormalizado(columna: Prisma.Sql) {
+  return Prisma.sql`translate(lower(coalesce(${columna}, '')), 'áéíóúüñÁÉÍÓÚÜÑ', 'aeiouunaeiouun')`;
+}
+
+type ResultadoBusqueda = {
+  idUsuario: number;
+  nombre: string;
+  apellidos: string | null;
+  correo: string;
+  fotoUrl: string | null;
+};
+
+/**
+ * Cada palabra (máximo 4) debe aparecer en nombre o apellidos, sin importar tildes ni mayúsculas.
+ * Los compañeros de grupo (ambos aceptados) van primero y el límite se aplica después de ordenar.
+ * No se muestran datos de disponibilidad.
+ */
+export async function buscarUsuarios(idUsuarioActual: number, consulta: string): Promise<ResultadoBusqueda[]> {
   const texto = consulta.trim();
   if (!texto) return [];
 
   const esCorreo = texto.includes("@");
   if (!esCorreo && texto.length < MIN_CARACTERES_BUSQUEDA) return [];
 
-  return prisma.usuario.findMany({
-    where: {
-      idUsuario: { not: idUsuarioActual },
-      eliminadoEn: null,
-      perfil: { visibleEnBusqueda: true },
-      ...(esCorreo
-        ? { correo: texto.toLowerCase() }
-        : {
-            OR: [
-              { nombre: { contains: texto, mode: "insensitive" } },
-              { apellidos: { contains: texto, mode: "insensitive" } },
-            ],
-          }),
-    },
-    select: { idUsuario: true, nombre: true, apellidos: true, correo: true, fotoUrl: true },
-    take: LIMITE_RESULTADOS_BUSQUEDA,
-  });
+  let condicion: Prisma.Sql;
+  if (esCorreo) {
+    condicion = Prisma.sql`u.correo = ${texto.toLowerCase()}`;
+  } else {
+    const palabras = normalizarTextoBusqueda(texto).split(/\s+/).filter(Boolean).slice(0, MAX_PALABRAS_BUSQUEDA);
+    if (palabras.length === 0) return [];
+    condicion = Prisma.join(
+      palabras.map((palabra) => {
+        const patron = `%${escaparLike(palabra)}%`;
+        return Prisma.sql`(${sqlNormalizado(Prisma.sql`u.nombre`)} LIKE ${patron} OR ${sqlNormalizado(Prisma.sql`u.apellidos`)} LIKE ${patron})`;
+      }),
+      " AND ",
+    );
+  }
+
+  return prisma.$queryRaw<ResultadoBusqueda[]>`
+    SELECT u.id_usuario AS "idUsuario", u.nombre, u.apellidos, u.correo, u.foto_url AS "fotoUrl"
+    FROM usuario u
+    JOIN perfil p ON p.id_usuario = u.id_usuario
+    WHERE u.id_usuario <> ${idUsuarioActual}
+      AND u.eliminado_en IS NULL
+      AND p.visible_en_busqueda = true
+      AND (${condicion})
+    ORDER BY EXISTS (
+        SELECT 1
+        FROM grupo_integrante otro
+        JOIN grupo_integrante yo ON yo.id_grupo = otro.id_grupo
+        WHERE otro.id_usuario = u.id_usuario AND otro.estado_invitacion = 'aceptada'
+          AND yo.id_usuario = ${idUsuarioActual} AND yo.estado_invitacion = 'aceptada'
+      ) DESC,
+      lower(u.nombre), lower(coalesce(u.apellidos, '')), u.id_usuario
+    LIMIT ${LIMITE_RESULTADOS_BUSQUEDA}
+  `;
 }
 
 /** Buscador general de personas: mismas reglas que buscarUsuarios, pero sin correo (perfil publico). */
@@ -233,8 +276,7 @@ export async function buscarPersonas(idUsuarioActual: number, consulta: string) 
       institucion: porUsuario.get(idUsuario)?.institucion ?? null,
       ciclo: porUsuario.get(idUsuario)?.ciclo ?? null,
       gruposEnComun: gruposEnComun.get(idUsuario) ?? 0,
-    }))
-    .sort((a, b) => Number(b.gruposEnComun > 0) - Number(a.gruposEnComun > 0));
+    }));
 }
 
 export async function invitarIntegrante(
