@@ -34,7 +34,7 @@ export function PanelLateral({
       >
         {movil ? <span className="mx-auto mt-2 h-[5px] w-9 shrink-0 rounded-full bg-input" aria-hidden /> : null}
         <SheetHeader className={cn("border-b px-5 py-4", movil && "pt-2")}>
-          <SheetTitle className="pr-8 text-base">{titulo}</SheetTitle>
+          <SheetTitle className="pr-8 text-base max-md:pr-12">{titulo}</SheetTitle>
           {descripcion ? <SheetDescription>{descripcion}</SheetDescription> : <SheetDescription className="sr-only">{titulo}</SheetDescription>}
         </SheetHeader>
         <div className="px-5 py-4">{children}</div>

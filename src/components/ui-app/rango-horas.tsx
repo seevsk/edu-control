@@ -80,7 +80,7 @@ function CampoHora({
           <button
             type="button"
             aria-label={`${titulo}: ${etiqueta(valor)}`}
-            className="flex h-9 w-full items-center gap-2 rounded-md border border-input bg-background px-3 text-sm tabular-nums shadow-xs transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring data-[state=open]:border-ring"
+            className="flex h-9 max-md:h-11 w-full items-center gap-2 rounded-md border border-input bg-background px-3 text-sm tabular-nums shadow-xs transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring data-[state=open]:border-ring"
           >
             <Clock className="size-3.5 text-subtle-foreground" aria-hidden />
             <span className="flex-1 text-left">{etiqueta(valor)}</span>
@@ -185,7 +185,7 @@ export function RangoHoras({
               aria-pressed={activa}
               onClick={() => setFin((inicio + minutos) % DIA)}
               className={cn(
-                "h-7 rounded-full border border-input px-2.5 text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-40",
+                "h-7 max-md:h-11 rounded-full border border-input px-2.5 max-md:px-3.5 text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-40",
                 activa && "border-foreground bg-foreground text-background hover:text-background",
               )}
             >

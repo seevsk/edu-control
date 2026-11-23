@@ -7,6 +7,7 @@ import { aOracion } from "@/lib/presentacion";
 import { cn } from "@/lib/utils";
 import { Migas } from "@/components/ui-app/barra-superior";
 import { Toast } from "@/components/toast";
+import { FilaDesplazable } from "@/components/ui-app/fila-desplazable";
 import { ACCION_MOVIL, ChipsFiltro, EncabezadoMovil, PaginaCompleta, VolverMovil } from "@/components/ui-app/page-header";
 import { Button } from "@/components/ui/button";
 import { EncabezadoSeccionReunion } from "@/components/ui-app/reuniones/encabezado-seccion";
@@ -123,7 +124,7 @@ export default async function ReunionesPage({
       {grupos.size > 1 ? (
         <>
           <ChipsFiltro etiqueta="Filtrar por grupo" opciones={opcionesFiltro} className="md:hidden" />
-          <nav aria-label="Filtrar por grupo" className="hidden gap-1 overflow-x-auto border-b px-5 py-2.5 md:flex lg:px-8">
+          <FilaDesplazable as="nav" aria-label="Filtrar por grupo" className="hidden border-b md:block" scrollerClassName="flex gap-1 px-5 py-2.5 lg:px-8">
             {opcionesFiltro.map((opcion) => (
               <Link
                 key={opcion.href}
@@ -137,7 +138,7 @@ export default async function ReunionesPage({
                 {opcion.texto}
               </Link>
             ))}
-          </nav>
+          </FilaDesplazable>
         </>
       ) : null}
 

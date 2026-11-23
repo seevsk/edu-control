@@ -36,7 +36,7 @@ export default async function EditarBloquePage({
   return (
     <div className="animate-page-in mx-auto flex max-w-2xl flex-col gap-5">
       <div>
-        <Link href={volverA} className="text-sm text-primary hover:underline">
+        <Link href={volverA} className="text-sm text-primary hover:underline max-md:-ml-2 max-md:flex max-md:min-h-11 max-md:w-fit max-md:items-center max-md:px-2">
           Calendario
         </Link>
         <h1 className="mt-1 text-xl font-semibold">Editar tiempo ocupado</h1>

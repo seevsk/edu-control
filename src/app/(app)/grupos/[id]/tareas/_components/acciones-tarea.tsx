@@ -130,7 +130,7 @@ export function AccionesTarea({
               <select
                 name="idAsignado"
                 defaultValue={tarea.idAsignado ?? ""}
-                className="max-w-full rounded-md border border-border-strong bg-surface px-2 py-1.5 text-sm"
+                className="max-w-full rounded-md border border-border-strong bg-surface px-2 py-1.5 text-sm max-md:min-h-11"
               >
                 <option value="">Sin asignar</option>
                 {asignables.map((integrante) => (

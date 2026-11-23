@@ -74,7 +74,7 @@ export default async function CursosPage({
       menu: (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="size-7" aria-label={`Más opciones de ${nombre}`}>
+            <Button variant="ghost" size="icon" className="size-7 max-md:size-11" aria-label={`Más opciones de ${nombre}`}>
               <MoreHorizontal aria-hidden />
             </Button>
           </DropdownMenuTrigger>

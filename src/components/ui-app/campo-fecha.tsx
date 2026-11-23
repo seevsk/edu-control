@@ -52,7 +52,7 @@ export function CampoFecha({
       <input type="hidden" name={name} value={valor} />
       <Popover open={abierto} onOpenChange={setAbierto}>
         <PopoverTrigger asChild>
-          <Button id={id} type="button" variant="outline" className="w-full justify-start font-normal">
+          <Button id={id} type="button" variant="outline" className="w-full justify-start font-normal max-md:h-11">
             <CalendarDays aria-hidden />
             {seleccionada ? fechaCorta(seleccionada) : <span className="text-subtle-foreground">{placeholder}</span>}
           </Button>

@@ -182,12 +182,12 @@ export default async function CursoDetallePage({
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" asChild>
+            <Button variant="outline" size="sm" className="max-md:h-11 max-md:px-3.5" asChild>
               <Link href={`${ruta}?editar=1`} scroll={false}><Pencil aria-hidden />Editar curso</Link>
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="size-8" aria-label="Más acciones del curso"><MoreHorizontal aria-hidden /></Button>
+                <Button variant="outline" size="icon" className="size-8 max-md:size-11" aria-label="Más acciones del curso"><MoreHorizontal aria-hidden /></Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <form action={alternarActivoCursoAction.bind(null, idCurso)}>
@@ -244,7 +244,7 @@ export default async function CursoDetallePage({
                           <span className="ml-2 text-subtle-foreground max-md:mt-0.5 max-md:ml-0 max-md:block max-md:text-[13px]">{duracionMinutos(minutos)}<span className="md:hidden"> · cada semana</span></span>
                         </span>
                         {modalidad ? <span className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground max-md:hidden">{curso.modalidad === "remoto" ? <Monitor className="size-3.5" aria-hidden /> : <Users className="size-3.5" aria-hidden />}{modalidad}</span> : null}
-                        <Button variant="ghost" size="sm" asChild>
+                        <Button variant="ghost" size="sm" className="max-md:h-11 max-md:px-3" asChild>
                           <Link href={`${ruta}?sesion=${horario.idHorario}`} scroll={false}>Editar sesión</Link>
                         </Button>
                       </li>
@@ -262,7 +262,7 @@ export default async function CursoDetallePage({
             <section>
               <div className="mb-2.5 flex items-center justify-between gap-3">
                 <h2 className="text-sm font-semibold">Evaluaciones</h2>
-                <Button variant="outline" size="sm" asChild>
+                <Button variant="outline" size="sm" className="max-md:h-11 max-md:px-3.5" asChild>
                   <Link href={`${ruta}?nuevaEvaluacion=1`} scroll={false}><Plus aria-hidden />Agregar evaluación</Link>
                 </Button>
               </div>

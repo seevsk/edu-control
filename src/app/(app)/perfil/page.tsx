@@ -66,7 +66,7 @@ export default async function PerfilPage({ searchParams }: { searchParams: Promi
               <span className="inline-flex items-center gap-1.5"><Clock className="size-3.5" aria-hidden />Miembro desde {mesAnio(usuario.fechaRegistro)}</span>
             </div>
           </div>
-          <Button variant="outline" size="sm" asChild>
+          <Button variant="outline" size="sm" className="max-md:h-11 max-md:px-3.5" asChild>
             <Link href="/perfil?editar=1" scroll={false}><Pencil aria-hidden />Editar perfil</Link>
           </Button>
         </section>

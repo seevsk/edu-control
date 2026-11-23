@@ -52,7 +52,7 @@ export default async function PerfilUsuarioPage({ params }: Props) {
   const tipo = TIPO_CUENTA[perfil.tipoCuenta];
   const resumen = [tipo, perfil.carrera, perfil.ciclo ? `${perfil.ciclo}.º ciclo` : null].filter(Boolean).join(" · ");
   const botonDisponibilidad = (
-    <Button size="sm" variant={usuario.puedeVerDisponibilidad ? "default" : "outline"} disabled={!usuario.puedeVerDisponibilidad} asChild={usuario.puedeVerDisponibilidad}>
+    <Button size="sm" className="max-md:h-11 max-md:px-3.5" variant={usuario.puedeVerDisponibilidad ? "default" : "outline"} disabled={!usuario.puedeVerDisponibilidad} asChild={usuario.puedeVerDisponibilidad}>
       {usuario.puedeVerDisponibilidad ? (
         <Link href={`/usuarios/${idUsuario}/disponibilidad`}><CalendarDays aria-hidden />Ver disponibilidad</Link>
       ) : (
