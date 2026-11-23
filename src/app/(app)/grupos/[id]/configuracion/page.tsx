@@ -71,7 +71,6 @@ export default async function ConfiguracionGrupoPage({
           <label className={CAMPO}>
             Estado
             <CampoSelect name="estado" defaultValue={estadoEscrito} opciones={[{ valor: "activo", texto: "Activo" }, { valor: "finalizado", texto: "Finalizado (solo lectura, no se puede revertir)" }]} />
-            <span className="text-xs font-normal text-subtle-foreground">Para finalizarlo, todas las tareas deben estar completadas o descartadas.</span>
           </label>
           <SubmitButton className="h-9 w-fit rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90">
             Guardar cambios

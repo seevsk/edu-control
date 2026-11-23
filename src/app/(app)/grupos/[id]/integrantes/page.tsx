@@ -76,7 +76,6 @@ export default async function IntegrantesGrupoPage({
       <section aria-labelledby="titulo-integrantes">
         <div className="flex items-baseline justify-between gap-3">
           <h2 id="titulo-integrantes" className="text-[13px] font-medium">Aporte de cada integrante</h2>
-          <p className="text-xs text-subtle-foreground">Sin ranking: carga y cumplimiento se leen juntos</p>
         </div>
         <div className="mt-3 overflow-x-auto rounded-lg border">
           <table className="w-full text-[13px] max-md:block">
@@ -222,7 +221,6 @@ export default async function IntegrantesGrupoPage({
               Correos de actividad {integranteActual.correoActividad ? "activados" : "desactivados"}.
             </p>
           )}
-          <p className="mt-2 text-xs text-subtle-foreground">Invitaciones, asignaciones, devoluciones y reuniones siempre llegan.</p>
         </section>
       ) : null}
 
