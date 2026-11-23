@@ -263,7 +263,7 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
           ) : (
             <p className="text-[13px] text-subtle-foreground">Tus clases, evaluaciones, entregas y reuniones de los próximos 7 días aparecerán aquí.</p>
           )}
-          <Link href="/calendario" className="mt-3.5 inline-block text-[13px] text-muted-foreground hover:text-foreground">Abrir calendario</Link>
+          <Link href="/calendario" className="mt-3.5 inline-block text-[13px] text-muted-foreground hover:text-foreground max-md:flex max-md:min-h-11 max-md:w-fit max-md:items-center">Abrir calendario</Link>
         </aside>
       </div>
     </PaginaCompleta>

@@ -62,7 +62,7 @@ export function EliminarCuenta() {
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
+        <Button variant="outline" size="sm" className="text-destructive hover:text-destructive max-md:h-11 max-md:px-3.5">
           <Trash2 aria-hidden />
           Eliminar cuenta…
         </Button>

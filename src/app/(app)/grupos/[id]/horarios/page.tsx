@@ -220,7 +220,7 @@ export default async function HorariosGrupoPage({
                   {persona.idUsuario === sesion.idUsuario ? <span className="text-subtle-foreground"> (tú)</span> : null}
                 </span>
                 {persona.idUsuario !== sesion.idUsuario ? (
-                  <Link href={`/usuarios/${persona.idUsuario}/disponibilidad`} className="shrink-0 text-xs text-muted-foreground hover:text-foreground">
+                  <Link href={`/usuarios/${persona.idUsuario}/disponibilidad`} className="flex shrink-0 text-xs text-muted-foreground hover:text-foreground max-md:min-h-11 max-md:items-center max-md:px-2">
                     Ver su horario
                   </Link>
                 ) : null}

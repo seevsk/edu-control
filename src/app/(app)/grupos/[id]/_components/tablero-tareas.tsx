@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useOptimistic, useRef, useState, useTransition } from "react";
+import { useId, useOptimistic, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Paperclip, Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -21,6 +21,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
 import { accionesDisponiblesTarea, ESTADOS_TAREA_ORDEN, ETIQUETA_ESTADO_TAREA, type EstadoTarea } from "@/lib/estado-tarea";
+import { FilaDesplazable } from "@/components/ui-app/fila-desplazable";
 import { StatusIcon } from "@/components/ui-app/status-icon";
 import { DueChip, EtiquetaAtraso } from "@/components/ui-app/due-chip";
 import { UserAvatar } from "@/components/ui-app/user-avatar";
@@ -140,10 +141,9 @@ export function TableroTareas({
   const [actuales, moverOptimista] = useOptimistic(filas, (previas, { idTarea, estado }: { idTarea: number; estado: EstadoTarea }) =>
     previas.map((fila) => (fila.idTarea === idTarea ? { ...fila, estado } : fila)),
   );
-  const carril = useRef<HTMLDivElement>(null);
   const [columnaVisible, setColumnaVisible] = useState(0);
   function irAColumna(indice: number) {
-    const contenedor = carril.current;
+    const contenedor = document.getElementById("carril-tablero");
     const columna = contenedor?.querySelectorAll<HTMLElement>("[id^=columna-]")[indice];
     if (contenedor && columna) contenedor.scrollTo({ left: columna.offsetLeft - contenedor.offsetLeft - 16, behavior: "smooth" });
   }
@@ -224,7 +224,7 @@ export function TableroTareas({
       onDragCancel={() => setArrastrando(null)}
       onDragEnd={alSoltar}
     >
-      <div className="flex gap-2 overflow-x-auto px-4 pt-3 [scrollbar-width:none] md:hidden" role="tablist" aria-label="Columnas del tablero">
+      <FilaDesplazable className="md:hidden" scrollerClassName="flex gap-2 px-4 pt-3" role="tablist" aria-label="Columnas del tablero">
         {ESTADOS_TAREA_ORDEN.map((estado, indice) => (
           <button
             key={estado}
@@ -242,15 +242,17 @@ export function TableroTareas({
             <span className="text-subtle-foreground">{actuales.filter((fila) => fila.estado === estado && !ocultas.includes(fila)).length}</span>
           </button>
         ))}
-      </div>
-      <div
-        ref={carril}
+      </FilaDesplazable>
+      <FilaDesplazable
+        id="carril-tablero"
+        centrarActivo={false}
+        fadeClassName="max-md:hidden"
         onScroll={(evento) => {
           const contenedor = evento.currentTarget;
           const ancho = contenedor.querySelector<HTMLElement>("[id^=columna-]")?.offsetWidth ?? 1;
           setColumnaVisible(Math.min(3, Math.round(contenedor.scrollLeft / (ancho + 12))));
         }}
-        className="snap-x snap-mandatory overflow-x-auto scroll-px-4 px-4 py-4 [scrollbar-width:none] sm:px-6 md:snap-none"
+        scrollerClassName="snap-x snap-mandatory scroll-px-4 px-4 py-4 sm:px-6 md:snap-none"
       >
         <div className="grid grid-cols-[repeat(4,calc(100vw-3rem))] gap-3 md:grid-cols-[repeat(4,minmax(240px,1fr))] md:gap-4">
           {ESTADOS_TAREA_ORDEN.map((estado) => {
@@ -272,7 +274,7 @@ export function TableroTareas({
                   </p>
                 ) : null}
                 {estado === "completada" && ocultas.length > 0 ? (
-                  <Link href={hrefAnteriores} className="px-1 text-xs text-muted-foreground hover:text-foreground">
+                  <Link href={hrefAnteriores} className="px-1 text-xs text-muted-foreground hover:text-foreground max-md:flex max-md:min-h-11 max-md:items-center">
                     Ver {ocultas.length} completadas hace más de {DIAS_COMPLETADAS_EN_TABLERO} días
                   </Link>
                 ) : null}
@@ -280,7 +282,7 @@ export function TableroTareas({
             );
           })}
         </div>
-      </div>
+      </FilaDesplazable>
       <DragOverlay>
         {filaArrastrada ? (
           <article className="flex rotate-1 flex-col gap-2.5 rounded-lg border bg-card p-3 text-card-foreground shadow-lg">

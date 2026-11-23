@@ -2,7 +2,7 @@ import { DIAS_CORTOS, DIAS_LARGOS } from "@/lib/calendario";
 import { RangoHoras } from "@/components/ui-app/rango-horas";
 
 const OPCION_DIA =
-  "flex min-w-12 cursor-pointer select-none items-center justify-center rounded-md border border-border-strong bg-surface px-2.5 py-1.5 text-sm transition-colors duration-150 hover:bg-bg has-[:checked]:border-primary has-[:checked]:bg-primary-soft has-[:checked]:font-medium has-[:checked]:text-primary has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-primary";
+  "flex min-w-12 cursor-pointer select-none items-center justify-center rounded-md border border-border-strong bg-surface px-2.5 py-1.5 text-sm transition-colors duration-150 max-md:min-h-11 hover:bg-bg has-[:checked]:border-primary has-[:checked]:bg-primary-soft has-[:checked]:font-medium has-[:checked]:text-primary has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-primary";
 
 /** Días (chips) + franja horaria. Envía `dias`/`diaSemana`, `horaInicio`, `horaFin` y, si aplica, `excepcional`. */
 export function SelectorHorarioSemanal({

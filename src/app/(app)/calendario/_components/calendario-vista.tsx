@@ -38,6 +38,7 @@ import { duracionMinutos, formatoHora, rangoHoras } from "@/lib/formato-fecha";
 import { cn } from "@/lib/utils";
 import type { EventoCalendario } from "./eventos";
 import { FILTROS_FECHAS, FILTROS_HORARIO, type DatoEvento, type FiltroCalendario, type IconoLinea, type ModoCalendario } from "./tipos-calendario";
+import { FilaDesplazable } from "@/components/ui-app/fila-desplazable";
 import { PuntoEnCurso } from "@/components/ui-app/reuniones/punto-en-curso";
 import { NuevoTiempoOcupado, type BorradorTiempo } from "./nuevo-tiempo-ocupado";
 import { CalendarioMovil } from "./calendario-movil";
@@ -246,7 +247,7 @@ export function CalendarioVista({
       {panelVisible ? <div className="contents max-lg:hidden"><Lateral hoyISO={hoyISO} minutos={minutos} ocultos={ocultos} setOcultos={setOcultos} soloLectura={soloLectura} /></div> : null}
       <div className="flex min-w-0 flex-[999_1_640px] flex-col">
         <BarraCalendario fecha={fecha} panelVisible={panelVisible} onAlternarPanel={() => setPanelVisible((visible) => !visible)} soloLectura={soloLectura} />
-        <div role="group" aria-label="Filtros" className="-mt-1 mb-3 flex gap-1.5 overflow-x-auto [scrollbar-width:none] lg:hidden">
+        <FilaDesplazable role="group" aria-label="Filtros" className="-mt-1 mb-3 lg:hidden" scrollerClassName="flex gap-1.5">
           {filtrosChips.map((filtro) => {
             const activo = !ocultos.includes(filtro.clave);
             return (
@@ -265,7 +266,7 @@ export function CalendarioVista({
               </button>
             );
           })}
-        </div>
+        </FilaDesplazable>
         <div className="overflow-hidden rounded-[10px] border bg-background">
           <EventCalendarContent />
         </div>

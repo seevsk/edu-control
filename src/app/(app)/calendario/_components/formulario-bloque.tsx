@@ -26,8 +26,8 @@ const TIPOS: { valor: Tipo; label: string; punto: string; marcado: string }[] = 
 ];
 
 const OPCION =
-  "flex cursor-pointer select-none items-center gap-2 rounded-md border border-border-strong bg-surface px-3 py-1.5 text-sm transition-colors duration-150 hover:bg-bg has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-primary";
-const CAMPO = "rounded-md border border-border-strong bg-surface px-3 py-1.5 text-sm font-normal";
+  "flex cursor-pointer select-none items-center gap-2 rounded-md border border-border-strong bg-surface px-3 py-1.5 text-sm transition-colors duration-150 max-md:min-h-11 hover:bg-bg has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-primary";
+const CAMPO = "rounded-md border border-border-strong bg-surface px-3 py-1.5 text-sm font-normal max-md:min-h-11";
 
 export type ValoresBloque = {
   tipo: Tipo;
@@ -98,12 +98,12 @@ export function FormularioBloque({
       </label>
 
       <div className="flex items-center gap-2 border-t border-border pt-5">
-        <SubmitButton className="justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover">
+        <SubmitButton className="justify-center rounded-md bg-primary px-4 py-2 text-sm max-md:min-h-11 font-medium text-primary-foreground hover:bg-primary-hover">
           {modo === "crear" ? "Agregar tiempo ocupado" : "Guardar cambios"}
         </SubmitButton>
         <Link
           href={volverA}
-          className="rounded-md border border-border-strong bg-surface px-4 py-2 text-sm font-medium transition-colors duration-150 hover:bg-bg"
+          className="flex items-center rounded-md border border-border-strong bg-surface px-4 py-2 text-sm font-medium transition-colors max-md:min-h-11 duration-150 hover:bg-bg"
         >
           Cancelar
         </Link>

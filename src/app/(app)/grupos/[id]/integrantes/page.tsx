@@ -243,7 +243,7 @@ export default async function IntegrantesGrupoPage({
               {esLider ? (
                 <label className="flex items-center gap-2 text-[13px]">
                   <span className="sr-only">Nuevo líder</span>
-                  <select name="nuevoLider" required defaultValue="" className="h-8 rounded-md border border-input bg-background px-2 text-[13px]">
+                  <select name="nuevoLider" required defaultValue="" className="h-8 rounded-md border border-input bg-background px-2 text-[13px] max-md:h-11">
                     <option value="" disabled>Nuevo líder…</option>
                     {candidatosLider.map((candidato) => (
                       <option key={candidato.idUsuario} value={candidato.idUsuario}>

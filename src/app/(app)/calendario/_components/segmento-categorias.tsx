@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CATEGORIAS_CALENDARIO, formatearDuracion, type CategoriaCalendario } from "@/lib/calendario";
+import { FilaDesplazable } from "@/components/ui-app/fila-desplazable";
 import { ESTILO_CATEGORIA } from "./items";
 
 export type VistaCalendario = CategoriaCalendario | "todo";
@@ -18,7 +19,7 @@ export function SegmentoCategorias({
   const opciones: { key: VistaCalendario; label: string }[] = [{ key: "todo", label: "Todo" }, ...CATEGORIAS_CALENDARIO];
 
   return (
-    <nav aria-label="Filtrar por categoría" className="max-w-full overflow-x-auto">
+    <FilaDesplazable as="nav" aria-label="Filtrar por categoría" className="max-w-full">
       <div className="flex w-max divide-x divide-border-strong overflow-hidden rounded-md border border-border-strong bg-surface text-sm">
         {opciones.map((opcion) => {
           const activo = opcion.key === activa;
@@ -48,6 +49,6 @@ export function SegmentoCategorias({
           );
         })}
       </div>
-    </nav>
+    </FilaDesplazable>
   );
 }

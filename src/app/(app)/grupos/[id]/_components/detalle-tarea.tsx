@@ -138,7 +138,7 @@ export function DetalleTarea({
           peso {tarea.peso}
         </span>
         {puedeEditar ? (
-          <Button variant="outline" size="sm" className="ml-auto h-7" asChild>
+          <Button variant="outline" size="sm" className="ml-auto h-7 max-md:h-11 max-md:px-3.5" asChild>
             <Link href={`${hrefBase}&editar=1`} scroll={false}>
               <Pencil aria-hidden />
               Editar
