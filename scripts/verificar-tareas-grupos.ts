@@ -730,7 +730,7 @@ async function verificar() {
       await tareaService.crearTarea(ana, grupo, { titulo: "Cierre", peso: 1, idAsignado: String(ana), fechaLimite: fechaLimitePrueba });
       await assert.rejects(grupoService.actualizarGrupo(ana, grupo, { ...base, fechaLimite: "2100-01-01" }), ErrorDeNegocio);
       await assert.rejects(grupoService.actualizarGrupo(lider, grupo, { ...base, fechaLimite: "2020-01-01" }), /pasado/);
-      await assert.rejects(grupoService.actualizarGrupo(lider, grupo, { ...base, fechaLimite: "2099-06-01" }), /Hay 1 tarea con fecha posterior/);
+      await assert.rejects(grupoService.actualizarGrupo(lider, grupo, { ...base, fechaLimite: "2099-06-01" }), /No puedes cerrar el grupo el .+: la tarea ".+" vence el .+\. Elige el .+ o una fecha posterior/);
       assert.equal((await db!.grupo.findUniqueOrThrow({ where: { idGrupo: grupo } })).fechaLimite, null);
       await grupoService.actualizarGrupo(lider, grupo, { ...base, fechaLimite: "2099-12-30" });
       const guardada = (await db!.grupo.findUniqueOrThrow({ where: { idGrupo: grupo } })).fechaLimite;

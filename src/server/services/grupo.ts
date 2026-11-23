@@ -121,6 +121,22 @@ export async function crearGrupo(idUsuario: number, datos: z.infer<typeof crearG
   });
 }
 
+/**
+ * Explica por qué no se puede adelantar la fecha del grupo: qué tareas quedan fuera, cuál es la
+ * fecha mínima posible y qué hacer. `tareas` viene ordenada de la más tardía a la más temprana.
+ */
+function mensajeTareasPosteriores(nueva: Date, tareas: { titulo: string; fechaLimite: Date | null }[]) {
+  // Se filtraron con `fechaLimite > nueva`, así que siempre tienen fecha.
+  const minima = fechaCorta(tareas[0].fechaLimite ?? nueva);
+  const dia = fechaCorta(nueva);
+  if (tareas.length === 1) {
+    return `No puedes cerrar el grupo el ${dia}: la tarea "${tareas[0].titulo}" vence el ${minima}. Elige el ${minima} o una fecha posterior, o cambia la fecha de esa tarea.`;
+  }
+  const nombres = tareas.slice(0, 2).map((tarea) => `"${tarea.titulo}"`).join(", ");
+  const resto = tareas.length > 2 ? ` y ${tareas.length - 2} más` : "";
+  return `No puedes cerrar el grupo el ${dia}: ${tareas.length} tareas vencen después (${nombres}${resto}); la última, el ${minima}. Elige el ${minima} o una fecha posterior, o cambia la fecha de esas tareas.`;
+}
+
 export async function actualizarGrupo(
   idUsuario: number,
   idGrupo: number,
@@ -151,16 +167,13 @@ export async function actualizarGrupo(
       // Si el día no cambia no se vuelve a validar: se pueden guardar otros campos con una fecha ya vencida.
       if (!grupo.fechaLimite || fechaEnZonaLimaISO(grupo.fechaLimite) !== datos.fechaLimite) {
         if (nueva < new Date()) throw new ErrorDeNegocio("La fecha límite del grupo no puede estar en el pasado");
-        const posteriores = await tx.tarea.aggregate({
+        const posteriores = await tx.tarea.findMany({
           where: { idGrupo, estado: { in: [...ESTADOS_TAREA_ABIERTOS] }, fechaLimite: { gt: nueva } },
-          _count: true,
-          _max: { fechaLimite: true },
+          select: { titulo: true, fechaLimite: true },
+          orderBy: { fechaLimite: "desc" },
         });
-        if (posteriores._count > 0) {
-          const masTardia = posteriores._max.fechaLimite;
-          throw new ErrorDeNegocio(
-            `Hay ${posteriores._count} ${posteriores._count === 1 ? "tarea" : "tareas"} con fecha posterior${masTardia ? ` (${fechaCorta(masTardia)})` : ""}`,
-          );
+        if (posteriores.length > 0) {
+          throw new ErrorDeNegocio(mensajeTareasPosteriores(nueva, posteriores));
         }
         fechaLimite = nueva;
       }
