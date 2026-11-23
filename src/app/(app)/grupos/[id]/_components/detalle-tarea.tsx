@@ -19,6 +19,7 @@ import { EntregasTarea } from "../tareas/_components/entregas-tarea";
 import { FormularioEntrega } from "../tareas/_components/formulario-entrega";
 import { RegistrarVista } from "../tareas/_components/registrar-vista";
 import { editarTareaAction } from "../tareas/actions";
+import type { FiltrosTarea } from "@/lib/validation/tarea";
 import type { obtenerGrupoDelUsuario } from "@/server/services/grupo";
 import type { obtenerTareaDelGrupo } from "@/server/services/tarea";
 
@@ -36,6 +37,7 @@ export function DetalleTarea({
   editar,
   entregar,
   error,
+  filtros,
 }: {
   datos: DatosGrupo;
   tarea: Tarea;
@@ -47,6 +49,8 @@ export function DetalleTarea({
   /** Abre el formulario de envío a revisión (solo lo ve el responsable de una tarea en progreso). */
   entregar?: boolean;
   error?: string;
+  /** Vista y filtros activos, para conservarlos al volver de una acción. */
+  filtros?: FiltrosTarea;
 }) {
   const { grupo, rolActual } = datos;
   const idGrupo = grupo.idGrupo;
@@ -76,7 +80,7 @@ export function DetalleTarea({
     return (
       <>
         {errorVisible}
-        <form action={editarTareaAction.bind(null, idGrupo, tarea.idTarea)} className="flex flex-col gap-4">
+        <form action={editarTareaAction.bind(null, idGrupo, tarea.idTarea, filtros ?? {})} className="flex flex-col gap-4">
           <label className={CAMPO}>
             Título
             <Input name="titulo" required maxLength={160} defaultValue={tarea.titulo} />
@@ -154,7 +158,7 @@ export function DetalleTarea({
       </div>
 
       {puedeGestionar ? (
-        <AccionesTarea idGrupo={idGrupo} tarea={tarea} idUsuario={idUsuario} rol={rolActual} asignables={asignables} destino="detalle" titulo="Siguiente acción" />
+        <AccionesTarea idGrupo={idGrupo} tarea={tarea} idUsuario={idUsuario} rol={rolActual} asignables={asignables} destino="detalle" filtros={filtros} titulo="Siguiente acción" />
       ) : null}
 
       <EntregasTarea tarea={tarea} puedeEntregar={puedeEntregar} hrefEntregar={puedeEntregar ? `${hrefBase}&entregar=1` : null} />

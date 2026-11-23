@@ -25,6 +25,7 @@ function leerFormData(formData: FormData) {
 /** Vuelve directo a la vista actual (/grupos/[id], con el detalle en ?tarea=), sin pasar por las rutas antiguas. */
 function rutaTarea(idGrupo: number, idTarea: number, destino: DestinoTarea, filtros: FiltrosTarea = {}) {
   const parametros = new URLSearchParams();
+  if (filtros.vista === "tablero") parametros.set("vista", "tablero");
   if (destino === "detalle") parametros.set("tarea", String(idTarea));
   if (filtros.estado) parametros.set("estado", filtros.estado);
   if (filtros.asignado) parametros.set("asignado", String(filtros.asignado));
@@ -49,24 +50,24 @@ function revalidarTarea(idGrupo: number) {
   revalidatePath("/");
 }
 
-export async function crearTareaAction(idGrupo: number, formData: FormData) {
+export async function crearTareaAction(idGrupo: number, filtros: FiltrosTarea, formData: FormData) {
   const sesion = await requerirSesion();
   const grupoId = idRegistroSchema.safeParse(idGrupo);
   if (!grupoId.success) redirect("/grupos");
+  const filtrosValidados = filtrosTareaSchema.safeParse(filtros);
+  const base = rutaTarea(grupoId.data, 0, "lista", filtrosValidados.success ? filtrosValidados.data : {});
   const parseo = crearTareaSchema.safeParse(leerFormData(formData));
 
-  if (!parseo.success) {
-    redirect(`/grupos/${idGrupo}?nueva=1&error=${encodeURIComponent(parseo.error.issues[0].message)}`);
-  }
+  if (!parseo.success) redirigirErrorTarea(conParametro(base, "nueva", "1"), parseo.error.issues[0].message);
 
   try {
     await tareaService.crearTarea(sesion.idUsuario, grupoId.data, parseo.data);
   } catch (error) {
-    redirect(`/grupos/${idGrupo}?nueva=1&error=${encodeURIComponent(mensajeParaUsuario(error, "No se pudo crear la tarea"))}`);
+    redirigirErrorTarea(conParametro(base, "nueva", "1"), mensajeParaUsuario(error, "No se pudo crear la tarea"));
   }
 
   revalidatePath(`/grupos/${idGrupo}`);
-  redirect(`/grupos/${idGrupo}?toast=${encodeURIComponent("Tarea creada")}`);
+  redirect(conParametro(base, "toast", "Tarea creada"));
 }
 
 export async function reasignarTareaAction(
@@ -175,11 +176,12 @@ export async function moverTareaAction(
   return { ok: true };
 }
 
-export async function editarTareaAction(idGrupo: number, idTarea: number, formData: FormData) {
+export async function editarTareaAction(idGrupo: number, idTarea: number, filtros: FiltrosTarea, formData: FormData) {
   const sesion = await requerirSesion();
   const contexto = contextoTareaSchema.safeParse({ idGrupo, idTarea, destino: "detalle" });
   if (!contexto.success) redirect("/grupos");
-  const ruta = rutaTarea(contexto.data.idGrupo, contexto.data.idTarea, "detalle");
+  const filtrosValidados = filtrosTareaSchema.safeParse(filtros);
+  const ruta = rutaTarea(contexto.data.idGrupo, contexto.data.idTarea, "detalle", filtrosValidados.success ? filtrosValidados.data : {});
   const parseo = editarTareaSchema.safeParse(leerFormData(formData));
   if (!parseo.success) redirigirErrorTarea(conParametro(ruta, "editar", "1"), parseo.error.issues[0].message);
 

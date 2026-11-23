@@ -6,6 +6,7 @@ import { finDeDiaLimaAUtc } from "@/lib/dates";
 import { fechaEnZonaLimaISO } from "@/lib/calendario";
 import { ESTADOS_TAREA_ABIERTOS } from "@/lib/estado-tarea";
 import { nombreCorto } from "@/lib/nombres";
+import { fechaCorta } from "@/lib/formato-fecha";
 import { Prisma } from "../../../generated/prisma/client";
 import { ejecutarCambioDeGrupo } from "./cambio-grupo";
 import type { crearGrupoSchema, actualizarGrupoSchema } from "@/lib/validation/grupo";
@@ -150,11 +151,16 @@ export async function actualizarGrupo(
       // Si el día no cambia no se vuelve a validar: se pueden guardar otros campos con una fecha ya vencida.
       if (!grupo.fechaLimite || fechaEnZonaLimaISO(grupo.fechaLimite) !== datos.fechaLimite) {
         if (nueva < new Date()) throw new ErrorDeNegocio("La fecha límite del grupo no puede estar en el pasado");
-        const posteriores = await tx.tarea.count({
+        const posteriores = await tx.tarea.aggregate({
           where: { idGrupo, estado: { in: [...ESTADOS_TAREA_ABIERTOS] }, fechaLimite: { gt: nueva } },
+          _count: true,
+          _max: { fechaLimite: true },
         });
-        if (posteriores > 0) {
-          throw new ErrorDeNegocio(`Hay ${posteriores} ${posteriores === 1 ? "tarea" : "tareas"} con fecha posterior`);
+        if (posteriores._count > 0) {
+          const masTardia = posteriores._max.fechaLimite;
+          throw new ErrorDeNegocio(
+            `Hay ${posteriores._count} ${posteriores._count === 1 ? "tarea" : "tareas"} con fecha posterior${masTardia ? ` (${fechaCorta(masTardia)})` : ""}`,
+          );
         }
         fechaLimite = nueva;
       }
