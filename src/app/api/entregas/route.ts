@@ -1,3 +1,4 @@
+import { env } from "@/lib/env";
 import { NextResponse } from "next/server";
 import { obtenerSesion } from "@/server/auth/session";
 import { entregaSchema } from "@/lib/validation/entrega";
@@ -22,7 +23,9 @@ export async function POST(request: Request) {
     try {
       hostOrigen = new URL(origen).host; // "null" (origen opaco) lanza
     } catch {}
-    if (hostOrigen !== new URL(request.url).host) return error("Solicitud no permitida", 403);
+    // Detrás de un proxy (Render) el host de request.url puede no ser el público: vale también APP_URL.
+    const permitidos = new Set([new URL(request.url).host, new URL(env.APP_URL).host]);
+    if (!hostOrigen || !permitidos.has(hostOrigen)) return error("Solicitud no permitida", 403);
   }
 
   const sesion = await obtenerSesion();
