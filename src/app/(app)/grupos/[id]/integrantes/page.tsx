@@ -1,3 +1,4 @@
+import { AvisoError } from "@/components/ui-app/aviso-error";
 import { metadataDeGrupo } from "../_components/metadata";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -70,7 +71,7 @@ export default async function IntegrantesGrupoPage({
   return (
     <MarcoGrupo datos={resultado} idUsuario={sesion.idUsuario} activa="integrantes">
       <Toast mensaje={toast} />
-      {error ? <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-[13px] text-destructive">{error}</p> : null}
+      {error ? <AvisoError>{error}</AvisoError> : null}
 
       <section aria-labelledby="titulo-integrantes">
         <div className="flex items-baseline justify-between gap-3">
@@ -78,8 +79,8 @@ export default async function IntegrantesGrupoPage({
           <p className="text-xs text-subtle-foreground">Sin ranking: carga y cumplimiento se leen juntos</p>
         </div>
         <div className="mt-3 overflow-x-auto rounded-lg border">
-          <table className="w-full text-[13px]">
-            <thead className="bg-muted text-left text-xs text-subtle-foreground">
+          <table className="w-full text-[13px] max-md:block">
+            <thead className="bg-muted text-left text-xs text-subtle-foreground max-md:hidden">
               <tr>
                 <th className="h-9 px-4 font-medium">Integrante</th>
                 <th className="h-9 px-4 font-medium" title="Peso asignado sobre el total del grupo">Carga</th>
@@ -88,14 +89,14 @@ export default async function IntegrantesGrupoPage({
                 {puedeAdministrar ? <th className="h-9 w-0 px-4"><span className="sr-only">Acciones</span></th> : null}
               </tr>
             </thead>
-            <tbody>
+            <tbody className="max-md:block">
               {integrantesVisibles.map((integrante) => {
                 const metrica = metricaDe.get(integrante.idUsuario);
                 const nombre = nombreCorto(integrante.usuario.nombre, integrante.usuario.apellidos);
                 const estado = integrante.estadoInvitacion === "retirado" && integrante.retiroVoluntario ? "salió del grupo" : ETIQUETAS_INVITACION[integrante.estadoInvitacion];
                 return (
-                  <tr key={integrante.idIntegrante} className="border-t">
-                    <td className="h-12 px-4">
+                  <tr key={integrante.idIntegrante} className="border-t max-md:grid max-md:grid-cols-3 max-md:gap-x-3 max-md:gap-y-2.5 max-md:px-4 max-md:py-3 max-md:first:border-t-0">
+                    <td className="h-12 px-4 max-md:col-span-3 max-md:h-auto max-md:px-0">
                       <span className="flex items-center gap-2.5">
                         <UserAvatar usuario={integrante.usuario} tamano="md" />
                         <span className="min-w-0">
@@ -110,34 +111,34 @@ export default async function IntegrantesGrupoPage({
                         </span>
                       </span>
                     </td>
-                    <td className="px-4 tabular-nums">{metrica ? porcentaje(metrica.carga) : "—"}</td>
-                    <td className="px-4 tabular-nums">{metrica ? porcentaje(metrica.cumplimiento) : "—"}</td>
-                    <td className="px-4 tabular-nums">{metrica ? porcentaje(metrica.puntualidad) : "—"}</td>
+                    <td className="px-4 tabular-nums max-md:px-0 before:content-['Carga'] before:block before:text-xs before:text-subtle-foreground md:before:hidden">{metrica ? porcentaje(metrica.carga) : "—"}</td>
+                    <td className="px-4 tabular-nums max-md:px-0 before:content-['Cumplimiento'] before:block before:text-xs before:text-subtle-foreground md:before:hidden">{metrica ? porcentaje(metrica.cumplimiento) : "—"}</td>
+                    <td className="px-4 tabular-nums max-md:px-0 before:content-['Puntualidad'] before:block before:text-xs before:text-subtle-foreground md:before:hidden">{metrica ? porcentaje(metrica.puntualidad) : "—"}</td>
                     {puedeAdministrar ? (
-                      <td className="px-4 text-right">
+                      <td className="px-4 text-right max-md:col-span-3 max-md:-ml-2.5 max-md:px-0 max-md:text-left empty:hidden">
                         {integrante.estadoInvitacion === "pendiente" ? (
                           <form action={cancelarInvitacionAction.bind(null, idGrupo, integrante.idUsuario)}>
                             <BotonConfirmacion
                               mensaje={`¿Cancelar la invitación a ${nombre}? Podrás volver a invitarla.`}
-                              className="rounded-md px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/10"
+                              className="whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/10 max-md:min-h-11"
                             >
                               Cancelar invitación
                             </BotonConfirmacion>
                           </form>
                         ) : integrante.rol !== "lider" && integrante.estadoInvitacion === "aceptada" ? (
-                          <div className="flex items-center justify-end gap-1">
+                          <div className="flex items-center justify-end gap-1 max-md:justify-start">
                             {integrante.rol === "miembro" ? (
                               <form action={cambiarRolIntegranteAction.bind(null, idGrupo, integrante.idUsuario, "observador")}>
                                 <BotonConfirmacion
                                   mensaje={`¿Pasar a ${nombre} a observador? Sus tareas abiertas quedarán sin asignar y solo podrá ver el grupo.`}
-                                  className="min-h-8 whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium hover:bg-accent"
+                                  className="min-h-8 whitespace-nowrap rounded-md max-md:min-h-11 px-2.5 py-1 text-xs font-medium hover:bg-accent"
                                 >
                                   Hacer observador
                                 </BotonConfirmacion>
                               </form>
                             ) : (
                               <form action={cambiarRolIntegranteAction.bind(null, idGrupo, integrante.idUsuario, "miembro")}>
-                                <SubmitButton pendingText="Guardando..." className="min-h-8 whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium hover:bg-accent">
+                                <SubmitButton pendingText="Guardando..." className="min-h-8 whitespace-nowrap rounded-md max-md:min-h-11 px-2.5 py-1 text-xs font-medium hover:bg-accent">
                                   Hacer miembro
                                 </SubmitButton>
                               </form>
@@ -145,7 +146,7 @@ export default async function IntegrantesGrupoPage({
                             <form action={retirarIntegranteAction.bind(null, idGrupo, integrante.idUsuario)}>
                               <BotonConfirmacion
                                 mensaje={`¿Retirar a ${nombre} del grupo? Sus tareas abiertas quedarán sin asignar.`}
-                                className="min-h-8 whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/10"
+                                className="min-h-8 whitespace-nowrap rounded-md max-md:min-h-11 px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/10"
                               >
                                 Retirar
                               </BotonConfirmacion>

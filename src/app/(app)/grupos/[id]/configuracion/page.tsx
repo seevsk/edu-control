@@ -1,3 +1,4 @@
+import { AvisoError } from "@/components/ui-app/aviso-error";
 import { metadataDeGrupo } from "../_components/metadata";
 import { notFound } from "next/navigation";
 import { requerirSesion } from "@/server/auth/session";
@@ -43,7 +44,7 @@ export default async function ConfiguracionGrupoPage({
   return (
     <MarcoGrupo datos={resultado} idUsuario={sesion.idUsuario} activa="configuracion">
       <Toast mensaje={toast} />
-      {error ? <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-[13px] text-destructive">{error}</p> : null}
+      {error ? <AvisoError className="max-w-xl">{error}</AvisoError> : null}
 
       {grupo.estado === "finalizado" ? (
         <p className="text-[13px] text-muted-foreground">

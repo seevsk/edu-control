@@ -6,7 +6,7 @@ import { finDeDiaLimaAUtc } from "@/lib/dates";
 import { fechaEnZonaLimaISO } from "@/lib/calendario";
 import { ESTADOS_TAREA_ABIERTOS } from "@/lib/estado-tarea";
 import { nombreCorto } from "@/lib/nombres";
-import { fechaCorta } from "@/lib/formato-fecha";
+import { diaCompleto } from "@/lib/formato-fecha";
 import { Prisma } from "../../../generated/prisma/client";
 import { ejecutarCambioDeGrupo } from "./cambio-grupo";
 import type { crearGrupoSchema, actualizarGrupoSchema } from "@/lib/validation/grupo";
@@ -127,14 +127,14 @@ export async function crearGrupo(idUsuario: number, datos: z.infer<typeof crearG
  */
 function mensajeTareasPosteriores(nueva: Date, tareas: { titulo: string; fechaLimite: Date | null }[]) {
   // Se filtraron con `fechaLimite > nueva`, así que siempre tienen fecha.
-  const minima = fechaCorta(tareas[0].fechaLimite ?? nueva);
-  const dia = fechaCorta(nueva);
+  const minima = diaCompleto(tareas[0].fechaLimite ?? nueva);
+  const dia = diaCompleto(nueva);
   if (tareas.length === 1) {
-    return `No puedes cerrar el grupo el ${dia}: la tarea "${tareas[0].titulo}" vence el ${minima}. Elige el ${minima} o una fecha posterior, o cambia la fecha de esa tarea.`;
+    return `No puedes cerrar el grupo el ${dia}. La tarea "${tareas[0].titulo}" vence el ${minima}. Elige esa fecha o una posterior, o cambia la fecha de la tarea.`;
   }
   const nombres = tareas.slice(0, 2).map((tarea) => `"${tarea.titulo}"`).join(", ");
   const resto = tareas.length > 2 ? ` y ${tareas.length - 2} más` : "";
-  return `No puedes cerrar el grupo el ${dia}: ${tareas.length} tareas vencen después (${nombres}${resto}); la última, el ${minima}. Elige el ${minima} o una fecha posterior, o cambia la fecha de esas tareas.`;
+  return `No puedes cerrar el grupo el ${dia}. ${tareas.length} tareas vencen después (${nombres}${resto}); la última, el ${minima}. Elige esa fecha o una posterior, o cambia la fecha de esas tareas.`;
 }
 
 export async function actualizarGrupo(
