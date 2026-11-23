@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useOptimistic, useRef, useState, useTransition } from "react";
+import { useId, useOptimistic, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Paperclip, Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -148,6 +148,7 @@ export function TableroTareas({
     if (contenedor && columna) contenedor.scrollTo({ left: columna.offsetLeft - contenedor.offsetLeft - 16, behavior: "smooth" });
   }
   const [arrastrando, setArrastrando] = useState<number | null>(null);
+  const idDnd = useId();
   const sensores = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
@@ -217,6 +218,7 @@ export function TableroTareas({
 
   return (
     <DndContext
+      id={idDnd}
       sensors={sensores}
       onDragStart={({ active }: DragStartEvent) => setArrastrando(Number(active.id))}
       onDragCancel={() => setArrastrando(null)}

@@ -38,21 +38,28 @@ export async function crearGrupoAction(formData: FormData) {
   redirect(`/grupos/${idGrupo}?nuevo=1`);
 }
 
+/** Vuelve a la configuración con el error y lo que la persona escribió, para que no lo pierda. */
+function volverConfiguracionConError(idGrupo: number, formData: FormData, mensaje: string): never {
+  const parametros = new URLSearchParams({ error: mensaje });
+  for (const campo of ["nombre", "descripcion", "enlaceTrabajo", "fechaLimite", "estado"]) {
+    const valor = formData.get(campo);
+    if (typeof valor === "string" && valor) parametros.set(campo, valor.slice(0, 600));
+  }
+  redirect(`/grupos/${idGrupo}/configuracion?${parametros.toString()}`);
+}
+
 export async function actualizarGrupoAction(idGrupo: number, formData: FormData) {
   const sesion = await requerirSesion();
   const grupoId = idRegistroSchema.safeParse(idGrupo);
   if (!grupoId.success) redirect("/grupos");
   const parseo = actualizarGrupoSchema.safeParse(leerFormData(formData));
 
-  if (!parseo.success) {
-    redirect(`/grupos/${idGrupo}/configuracion?error=${encodeURIComponent(parseo.error.issues[0].message)}`);
-  }
+  if (!parseo.success) volverConfiguracionConError(idGrupo, formData, parseo.error.issues[0].message);
 
   try {
     await grupoService.actualizarGrupo(sesion.idUsuario, grupoId.data, parseo.data);
   } catch (error) {
-    const mensaje = mensajeParaUsuario(error, "No se pudo actualizar el grupo");
-    redirect(`/grupos/${idGrupo}/configuracion?error=${encodeURIComponent(mensaje)}`);
+    volverConfiguracionConError(idGrupo, formData, mensajeParaUsuario(error, "No se pudo actualizar el grupo"));
   }
   revalidatePath(`/grupos/${idGrupo}`);
   revalidatePath(`/grupos/${idGrupo}/tareas`);

@@ -52,6 +52,7 @@ export function LineaTiempoTarea({
   const reprogramada = original && tarea.fechaLimite && original.getTime() !== tarea.fechaLimite.getTime();
   const personasConTrabajo = Object.entries(tiempos.trabajoPorUsuario);
 
+  // Solo los estados por los que la tarea realmente pasó.
   const tarjetas = [
     { etiqueta: "En progreso", ms: tiempos.enProgresoMs, color: COLOR_ESTADO_TAREA.en_progreso },
     { etiqueta: "En revisión", ms: tiempos.enRevisionMs, color: COLOR_ESTADO_TAREA.en_revision },
@@ -59,7 +60,7 @@ export function LineaTiempoTarea({
     ...(tiempos.sinAsignarMs > 0
       ? [{ etiqueta: "Sin asignar", ms: tiempos.sinAsignarMs, color: "var(--input)" }]
       : []),
-  ];
+  ].filter((tarjeta) => tarjeta.ms > 0);
   const detalles = [
     reprogramada ? `fecha original ${formatearFechaLima(original)}` : null,
     tiempos.devoluciones ? plural(tiempos.devoluciones, "devolución", "devoluciones") : null,
@@ -99,7 +100,7 @@ export function LineaTiempoTarea({
             </p>
           ) : null}
         </div>
-        <dl className="grid grid-cols-3 gap-2">
+        <dl className="grid grid-cols-3 gap-2 empty:hidden">
           {tarjetas.map((tarjeta) => (
             <div key={tarjeta.etiqueta} className="rounded-md border border-border bg-bg/60 px-2.5 py-2">
               <dt className="flex items-center gap-1.5 text-[11px] text-text-muted">

@@ -130,14 +130,14 @@ export default async function IntegrantesGrupoPage({
                               <form action={cambiarRolIntegranteAction.bind(null, idGrupo, integrante.idUsuario, "observador")}>
                                 <BotonConfirmacion
                                   mensaje={`¿Pasar a ${nombre} a observador? Sus tareas abiertas quedarán sin asignar y solo podrá ver el grupo.`}
-                                  className="min-h-8 rounded-md px-2.5 py-1 text-xs font-medium hover:bg-accent"
+                                  className="min-h-8 whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium hover:bg-accent"
                                 >
                                   Hacer observador
                                 </BotonConfirmacion>
                               </form>
                             ) : (
                               <form action={cambiarRolIntegranteAction.bind(null, idGrupo, integrante.idUsuario, "miembro")}>
-                                <SubmitButton pendingText="Guardando..." className="min-h-8 rounded-md px-2.5 py-1 text-xs font-medium hover:bg-accent">
+                                <SubmitButton pendingText="Guardando..." className="min-h-8 whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium hover:bg-accent">
                                   Hacer miembro
                                 </SubmitButton>
                               </form>
@@ -145,7 +145,7 @@ export default async function IntegrantesGrupoPage({
                             <form action={retirarIntegranteAction.bind(null, idGrupo, integrante.idUsuario)}>
                               <BotonConfirmacion
                                 mensaje={`¿Retirar a ${nombre} del grupo? Sus tareas abiertas quedarán sin asignar.`}
-                                className="min-h-8 rounded-md px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/10"
+                                className="min-h-8 whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/10"
                               >
                                 Retirar
                               </BotonConfirmacion>
