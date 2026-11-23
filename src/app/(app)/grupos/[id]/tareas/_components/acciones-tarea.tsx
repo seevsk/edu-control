@@ -2,7 +2,7 @@ import { accionesDisponiblesTarea, type AccionConMotivo, type EstadoTarea } from
 import { nombreCorto } from "@/lib/nombres";
 import { SubmitButton } from "@/components/submit-button";
 import { CerrarDetalles } from "@/components/cerrar-detalles";
-import { cambiarEstadoTareaAction, reasignarTareaAction } from "../actions";
+import { cambiarEstadoTareaAction, reasignarTareaAction, tomarTareaAction } from "../actions";
 import type { DestinoTarea, FiltrosTarea } from "@/lib/validation/tarea";
 
 const TEXTOS_MOTIVO: Record<AccionConMotivo, { confirmar: string; enviando: string }> = {
@@ -43,9 +43,20 @@ export function AccionesTarea({
   // El líder revisa su propia tarea, así que a él no se le dice que espera.
   const esperaRevision = tarea.estado === "en_revision" && tarea.idAsignado === idUsuario && rol !== "lider";
   const puedeReasignar = tarea.estado === "pendiente" || (tarea.estado === "en_progreso" && rol === "lider");
-  if (acciones.length === 0 && !esperaRevision && !puedeReasignar) return null;
+  const puedeTomar = tarea.estado === "pendiente" && tarea.idAsignado === null;
+  if (acciones.length === 0 && !esperaRevision && !puedeReasignar && !puedeTomar) return null;
   const contenido = (
     <div className="flex flex-wrap items-center gap-2 pt-1">
+      {puedeTomar ? (
+        <form action={tomarTareaAction.bind(null, idGrupo, tarea.idTarea, destino, filtros)} className="max-md:w-full">
+          <SubmitButton
+            pendingText="Tomando..."
+            className={`rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary max-md:h-12 max-md:w-full max-md:text-[15px] max-md:font-semibold`}
+          >
+            Tomar tarea
+          </SubmitButton>
+        </form>
+      ) : null}
       {acciones.map((accion) => {
         const accionCambio = cambiarEstadoTareaAction.bind(null, idGrupo, tarea.idTarea, accion.estado, destino, filtros);
         if (accion.motivo) {
@@ -108,7 +119,7 @@ export function AccionesTarea({
       {puedeReasignar ? (
         <details className="ml-auto">
           <summary className="cursor-pointer list-none rounded-md px-2.5 py-1.5 text-xs font-medium text-text-muted hover:bg-bg hover:text-text max-md:flex max-md:h-11 max-md:items-center max-md:text-sm [&::-webkit-details-marker]:hidden">
-            Cambiar responsable
+            {tarea.idAsignado === null ? "Asignar a alguien" : "Cambiar responsable"}
           </summary>
           <form
             action={reasignarTareaAction.bind(null, idGrupo, tarea.idTarea, destino, filtros)}
@@ -119,7 +130,7 @@ export function AccionesTarea({
               <select
                 name="idAsignado"
                 defaultValue={tarea.idAsignado ?? ""}
-                className="max-w-full rounded-md border border-border-strong bg-surface px-2 py-1.5 text-sm"
+                className="max-w-full rounded-md border border-border-strong bg-surface px-2 py-1.5 text-sm max-md:min-h-11"
               >
                 <option value="">Sin asignar</option>
                 {asignables.map((integrante) => (

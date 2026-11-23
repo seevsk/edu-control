@@ -1,8 +1,10 @@
 import { prisma } from "@/server/db/client";
-import { crearNotificacion } from "@/server/notifications/crear-notificacion";
+import { crearNotificacion, notificarVarios } from "@/server/notifications/crear-notificacion";
 import { plantillasNotificacion } from "@/server/notifications/templates";
 import { finDeDiaLimaAUtc } from "@/lib/dates";
 import { diaYMes } from "@/lib/formato-fecha";
+import { nombreCorto } from "@/lib/nombres";
+import { fechaEnZonaLimaISO } from "@/lib/calendario";
 import { ErrorDeNegocio } from "@/lib/errores";
 import {
   filtrosTareaSchema,
@@ -14,7 +16,9 @@ import { valorHistorialConMotivo } from "@/lib/tarea-historial";
 import { ESTADOS_TAREA_ABIERTOS, estaAbierta, type AccionConMotivo, type EstadoTarea } from "@/lib/estado-tarea";
 import type { z } from "zod";
 import type { Prisma } from "../../../generated/prisma/client";
-import { ejecutarCambioDeGrupo } from "./cambio-grupo";
+import { ejecutarCambioDeGrupo, MENSAJE_CONFLICTO_GRUPO } from "./cambio-grupo";
+
+const MENSAJE_TAREA_YA_TOMADA = "Otra persona ya tomó esta tarea";
 
 type RolDb = "lider" | "miembro" | "observador";
 
@@ -48,6 +52,27 @@ async function esAsignable(idGrupo: number, idUsuario: number, tx: Prisma.Transa
 async function validarAsignable(idGrupo: number, idUsuario: number, tx: Prisma.TransactionClient) {
   if (!(await esAsignable(idGrupo, idUsuario, tx))) {
     throw new ErrorDeNegocio("Esa persona no puede ser asignada en este grupo");
+  }
+}
+
+/**
+ * Nombre de quien actuo y del grupo, para el contenido del correo. Se lee fuera de la transaccion
+ * y nunca falla: sin datos, la plantilla usa un texto generico.
+ */
+async function contextoAviso(idActor: number | null, idGrupo: number) {
+  try {
+    const [actor, grupo] = await Promise.all([
+      idActor === null
+        ? null
+        : prisma.usuario.findUnique({ where: { idUsuario: idActor }, select: { nombre: true, apellidos: true } }),
+      prisma.grupo.findUnique({ where: { idGrupo }, select: { nombre: true } }),
+    ]);
+    return {
+      actor: actor?.nombre ? nombreCorto(actor.nombre, actor.apellidos) : null,
+      grupo: grupo?.nombre ?? null,
+    };
+  } catch {
+    return { actor: null, grupo: null };
   }
 }
 
@@ -111,7 +136,8 @@ export function accionConMotivo(estadoActual: EstadoTarea, nuevoEstado: EstadoTa
 export function validarFechaLimiteTarea(fechaLimite: Date | null, fechaLimiteGrupo: Date | null, ahora = new Date()) {
   if (!fechaLimite) return;
   if (fechaLimite < ahora) throw new ErrorDeNegocio("La fecha límite de la tarea no puede estar en el pasado");
-  if (fechaLimiteGrupo && fechaLimite > fechaLimiteGrupo) {
+  // Se compara por día en Lima: la fecha de la tarea es "fin del día" y el grupo puede vencer a media jornada.
+  if (fechaLimiteGrupo && fechaEnZonaLimaISO(fechaLimite) > fechaEnZonaLimaISO(fechaLimiteGrupo)) {
     throw new ErrorDeNegocio("La fecha límite de la tarea no puede superar la fecha límite del grupo");
   }
 }
@@ -177,7 +203,7 @@ export async function listarTareasDelGrupo(
   const condiciones = [
     // Las descartadas solo aparecen cuando se filtran explicitamente.
     estado ? { estado } : { estado: { not: "descartada" as const } },
-    asignado ? { idAsignado: asignado } : {},
+    asignado === "sin" ? { idAsignado: null } : asignado ? { idAsignado: asignado } : {},
     q
       ? {
           OR: [
@@ -269,12 +295,12 @@ export async function crearTarea(
   idGrupo: number,
   datos: z.infer<typeof crearTareaSchema>,
 ) {
-  if (!datos.idAsignado) throw new ErrorDeNegocio("Selecciona un responsable");
   if (!datos.fechaLimite) throw new ErrorDeNegocio("La fecha límite es obligatoria");
-  const idAsignado = Number(datos.idAsignado);
+  // El responsable es opcional: sin él la tarea queda "Sin asignar" hasta que alguien la tome o el líder la asigne.
+  const idAsignado = datos.idAsignado ? Number(datos.idAsignado) : null;
   const tarea = await ejecutarCambioDeGrupo(async (tx) => {
     const integrante = await requerirIntegranteQuePuedeModificar(idActor, idGrupo, tx);
-    await validarAsignable(idGrupo, idAsignado, tx);
+    if (idAsignado !== null) await validarAsignable(idGrupo, idAsignado, tx);
     const fechaLimite = finDeDiaLimaAUtc(datos.fechaLimite);
     validarFechaLimiteTarea(fechaLimite, integrante.grupo.fechaLimite);
     return tx.tarea.create({
@@ -302,11 +328,47 @@ export async function crearTarea(
       idUsuario: idAsignado,
       tipo: "tarea_asignada",
       idGrupo,
-      ...plantillasNotificacion.tareaAsignada(tarea.titulo, idGrupo, tarea.idTarea),
+      ...plantillasNotificacion.tareaAsignada(tarea.titulo, idGrupo, tarea.idTarea, {
+        ...(await contextoAviso(idActor, idGrupo)),
+        fechaLimite: tarea.fechaLimite,
+        peso: tarea.peso,
+      }),
     });
   }
 
   return tarea;
+}
+
+/**
+ * "Tomar tarea": un integrante se asigna a si mismo una tarea pendiente sin responsable.
+ * Es una reasignacion normal (historial `reasignada` + `vista`, sin notificar al propio actor).
+ * Si dos personas la toman a la vez, la transaccion serializable deja ganar a una sola.
+ */
+export async function tomarTarea(idActor: number, idGrupo: number, idTarea: number) {
+  const intentar = () =>
+    ejecutarCambioDeGrupo(async (tx) => {
+      await requerirIntegranteQuePuedeModificar(idActor, idGrupo, tx);
+      const tarea = await tx.tarea.findFirst({ where: { idTarea, idGrupo } });
+      if (!tarea) throw new ErrorDeNegocio("Tarea no encontrada");
+      if (tarea.idAsignado === idActor) throw new ErrorDeNegocio("Esta tarea ya es tuya");
+      if (tarea.idAsignado !== null) throw new ErrorDeNegocio(MENSAJE_TAREA_YA_TOMADA);
+      if (tarea.estado !== "pendiente") throw new ErrorDeNegocio("Solo se pueden tomar tareas pendientes");
+      // Condicion en el propio UPDATE: aun sin conflicto serializable, solo una toma puede ganar.
+      const { count } = await tx.tarea.updateMany({ where: { idTarea, idAsignado: null }, data: { idAsignado: idActor } });
+      if (count === 0) throw new ErrorDeNegocio(MENSAJE_TAREA_YA_TOMADA);
+      await tx.tareaHistorial.create({
+        data: { idTarea, idUsuario: idActor, accion: "reasignada", valorAnterior: null, valorNuevo: String(idActor) },
+      });
+      await tx.tareaHistorial.create({ data: { idTarea, idUsuario: idActor, accion: "vista" } });
+      return { ...tarea, idAsignado: idActor };
+    });
+  try {
+    return await intentar();
+  } catch (error) {
+    // El perdedor de una toma simultanea recibe el conflicto del grupo: se reintenta una vez y ve que ya tiene dueño.
+    if (error instanceof ErrorDeNegocio && error.message === MENSAJE_CONFLICTO_GRUPO) return intentar();
+    throw error;
+  }
 }
 
 /** Edicion de una tarea abierta: el lider o quien la creo. Peso y fecha limite quedan en el historial. */
@@ -373,7 +435,10 @@ export async function editarTarea(
       idUsuario: tarea.idAsignado,
       tipo: "tarea_reprogramada",
       idGrupo,
-      ...plantillasNotificacion.tareaReprogramada(tarea.titulo, idGrupo, idTarea, diaYMes(tarea.fechaLimite)),
+      ...plantillasNotificacion.tareaReprogramada(tarea.titulo, idGrupo, idTarea, diaYMes(tarea.fechaLimite), {
+        ...(await contextoAviso(idActor, idGrupo)),
+        fechaLimite: tarea.fechaLimite,
+      }),
     });
   }
   return tarea;
@@ -468,7 +533,11 @@ export async function reasignarTarea(
       idUsuario: nuevoIdAsignado,
       tipo: "tarea_asignada",
       idGrupo,
-      ...plantillasNotificacion.tareaAsignada(tarea.titulo, idGrupo, tarea.idTarea),
+      ...plantillasNotificacion.tareaAsignada(tarea.titulo, idGrupo, tarea.idTarea, {
+        ...(await contextoAviso(idActor, idGrupo)),
+        fechaLimite: tarea.fechaLimite,
+        peso: tarea.peso,
+      }),
     });
   }
 
@@ -480,29 +549,32 @@ export async function notificarTareaEnRevision(idGrupo: number, idTarea: number,
   const destinos = await prisma.grupoIntegrante.findMany({
     where: { idGrupo, estadoInvitacion: "aceptada", rol: { not: "observador" } },
   });
-  for (const destino of destinos) {
-    if (destino.idUsuario === idAsignado) continue;
-    await crearNotificacion({
-      idUsuario: destino.idUsuario,
-      tipo: "tarea_en_revision",
-      idGrupo,
-      ...plantillasNotificacion.tareaEnRevision(titulo, idGrupo, idTarea),
-    });
-  }
+  const contexto = await contextoAviso(idAsignado, idGrupo);
+  await notificarVarios(
+    destinos
+      .filter((destino) => destino.idUsuario !== idAsignado)
+      .map((destino) => ({
+        idUsuario: destino.idUsuario,
+        tipo: "tarea_en_revision" as const,
+        idGrupo,
+        ...plantillasNotificacion.tareaEnRevision(titulo, idGrupo, idTarea, contexto),
+      })),
+  );
 }
 
 async function notificarAutoaprobacion(idGrupo: number, idTarea: number, titulo: string, idLider: number) {
   const destinos = await prisma.grupoIntegrante.findMany({
     where: { idGrupo, estadoInvitacion: "aceptada", rol: { not: "observador" }, idUsuario: { not: idLider } },
   });
-  for (const destino of destinos) {
-    await crearNotificacion({
+  const contexto = await contextoAviso(idLider, idGrupo);
+  await notificarVarios(
+    destinos.map((destino) => ({
       idUsuario: destino.idUsuario,
-      tipo: "tarea_completada",
+      tipo: "tarea_completada" as const,
       idGrupo,
-      ...plantillasNotificacion.tareaAutoaprobada(titulo, idGrupo, idTarea),
-    });
-  }
+      ...plantillasNotificacion.tareaAutoaprobada(titulo, idGrupo, idTarea, contexto),
+    })),
+  );
 }
 
 export async function cambiarEstadoTarea(
@@ -512,7 +584,7 @@ export async function cambiarEstadoTarea(
   nuevoEstado: EstadoTarea,
   motivo = "",
 ) {
-  const { tarea, accion, motivoValidado } = await ejecutarCambioDeGrupo(async (tx) => {
+  const { tarea, accion, motivoValidado, asignadoPuedeRecibir } = await ejecutarCambioDeGrupo(async (tx) => {
     const integrante = await requerirIntegranteQuePuedeModificar(idActor, idGrupo, tx);
     const tarea = await tx.tarea.findFirst({ where: { idTarea, idGrupo } });
     if (!tarea) throw new ErrorDeNegocio("Tarea no encontrada");
@@ -533,12 +605,13 @@ export async function cambiarEstadoTarea(
       if (!parseo.success) throw new ErrorDeNegocio(parseo.error.issues[0].message);
       motivoValidado = parseo.data;
     }
-    // Al reabrir o restaurar, si el responsable ya no puede recibir tareas (se retiro o es
-    // observador), la tarea vuelve a Pendiente sin asignar para que el lider la reasigne.
+    // Al devolver, reabrir o restaurar, si el responsable ya no puede recibir tareas (se retiro, es
+    // observador o no hay), la tarea vuelve a Pendiente sin asignar para que el lider la reasigne:
+    // nunca queda en progreso sin responsable.
+    const asignadoPuedeRecibir = tarea.idAsignado !== null && (await esAsignable(idGrupo, tarea.idAsignado, tx));
     const vuelveSinResponsable =
-      (accion === "reabrir" || estadoAnterior === "descartada") &&
-      tarea.idAsignado !== null &&
-      !(await esAsignable(idGrupo, tarea.idAsignado, tx));
+      (accion === "reabrir" || accion === "devolver" || estadoAnterior === "descartada") &&
+      !asignadoPuedeRecibir;
     const idAsignado = vuelveSinResponsable ? null : tarea.idAsignado;
     const estadoFinal: EstadoTarea = vuelveSinResponsable ? "pendiente" : nuevoEstado;
     const fechaTerminada =
@@ -552,11 +625,19 @@ export async function cambiarEstadoTarea(
     // Aprobar o devolver cierra la entrega vigente. Una tarea que llego a revision antes de existir
     // las entregas no tiene ninguna: el estado cambia igual.
     if (estadoAnterior === "en_revision" && (estadoFinal === "completada" || accion === "devolver")) {
-      const vigente = await tx.entrega.findFirst({
+      const pendientes = await tx.entrega.findMany({
         where: { idTarea, resultado: "en_revision" },
-        orderBy: { fechaEnvio: "desc" },
+        orderBy: [{ fechaEnvio: "desc" }, { idEntrega: "desc" }],
         select: { idEntrega: true },
       });
+      const [vigente, ...obsoletas] = pendientes;
+      // Ninguna entrega anterior debe quedar "En revisión" si la tarea ya se resolvió.
+      if (obsoletas.length > 0) {
+        await tx.entrega.updateMany({
+          where: { idEntrega: { in: obsoletas.map((entrega) => entrega.idEntrega) } },
+          data: { resultado: "devuelta" },
+        });
+      }
       if (vigente) {
         await tx.entrega.update({
           where: { idEntrega: vigente.idEntrega },
@@ -578,7 +659,7 @@ export async function cambiarEstadoTarea(
         valorNuevo: accion ? valorHistorialConMotivo(estadoFinal, accion, motivoValidado) : estadoFinal,
       },
     });
-    if (idAsignado !== tarea.idAsignado) {
+    if (tarea.idAsignado !== null && idAsignado !== tarea.idAsignado) {
       await tx.tareaHistorial.create({
         data: {
           idTarea,
@@ -589,7 +670,7 @@ export async function cambiarEstadoTarea(
         },
       });
     }
-    return { tarea: { ...tarea, idAsignado }, accion, motivoValidado };
+    return { tarea: { ...tarea, idAsignado }, accion, motivoValidado, asignadoPuedeRecibir };
   });
 
   const asignado = tarea.idAsignado;
@@ -598,34 +679,37 @@ export async function cambiarEstadoTarea(
     await notificarAutoaprobacion(idGrupo, idTarea, tarea.titulo, idActor);
     return;
   }
-  if (!asignado || asignado === idActor) return;
+  // Quien ya salió del grupo (dejó la tarea en revisión) no recibe avisos.
+  if (!asignado || asignado === idActor || !asignadoPuedeRecibir) return;
+  if (!accion && nuevoEstado !== "completada") return;
+  const contexto = { ...(await contextoAviso(idActor, idGrupo)), fechaLimite: tarea.fechaLimite, peso: tarea.peso };
   if (accion === "devolver") {
     await crearNotificacion({
       idUsuario: asignado,
       tipo: "tarea_devuelta",
       idGrupo,
-      ...plantillasNotificacion.tareaDevuelta(tarea.titulo, idGrupo, idTarea, motivoValidado),
+      ...plantillasNotificacion.tareaDevuelta(tarea.titulo, idGrupo, idTarea, motivoValidado, contexto),
     });
   } else if (accion === "reabrir") {
     await crearNotificacion({
       idUsuario: asignado,
       tipo: "tarea_reabierta",
       idGrupo,
-      ...plantillasNotificacion.tareaReabierta(tarea.titulo, idGrupo, idTarea, motivoValidado),
+      ...plantillasNotificacion.tareaReabierta(tarea.titulo, idGrupo, idTarea, motivoValidado, contexto),
     });
   } else if (accion === "descartar") {
     await crearNotificacion({
       idUsuario: asignado,
       tipo: "tarea_descartada",
       idGrupo,
-      ...plantillasNotificacion.tareaDescartada(tarea.titulo, idGrupo, idTarea, motivoValidado),
+      ...plantillasNotificacion.tareaDescartada(tarea.titulo, idGrupo, idTarea, motivoValidado, contexto),
     });
   } else if (nuevoEstado === "completada") {
     await crearNotificacion({
       idUsuario: asignado,
       tipo: "tarea_completada",
       idGrupo,
-      ...plantillasNotificacion.tareaCompletada(tarea.titulo, idGrupo, idTarea),
+      ...plantillasNotificacion.tareaCompletada(tarea.titulo, idGrupo, idTarea, contexto),
     });
   }
 }

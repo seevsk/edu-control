@@ -3,11 +3,20 @@ import { z } from "zod";
 
 const horaHHMM = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Hora inválida");
 
+/** "2026-02-31" cumple el patron pero no existe: Date la normalizaria al 3 de marzo. */
+function esFechaReal(valor: string) {
+  const fecha = new Date(`${valor}T00:00:00Z`);
+  return !Number.isNaN(fecha.getTime()) && fecha.toISOString().slice(0, 10) === valor;
+}
+
 export const crearReunionSchema = z
   .object({
     idGrupo: z.coerce.number().int().positive("Elige un grupo"),
     titulo: z.string().trim().min(1, "El título es obligatorio").max(120, "El título admite hasta 120 caracteres"),
-    fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida"),
+    fecha: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida")
+      .refine(esFechaReal, "Fecha inválida"),
     horaInicio: horaHHMM,
     horaFin: horaHHMM,
     lugar: z.string().trim().max(160, "El lugar admite hasta 160 caracteres").optional().or(z.literal("")),

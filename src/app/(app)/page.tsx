@@ -14,6 +14,7 @@ import { TaskRow, type FilaTarea } from "@/components/ui-app/task-row";
 import { CourseDot } from "@/components/ui-app/course-dot";
 import { Toast } from "@/components/toast";
 import { cookies } from "next/headers";
+import { nombrePila } from "@/lib/nombres";
 import { obtenerPerfilCompleto } from "@/server/services/perfil";
 import { Bienvenida } from "./_components/bienvenida";
 import { COOKIE_BIENVENIDA } from "./_components/bienvenida-cookie";
@@ -112,7 +113,7 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
         dia: etiquetaDia(fechaISO),
         hora: timeAHora(horario.horaInicio),
         titulo: aOracion(horario.curso.nombre),
-        tipo: `Clase · ${horario.curso.modalidad === "presencial" ? "presencial" : "remota"}`,
+        tipo: horario.curso.modalidad ? `Clase · ${horario.curso.modalidad === "presencial" ? "presencial" : "remota"}` : "Clase",
         color: colorCurso(horario.curso.idCurso),
         href: `/cursos/${horario.curso.idCurso}`,
       });
@@ -161,7 +162,7 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
   // Guía de primer ingreso: visible hasta completar los tres pasos o hasta que el usuario la oculte.
   const perfil = usuario.perfil;
   const datosBienvenida = {
-    nombre: usuario.nombre.split(" ")[0] || usuario.nombre,
+    nombre: nombrePila(usuario.nombre) || usuario.nombre,
     perfilCompleto: Boolean(perfil?.institucion && perfil.carrera && perfil.ciclo),
     visibleEnBusqueda: perfil?.visibleEnBusqueda ?? true,
     cursosConHorario: cursos.filter((curso) => curso.horarios.length > 0).length,
@@ -262,7 +263,7 @@ export default async function InicioPage({ searchParams }: { searchParams: Promi
           ) : (
             <p className="text-[13px] text-subtle-foreground">Tus clases, evaluaciones, entregas y reuniones de los próximos 7 días aparecerán aquí.</p>
           )}
-          <Link href="/calendario" className="mt-3.5 inline-block text-[13px] text-muted-foreground hover:text-foreground">Abrir calendario</Link>
+          <Link href="/calendario" className="mt-3.5 inline-block text-[13px] text-muted-foreground hover:text-foreground max-md:flex max-md:min-h-11 max-md:w-fit max-md:items-center">Abrir calendario</Link>
         </aside>
       </div>
     </PaginaCompleta>

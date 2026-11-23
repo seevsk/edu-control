@@ -18,11 +18,11 @@ export function HistorialTareas({
   return (
     <ol className="flex flex-col gap-3">
       {entradas.map((entrada) => (
-        <li key={entrada.idHistorial} className="rounded-md border border-border bg-surface p-3 text-sm">
+        <li key={entrada.idHistorial} className="relative rounded-md border border-border bg-surface p-3 text-sm">
           {entrada.tarea ? (
             <Link
               href={`/grupos/${idGrupo}/tareas/${entrada.tarea.idTarea}`}
-              className="mb-1 block font-medium text-primary hover:underline"
+              className="mb-1 block font-medium text-primary hover:underline after:absolute after:inset-0 after:content-[''] focus-visible:outline-2 focus-visible:outline-ring"
             >
               {entrada.tarea.titulo}
             </Link>

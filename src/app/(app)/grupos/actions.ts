@@ -8,6 +8,7 @@ import {
   actualizarGrupoSchema,
   actualizarPreferenciaCorreoActividadSchema,
   invitacionGrupoSchema,
+  cambiarRolIntegranteSchema,
   responderInvitacionSchema,
 } from "@/lib/validation/grupo";
 import { idRegistroSchema } from "@/lib/validation/tarea";
@@ -26,9 +27,25 @@ export async function crearGrupoAction(formData: FormData) {
     redirect(`/grupos?nuevo=1&error=${encodeURIComponent(parseo.error.issues[0].message)}`);
   }
 
-  const grupo = await grupoService.crearGrupo(sesion.idUsuario, parseo.data);
+  let idGrupo: number;
+  try {
+    idGrupo = (await grupoService.crearGrupo(sesion.idUsuario, parseo.data)).idGrupo;
+  } catch (error) {
+    const mensaje = mensajeParaUsuario(error, "No se pudo crear el grupo");
+    redirect(`/grupos?nuevo=1&error=${encodeURIComponent(mensaje)}`);
+  }
   revalidatePath("/grupos");
-  redirect(`/grupos/${grupo.idGrupo}?nuevo=1`);
+  redirect(`/grupos/${idGrupo}?nuevo=1`);
+}
+
+/** Vuelve a la configuración con el error y lo que la persona escribió, para que no lo pierda. */
+function volverConfiguracionConError(idGrupo: number, formData: FormData, mensaje: string): never {
+  const parametros = new URLSearchParams({ error: mensaje });
+  for (const campo of ["nombre", "descripcion", "enlaceTrabajo", "fechaLimite", "estado"]) {
+    const valor = formData.get(campo);
+    if (typeof valor === "string" && valor) parametros.set(campo, valor.slice(0, 600));
+  }
+  redirect(`/grupos/${idGrupo}/configuracion?${parametros.toString()}`);
 }
 
 export async function actualizarGrupoAction(idGrupo: number, formData: FormData) {
@@ -37,15 +54,12 @@ export async function actualizarGrupoAction(idGrupo: number, formData: FormData)
   if (!grupoId.success) redirect("/grupos");
   const parseo = actualizarGrupoSchema.safeParse(leerFormData(formData));
 
-  if (!parseo.success) {
-    redirect(`/grupos/${idGrupo}/configuracion?error=${encodeURIComponent(parseo.error.issues[0].message)}`);
-  }
+  if (!parseo.success) volverConfiguracionConError(idGrupo, formData, parseo.error.issues[0].message);
 
   try {
     await grupoService.actualizarGrupo(sesion.idUsuario, grupoId.data, parseo.data);
   } catch (error) {
-    const mensaje = mensajeParaUsuario(error, "No se pudo actualizar el grupo");
-    redirect(`/grupos/${idGrupo}/configuracion?error=${encodeURIComponent(mensaje)}`);
+    volverConfiguracionConError(idGrupo, formData, mensajeParaUsuario(error, "No se pudo actualizar el grupo"));
   }
   revalidatePath(`/grupos/${idGrupo}`);
   revalidatePath(`/grupos/${idGrupo}/tareas`);
@@ -60,14 +74,14 @@ export async function invitarIntegranteAction(idGrupo: number, formData: FormDat
   const sesion = await requerirSesion();
   const grupoId = idRegistroSchema.safeParse(idGrupo);
   if (!grupoId.success) redirect("/grupos");
-  const parseo = invitacionGrupoSchema.safeParse({ idGrupo: grupoId.data, idUsuario: formData.get("idUsuario") });
+  const parseo = invitacionGrupoSchema.safeParse({ idGrupo: grupoId.data, idUsuario: formData.get("idUsuario"), rol: formData.get("rol") || undefined });
 
   if (!parseo.success) {
     redirect(`/grupos/${idGrupo}/integrantes?error=${encodeURIComponent("Selecciona a alguien de la búsqueda")}`);
   }
 
   try {
-    await grupoService.invitarIntegrante(sesion.idUsuario, parseo.data.idGrupo, parseo.data.idUsuario);
+    await grupoService.invitarIntegrante(sesion.idUsuario, parseo.data.idGrupo, parseo.data.idUsuario, parseo.data.rol);
   } catch (error) {
     const mensaje = mensajeParaUsuario(error, "No se pudo invitar");
     redirect(`/grupos/${idGrupo}/integrantes?error=${encodeURIComponent(mensaje)}`);
@@ -173,6 +187,24 @@ export async function cancelarInvitacionAction(idGrupo: number, idUsuarioObjetiv
   revalidatePath(`/grupos/${idGrupo}/integrantes`);
   revalidatePath("/notificaciones");
   redirect(`/grupos/${idGrupo}/integrantes?toast=${encodeURIComponent("Invitación cancelada")}`);
+}
+
+export async function cambiarRolIntegranteAction(idGrupo: number, idUsuarioObjetivo: number, rol: "miembro" | "observador") {
+  const sesion = await requerirSesion();
+  const parseo = cambiarRolIntegranteSchema.safeParse({ idGrupo, idUsuario: idUsuarioObjetivo, rol });
+  if (!parseo.success) redirect("/grupos");
+
+  try {
+    await grupoService.cambiarRolIntegrante(sesion.idUsuario, parseo.data.idGrupo, parseo.data.idUsuario, parseo.data.rol);
+  } catch (error) {
+    const mensaje = mensajeParaUsuario(error, "No se pudo cambiar el rol");
+    redirect(`/grupos/${idGrupo}/integrantes?error=${encodeURIComponent(mensaje)}`);
+  }
+
+  revalidatePath(`/grupos/${idGrupo}`, "layout");
+  revalidatePath("/calendario");
+  revalidatePath("/");
+  redirect(`/grupos/${idGrupo}/integrantes?toast=${encodeURIComponent(rol === "observador" ? "Ahora es observador" : "Ahora es miembro")}`);
 }
 
 export async function retirarIntegranteAction(idGrupo: number, idUsuarioObjetivo: number) {

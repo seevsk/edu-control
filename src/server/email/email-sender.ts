@@ -2,10 +2,10 @@ export interface DatosEmail {
   idNotificacion: number;
   destinatario: string;
   asunto: string;
-  cuerpo: string;
-  enlace?: string;
-  /** Texto que acompaña al enlace; por defecto "Abrir en EduControl". */
-  textoEnlace?: string;
+  /** HTML completo del correo (src/server/email/layout.ts). */
+  html: string;
+  /** Versión de texto plano equivalente. */
+  texto: string;
 }
 
 export interface ResultadoEnvio {

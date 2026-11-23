@@ -1,4 +1,6 @@
+import { cache } from "react";
 import { prisma } from "@/server/db/client";
+import { puedeReabrirse } from "@/lib/estado-reunion";
 
 export async function listarNotificaciones(idUsuario: number, limite = 30) {
   return prisma.notificacion.findMany({
@@ -8,8 +10,33 @@ export async function listarNotificaciones(idUsuario: number, limite = 30) {
   });
 }
 
+/**
+ * Lo que muestra la insignia de la Bandeja: avisos sin leer (apilados por tarea) más invitaciones
+ * pendientes con aviso sin leer. Es la misma cuenta de la página, porque sale de obtenerBandeja.
+ */
+export function contarSinLeerBandeja(bandeja: {
+  elementos: { leida: boolean }[];
+  invitacionesPendientes: { avisoLeido: boolean }[];
+}) {
+  return (
+    bandeja.elementos.filter((elemento) => !elemento.leida).length +
+    bandeja.invitacionesPendientes.filter((pendiente) => !pendiente.avisoLeido).length
+  );
+}
+
 export async function contarNotificacionesNoLeidas(idUsuario: number) {
-  return prisma.notificacion.count({ where: { idUsuario, leida: false } });
+  return contarSinLeerBandeja(await obtenerBandeja(idUsuario));
+}
+
+/** Un correo "pendiente" tarda segundos; pasados 10 min el proceso murió antes de registrar el resultado. */
+const CORREO_PENDIENTE_MAX_MS = 10 * 60_000;
+
+/** Reconciliación perezosa (sin cron): al abrir la Bandeja, los correos olvidados pasan a fallido. */
+async function cerrarCorreosPendientes(idUsuario: number) {
+  await prisma.notificacion.updateMany({
+    where: { idUsuario, estadoCorreo: "pendiente", fechaCreacion: { lt: new Date(Date.now() - CORREO_PENDIENTE_MAX_MS) } },
+    data: { estadoCorreo: "fallido" },
+  });
 }
 
 export async function marcarNotificacionLeida(idUsuario: number, idNotificacion: number) {
@@ -72,7 +99,11 @@ function leerEnlace(enlace: string | null): Destino {
  * enlace que generó el servidor, sin columnas nuevas. Las de una misma tarea se apilan en un solo
  * elemento. Absorbe el antiguo módulo Invitaciones: pendientes por responder e historial.
  */
-export async function obtenerBandeja(idUsuario: number) {
+// cache: el layout (insignia) y la página comparten una sola consulta por petición.
+export const obtenerBandeja = cache(obtenerBandejaSinCache);
+
+async function obtenerBandejaSinCache(idUsuario: number) {
+  await cerrarCorreosPendientes(idUsuario).catch(() => undefined);
   const [notificaciones, pendientes, historial] = await Promise.all([
     prisma.notificacion.findMany({
       where: { idUsuario },
@@ -89,9 +120,14 @@ export async function obtenerBandeja(idUsuario: number) {
       },
       orderBy: { fechaInvitacion: "desc" },
     }),
-    // Invitaciones respondidas y salidas (no incluye los grupos que creó).
+    // Invitaciones respondidas y salidas. No incluye los grupos que creó (salvo su propia salida) ni las
+    // invitaciones canceladas antes de responderlas.
     prisma.grupoIntegrante.findMany({
-      where: { idUsuario, estadoInvitacion: { not: "pendiente" }, grupo: { NOT: { idCreador: idUsuario } } },
+      where: {
+        idUsuario,
+        estadoInvitacion: { notIn: ["pendiente", "cancelada"] },
+        OR: [{ grupo: { idCreador: { not: idUsuario } } }, { estadoInvitacion: "retirado" }],
+      },
       select: {
         idGrupo: true,
         estadoInvitacion: true,
@@ -251,7 +287,8 @@ export async function obtenerDetalleInvitacion(idUsuario: number, idGrupo: numbe
       },
     },
   });
-  if (!registro) return null;
+  // Una invitación cancelada nunca llegó a ser del invitado: no se le muestra nada del grupo.
+  if (!registro || registro.estadoInvitacion === "cancelada") return null;
   const aceptado = registro.estadoInvitacion === "aceptada";
   return {
     ...registro,
@@ -267,7 +304,7 @@ export async function obtenerReunionParaBandeja(idUsuario: number, idGrupo: numb
   const miembro = await prisma.grupoIntegrante.findFirst({ where: { idGrupo, idUsuario, estadoInvitacion: "aceptada" }, select: { idUsuario: true } });
   if (!miembro) return null;
   const margen = 5 * 60_000;
-  return prisma.reunion.findFirst({
+  const reunion = await prisma.reunion.findFirst({
     where: idReunion
       ? { idReunion, idGrupo }
       : {
@@ -276,9 +313,22 @@ export async function obtenerReunionParaBandeja(idUsuario: number, idGrupo: numb
           fechaCreacion: { gte: new Date(fechaAviso.getTime() - margen), lte: new Date(fechaAviso.getTime() + margen) },
         },
     include: {
+      grupo: { select: { estado: true } },
       creador: { select: PERSONA },
       finalizador: { select: PERSONA },
-      asistentes: { select: { respuesta: true, fechaEntrada: true, usuario: { select: PERSONA } } },
+      asistentes: { select: { idUsuario: true, respuesta: true, fechaEntrada: true, usuario: { select: PERSONA } } },
     },
   });
+  if (!reunion) return null;
+  // Cerrada sola por sala vacia y dentro de la ventana: el panel ofrece Unirse en vez de "terminó".
+  const vigentes = await prisma.grupoIntegrante.findMany({
+    where: { idGrupo, estadoInvitacion: "aceptada", rol: { not: "observador" } },
+    select: { idUsuario: true },
+  });
+  const ids = new Set(vigentes.map((v) => v.idUsuario));
+  return {
+    ...reunion,
+    asistentes: reunion.asistentes.filter((a) => ids.has(a.idUsuario)),
+    reabrible: reunion.grupo.estado === "activo" && puedeReabrirse(reunion, new Date()),
+  };
 }

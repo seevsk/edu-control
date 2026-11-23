@@ -3,11 +3,17 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Monitor, MoreHorizontal, Pencil, Plus, Repeat, Users } from "lucide-react";
 import { requerirSesion } from "@/server/auth/session";
-import { obtenerCursoDelUsuario, obtenerEvaluacionDelUsuario, hayActualizacionesDeCursoImportado } from "@/server/services/curso";
+import {
+  obtenerCursoDelUsuario,
+  obtenerEvaluacionDelUsuario,
+  cambiosPendientesDeCursoImportado,
+  describirCambiosPendientes,
+  gruposVinculadosPorCurso,
+} from "@/server/services/curso";
 import { listarMisGrupos } from "@/server/services/grupo";
 import { DIAS_SEMANA } from "@/lib/dates";
 import { distancia, duracionMinutos, fechaCorta, rangoHoras } from "@/lib/formato-fecha";
-import { aOracion } from "@/lib/presentacion";
+import { aOracion, avisoGruposDesvinculados } from "@/lib/presentacion";
 import { formatoTitulo, nombreCorto } from "@/lib/nombres";
 import {
   actualizarCursoAction,
@@ -79,9 +85,10 @@ export default async function CursoDetallePage({
   const curso = await obtenerCursoDelUsuario(sesion.idUsuario, idCurso).catch(() => null);
   if (!curso) notFound();
   const idEvaluacionAbierta = Number(consulta.evaluacion);
-  const [hayActualizaciones, grupos, evaluacionAbiertaDetalle] = await Promise.all([
-    curso.importadoDeIdCurso ? hayActualizacionesDeCursoImportado(idCurso) : Promise.resolve(false),
+  const [cambiosPendientes, grupos, vinculados, evaluacionAbiertaDetalle] = await Promise.all([
+    curso.importadoDeIdCurso ? cambiosPendientesDeCursoImportado(idCurso) : Promise.resolve(null),
     listarMisGrupos(sesion.idUsuario),
+    gruposVinculadosPorCurso(sesion.idUsuario),
     Number.isInteger(idEvaluacionAbierta) && curso.evaluaciones.some((evaluacion) => evaluacion.idEvaluacion === idEvaluacionAbierta)
       ? obtenerEvaluacionDelUsuario(sesion.idUsuario, idEvaluacionAbierta).catch(() => null)
       : Promise.resolve(null),
@@ -144,7 +151,7 @@ export default async function CursoDetallePage({
               </form>
             ) : null}
             <form action={eliminarEvaluacionAction.bind(null, idCurso, evaluacion.idEvaluacion)}>
-              <BotonConfirmacion mensaje={`¿Quitar la evaluación ${evaluacion.nombre}?`} className="w-full rounded-sm px-2 py-1.5 text-left text-sm text-destructive hover:bg-destructive/10">
+              <BotonConfirmacion mensaje={`¿Quitar la evaluación ${evaluacion.nombre}?${avisoGruposDesvinculados(vinculados.porEvaluacion.get(evaluacion.idEvaluacion) ?? 0, "evaluación")}`} className="w-full rounded-sm px-2 py-1.5 text-left text-sm text-destructive hover:bg-destructive/10">
                 Quitar
               </BotonConfirmacion>
             </form>
@@ -175,12 +182,12 @@ export default async function CursoDetallePage({
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" asChild>
+            <Button variant="outline" size="sm" className="max-md:h-11 max-md:px-3.5" asChild>
               <Link href={`${ruta}?editar=1`} scroll={false}><Pencil aria-hidden />Editar curso</Link>
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="size-8" aria-label="Más acciones del curso"><MoreHorizontal aria-hidden /></Button>
+                <Button variant="outline" size="icon" className="size-8 max-md:size-11" aria-label="Más acciones del curso"><MoreHorizontal aria-hidden /></Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <form action={alternarActivoCursoAction.bind(null, idCurso)}>
@@ -188,7 +195,7 @@ export default async function CursoDetallePage({
                 </form>
                 <DropdownMenuSeparator />
                 <form action={eliminarCursoAction.bind(null, idCurso)}>
-                  <BotonConfirmacion mensaje={`¿Eliminar ${nombre}? También se eliminarán sus horarios y evaluaciones.`} className="w-full rounded-sm px-2 py-1.5 text-left text-sm text-destructive hover:bg-destructive/10">
+                  <BotonConfirmacion mensaje={`¿Eliminar ${nombre}? También se eliminarán sus horarios y evaluaciones.${avisoGruposDesvinculados(vinculados.porCurso.get(idCurso) ?? 0, "curso")}`} className="w-full rounded-sm px-2 py-1.5 text-left text-sm text-destructive hover:bg-destructive/10">
                     Eliminar curso
                   </BotonConfirmacion>
                 </form>
@@ -201,11 +208,11 @@ export default async function CursoDetallePage({
           <p role="alert" className="mt-4 rounded-md bg-destructive/10 px-3 py-2 text-[13px] text-destructive">{error}</p>
         ) : null}
 
-        {importado && hayActualizaciones ? (
+        {importado && cambiosPendientes ? (
           <div className="mt-5 flex flex-wrap items-center gap-3 rounded-lg border border-dashed border-input p-3 text-[13px]">
             <span className="flex-1 text-muted-foreground">{dueno ? `${dueno} cambió` : "Cambió"} el horario o las evaluaciones del curso original.</span>
             <form action={sincronizarCursoAction.bind(null, idCurso)}>
-              <SubmitButton className="h-8 rounded-md border border-input px-3 text-[13px] hover:bg-accent" pendingText="Trayendo…">Traer actualizaciones</SubmitButton>
+              <BotonConfirmacion mensaje={describirCambiosPendientes(cambiosPendientes)} className="h-8 rounded-md border border-input px-3 text-[13px] hover:bg-accent">Traer actualizaciones</BotonConfirmacion>
             </form>
           </div>
         ) : null}
@@ -237,7 +244,7 @@ export default async function CursoDetallePage({
                           <span className="ml-2 text-subtle-foreground max-md:mt-0.5 max-md:ml-0 max-md:block max-md:text-[13px]">{duracionMinutos(minutos)}<span className="md:hidden"> · cada semana</span></span>
                         </span>
                         {modalidad ? <span className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground max-md:hidden">{curso.modalidad === "remoto" ? <Monitor className="size-3.5" aria-hidden /> : <Users className="size-3.5" aria-hidden />}{modalidad}</span> : null}
-                        <Button variant="ghost" size="sm" asChild>
+                        <Button variant="ghost" size="sm" className="max-md:h-11 max-md:px-3" asChild>
                           <Link href={`${ruta}?sesion=${horario.idHorario}`} scroll={false}>Editar sesión</Link>
                         </Button>
                       </li>
@@ -255,7 +262,7 @@ export default async function CursoDetallePage({
             <section>
               <div className="mb-2.5 flex items-center justify-between gap-3">
                 <h2 className="text-sm font-semibold">Evaluaciones</h2>
-                <Button variant="outline" size="sm" asChild>
+                <Button variant="outline" size="sm" className="max-md:h-11 max-md:px-3.5" asChild>
                   <Link href={`${ruta}?nuevaEvaluacion=1`} scroll={false}><Plus aria-hidden />Agregar evaluación</Link>
                 </Button>
               </div>
@@ -339,7 +346,7 @@ export default async function CursoDetallePage({
               <Input name="nombre" required maxLength={120} defaultValue={curso.nombre} readOnly={importado} className={importado ? "bg-muted text-muted-foreground" : undefined} />
             </label>
             <div className="grid gap-4 sm:grid-cols-2">
-              <label className={CAMPO}>Código<Input name="codigo" maxLength={30} defaultValue={curso.codigo ?? ""} /></label>
+              <label className={CAMPO}>Código<Input name="codigo" required maxLength={30} defaultValue={curso.codigo ?? ""} /></label>
               <label className={CAMPO}>
                 Docente
                 <Input name="docente" maxLength={120} defaultValue={curso.docente ?? ""} readOnly={importado} className={importado ? "bg-muted text-muted-foreground" : undefined} />

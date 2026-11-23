@@ -22,6 +22,8 @@ export interface ReunionVideoDetalle {
   iniciadaEn: Date | null;
   finalizadaEn: Date | null;
   finalizador: Persona | null;
+  /** Cerrada sola por sala vacia y aun dentro de la ventana: se puede volver a entrar. */
+  reabrible?: boolean;
   asistentes: { fechaEntrada: Date | null; usuario: Persona }[];
 }
 
@@ -71,7 +73,7 @@ export function DetalleReunionIniciada({
   ahora: Date;
   puedeUnirse: boolean;
 }) {
-  const estado = estadoReunion(reunion, ahora);
+  const estado = reunion.reabrible ? "en_curso" : estadoReunion(reunion, ahora);
   const terminada = estado === "terminada";
   const entradas = reunion.asistentes
     .filter((a) => a.fechaEntrada)
@@ -111,10 +113,12 @@ export function DetalleReunionFinalizada({
   reunion,
   grupo,
   idUsuario,
+  puedeUnirse = false,
 }: {
   reunion: ReunionVideoDetalle;
   grupo: ReactNode;
   idUsuario: number;
+  puedeUnirse?: boolean;
 }) {
   const entradas = reunion.asistentes
     .filter((a) => a.fechaEntrada)
@@ -138,7 +142,8 @@ export function DetalleReunionFinalizada({
           {reunion.finalizador ? <PersonaFila persona={reunion.finalizador} idUsuario={idUsuario} /> : <span>Cerrada automáticamente</span>}
         </Fila>
       </dl>
-      <div>
+      <div className="flex flex-wrap items-center gap-2">
+        {reunion.reabrible && puedeUnirse ? <BotonUnirse idReunion={reunion.idReunion} tamano="l" /> : null}
         <Button variant="outline" asChild className="h-10 px-3.5 text-sm">
           <Link href={`/reuniones/${reunion.idReunion}`}>Ver detalle</Link>
         </Button>

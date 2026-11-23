@@ -8,8 +8,9 @@ import { listarTareasDelGrupo, obtenerTareaDelGrupo } from "@/server/services/ta
 import { calcularAvanceGrupo } from "@/lib/metricas";
 import { ESTADOS_TAREA_ORDEN, type EstadoTarea } from "@/lib/estado-tarea";
 import { nombreCorto } from "@/lib/nombres";
+import { evaluarEntrega } from "@/lib/tiempos-tarea";
 import { fechaEnZonaLimaISO } from "@/lib/calendario";
-import { filtrosTareaSchema, idRegistroSchema } from "@/lib/validation/tarea";
+import { filtrosTareaSchema, idRegistroSchema, type FiltrosTarea } from "@/lib/validation/tarea";
 import { PaginaCompleta } from "@/components/ui-app/page-header";
 import { PanelLateral } from "@/components/ui-app/panel-lateral";
 import { ViewSwitcher } from "@/components/ui-app/view-switcher";
@@ -63,6 +64,7 @@ export default async function GrupoTareasPage({
   const estado = filtros.success ? filtros.data.estado || undefined : undefined;
   const asignado = filtros.success ? filtros.data.asignado || undefined : undefined;
   const vista = texto(parametros.vista) === "tablero" ? "tablero" : "lista";
+  const filtrosActuales: FiltrosTarea = { vista, estado, asignado };
   const idTareaAbierta = idRegistroSchema.safeParse(texto(parametros.tarea));
   const abrirNueva = texto(parametros.nueva) === "1";
   const error = texto(parametros.error);
@@ -79,7 +81,7 @@ export default async function GrupoTareasPage({
     idTareaAbierta.success ? obtenerTareaDelGrupo(sesion.idUsuario, idGrupo, idTareaAbierta.data).catch(() => null) : Promise.resolve(null),
   ]);
   const visibles = (estado === "descartada" ? descartadas : todas).filter(
-    (tarea) => (!estado || tarea.estado === estado) && (!asignado || tarea.idAsignado === asignado),
+    (tarea) => (!estado || tarea.estado === estado) && (!asignado || tarea.idAsignado === (asignado === "sin" ? null : asignado)),
   );
 
   const ahora = new Date();
@@ -110,6 +112,7 @@ export default async function GrupoTareasPage({
     asignado: tarea.asignado ? { idUsuario: tarea.asignado.idUsuario, nombre: tarea.asignado.nombre, apellidos: tarea.asignado.apellidos, fotoUrl: tarea.asignado.fotoUrl } : null,
     nota: tarea.estado === "en_revision" && puedeGestionar && datos.rolActual === "lider" ? "Te toca revisar" : undefined,
     adjuntos: tarea.entregas[0]?._count.archivos ?? 0,
+    conAtraso: tarea.estado === "completada" && evaluarEntrega(tarea, tarea.historial)?.aTiempo === false,
   }));
   const responsableFiltrado = asignables.find((integrante) => integrante.idUsuario === asignado);
 
@@ -162,7 +165,12 @@ export default async function GrupoTareasPage({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className={asignado ? "h-7" : "h-7 border-dashed text-muted-foreground"}>
-              {responsableFiltrado ? (
+              {asignado === "sin" ? (
+                <>
+                  <UserAvatar usuario={null} tamano="xs" />
+                  Sin asignar
+                </>
+              ) : responsableFiltrado ? (
                 <>
                   <UserAvatar usuario={responsableFiltrado.usuario} tamano="xs" />
                   {nombreCorto(responsableFiltrado.usuario.nombre, responsableFiltrado.usuario.apellidos)}
@@ -172,6 +180,12 @@ export default async function GrupoTareasPage({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
+            <DropdownMenuItem asChild>
+              <Link href={href({ asignado: "sin" })} scroll={false}>
+                <UserAvatar usuario={null} tamano="xs" />
+                Sin asignar
+              </Link>
+            </DropdownMenuItem>
             {asignables.map((integrante) => (
               <DropdownMenuItem key={integrante.idUsuario} asChild>
                 <Link href={href({ asignado: String(integrante.idUsuario) })} scroll={false}>
@@ -222,6 +236,12 @@ export default async function GrupoTareasPage({
             ))}
             <DropdownMenuSeparator />
             <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Responsable</DropdownMenuLabel>
+            <DropdownMenuItem asChild className="min-h-10">
+              <Link href={href({ asignado: "sin" })} scroll={false}>
+                <UserAvatar usuario={null} tamano="xs" />
+                Sin asignar
+              </Link>
+            </DropdownMenuItem>
             {asignables.map((integrante) => (
               <DropdownMenuItem key={integrante.idUsuario} asChild className="min-h-10">
                 <Link href={href({ asignado: String(integrante.idUsuario) })} scroll={false}>
@@ -320,6 +340,7 @@ export default async function GrupoTareasPage({
             editar={texto(parametros.editar) === "1"}
             entregar={texto(parametros.entregar) === "1"}
             error={error}
+            filtros={filtrosActuales}
           />
         </PanelLateral>
       ) : null}
@@ -327,7 +348,7 @@ export default async function GrupoTareasPage({
       {abrirNueva && puedeGestionar ? (
         <PanelLateral titulo="Nueva tarea" cerrarEn={hrefCerrar}>
           {error ? <p role="alert" className="mb-4 rounded-md bg-destructive/10 px-3 py-2 text-[13px] text-destructive">{error}</p> : null}
-          <form action={crearTareaAction.bind(null, idGrupo)} className="flex flex-col gap-4">
+          <form action={crearTareaAction.bind(null, idGrupo, filtrosActuales)} className="flex flex-col gap-4">
             <label className={CAMPO}>
               Título
               <Input name="titulo" required maxLength={160} autoFocus />
@@ -340,9 +361,11 @@ export default async function GrupoTareasPage({
               Responsable
               <CampoSelect
                 name="idAsignado"
-                required
-                placeholder="Elige a quién le toca"
-                opciones={asignables.map((integrante) => ({ valor: String(integrante.idUsuario), texto: nombreCorto(integrante.usuario.nombre, integrante.usuario.apellidos) }))}
+                defaultValue=""
+                opciones={[
+                  { valor: "", texto: "Sin asignar" },
+                  ...asignables.map((integrante) => ({ valor: String(integrante.idUsuario), texto: nombreCorto(integrante.usuario.nombre, integrante.usuario.apellidos) })),
+                ]}
               />
             </label>
             <div className="grid gap-4 sm:grid-cols-2">

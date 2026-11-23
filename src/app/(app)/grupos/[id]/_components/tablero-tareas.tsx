@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState, useTransition } from "react";
+import { useId, useOptimistic, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Paperclip, Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -21,8 +21,9 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
 import { accionesDisponiblesTarea, ESTADOS_TAREA_ORDEN, ETIQUETA_ESTADO_TAREA, type EstadoTarea } from "@/lib/estado-tarea";
+import { FilaDesplazable } from "@/components/ui-app/fila-desplazable";
 import { StatusIcon } from "@/components/ui-app/status-icon";
-import { DueChip } from "@/components/ui-app/due-chip";
+import { DueChip, EtiquetaAtraso } from "@/components/ui-app/due-chip";
 import { UserAvatar } from "@/components/ui-app/user-avatar";
 import type { FilaTarea } from "@/components/ui-app/task-row";
 import { moverTareaAction } from "../tareas/actions";
@@ -43,6 +44,7 @@ function ContenidoTarjeta({ fila, ahora }: { fila: FilaTarea; ahora: Date }) {
         <UserAvatar usuario={fila.asignado} />
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
+        {fila.conAtraso ? <EtiquetaAtraso /> : null}
         <DueChip fecha={fila.fechaLimite} cerrada={cerrada} ahora={ahora} />
         {fila.adjuntos ? (
           <span className="inline-flex items-center gap-1 text-xs text-muted-foreground" title={`${fila.adjuntos} ${fila.adjuntos === 1 ? "archivo" : "archivos"} en la entrega`}>
@@ -77,14 +79,17 @@ function Tarjeta({ fila, ahora, arrastrable, href }: { fila: FilaTarea; ahora: D
   );
 }
 
-function Columna({ estado, cantidad, hrefNueva, children }: { estado: EstadoTarea; cantidad: number; hrefNueva?: string; children: React.ReactNode }) {
+function Columna({ estado, cantidad, hrefNueva, bloqueada, children }: { estado: EstadoTarea; cantidad: number; hrefNueva?: string; bloqueada?: boolean; children: React.ReactNode }) {
   const { setNodeRef, isOver } = useDroppable({ id: estado });
   return (
     <section
       ref={setNodeRef}
       aria-label={ETIQUETA_ESTADO_TAREA[estado]}
       id={`columna-${estado}`}
-      className={cn("flex min-w-0 snap-start flex-col gap-2 rounded-[10px] bg-sidebar p-2 transition-colors dark:bg-transparent dark:p-1", isOver && "bg-accent dark:bg-accent")}
+      className={cn(
+        "flex min-w-0 snap-start flex-col gap-2 rounded-[10px] bg-sidebar p-2 transition-[colors,opacity] dark:bg-transparent dark:p-1",
+        bloqueada ? "opacity-45" : isOver && "bg-accent dark:bg-accent",
+      )}
     >
       <h2 className="flex h-8 items-center gap-2 px-1 text-[13px] max-md:hidden">
         <StatusIcon estado={estado} />
@@ -132,15 +137,18 @@ export function TableroTareas({
 }) {
   const router = useRouter();
   const [, iniciarTransicion] = useTransition();
-  const [movidas, setMovidas] = useState<Record<number, EstadoTarea>>({});
-  const carril = useRef<HTMLDivElement>(null);
+  // Estado optimista: dura lo que dura la transición; después manda el estado real del servidor.
+  const [actuales, moverOptimista] = useOptimistic(filas, (previas, { idTarea, estado }: { idTarea: number; estado: EstadoTarea }) =>
+    previas.map((fila) => (fila.idTarea === idTarea ? { ...fila, estado } : fila)),
+  );
   const [columnaVisible, setColumnaVisible] = useState(0);
   function irAColumna(indice: number) {
-    const contenedor = carril.current;
+    const contenedor = document.getElementById("carril-tablero");
     const columna = contenedor?.querySelectorAll<HTMLElement>("[id^=columna-]")[indice];
     if (contenedor && columna) contenedor.scrollTo({ left: columna.offsetLeft - contenedor.offsetLeft - 16, behavior: "smooth" });
   }
   const [arrastrando, setArrastrando] = useState<number | null>(null);
+  const idDnd = useId();
   const sensores = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
@@ -148,10 +156,38 @@ export function TableroTareas({
   );
 
   const puedeMover = rol !== "observador" && activo;
-  const actuales = filas.map((fila) => ({ ...fila, estado: movidas[fila.idTarea] ?? fila.estado }));
   const limite = ahora.getTime() - DIAS_COMPLETADAS_EN_TABLERO * 86_400_000;
   const ocultas = actuales.filter((fila) => fila.estado === "completada" && completadasEn[fila.idTarea] && Date.parse(completadasEn[fila.idTarea]) < limite);
   const filaArrastrada = actuales.find((fila) => fila.idTarea === arrastrando) ?? null;
+
+  /** Qué pasa al soltar una tarjeta en una columna: se decide con las reglas puras, antes de mover nada. */
+  function resolverSoltar(fila: FilaTarea, destino: EstadoTarea):
+    | { tipo: "mover" }
+    | { tipo: "ir"; href: string; aviso?: string }
+    | { tipo: "rechazar"; aviso: string } {
+    const idAsignado = fila.asignado?.idUsuario ?? null;
+    // Pasar a revisión exige una entrega: en vez de mover la tarjeta se abre el formulario.
+    if (destino === "en_revision" && fila.estado === "en_progreso") {
+      return idAsignado === idUsuario
+        ? { tipo: "ir", href: `${hrefTarea[fila.idTarea]}&entregar=1` }
+        : { tipo: "rechazar", aviso: "Solo el responsable envía la entrega a revisión." };
+    }
+    // Aprobar y devolver se hacen en el detalle, donde está la entrega que se revisa.
+    if (fila.estado === "en_revision") {
+      return rol === "lider"
+        ? { tipo: "ir", href: hrefTarea[fila.idTarea], aviso: "Revisa la entrega en el detalle para aprobarla o devolverla." }
+        : { tipo: "rechazar", aviso: "Solo el líder aprueba o devuelve una entrega." };
+    }
+    const accion = accionesDisponiblesTarea({ estado: fila.estado, idAsignado, idUsuario, rol }).find((opcion) => opcion.estado === destino);
+    if (!accion) {
+      if (fila.estado === "pendiente" && destino === "en_revision") return { tipo: "rechazar", aviso: "Empieza la tarea antes de enviarla a revisión." };
+      if (fila.estado === "pendiente" && destino === "en_progreso" && idAsignado === null) return { tipo: "rechazar", aviso: "Asigna un responsable antes de empezar la tarea." };
+      if (fila.estado === "pendiente" && destino === "en_progreso") return { tipo: "rechazar", aviso: "Solo el responsable o el líder pueden empezar la tarea." };
+      return { tipo: "rechazar", aviso: `No se puede pasar de ${ETIQUETA_ESTADO_TAREA[fila.estado]} a ${ETIQUETA_ESTADO_TAREA[destino]} desde el tablero.` };
+    }
+    if (accion.motivo) return { tipo: "ir", href: hrefTarea[fila.idTarea], aviso: AVISO_MOTIVO[destino] ?? "Esta acción necesita un motivo; complétala en el detalle." };
+    return { tipo: "mover" };
+  }
 
   function alSoltar({ active, over }: DragEndEvent) {
     setArrastrando(null);
@@ -159,52 +195,36 @@ export function TableroTareas({
     const destino = over?.id as EstadoTarea | undefined;
     if (!fila || !destino || destino === fila.estado) return;
 
-    // Pasar a revisión exige una entrega: en vez de mover la tarjeta se abre el formulario.
-    if (destino === "en_revision" && fila.estado === "en_progreso") {
-      if (fila.asignado?.idUsuario === idUsuario) {
-        router.push(`${hrefTarea[fila.idTarea]}&entregar=1`, { scroll: false });
-      } else {
-        toast("Solo el responsable envía la entrega a revisión.");
-      }
+    const resolucion = resolverSoltar(fila, destino);
+    if (resolucion.tipo === "rechazar") {
+      toast(resolucion.aviso);
       return;
     }
-    // Aprobar y devolver se hacen en el detalle, donde está la entrega que se revisa.
-    if (fila.estado === "en_revision") {
-      toast(rol === "lider" ? "Revisa la entrega en el detalle para aprobarla o devolverla." : "Solo el líder aprueba o devuelve una entrega.");
-      router.push(hrefTarea[fila.idTarea], { scroll: false });
+    if (resolucion.tipo === "ir") {
+      if (resolucion.aviso) toast(resolucion.aviso);
+      router.push(resolucion.href, { scroll: false });
       return;
     }
 
-    const accion = accionesDisponiblesTarea({ estado: fila.estado, idAsignado: fila.asignado?.idUsuario ?? null, idUsuario, rol })
-      .find((opcion) => opcion.estado === destino);
-    if (accion?.motivo) {
-      toast(AVISO_MOTIVO[destino] ?? "Esta acción necesita un motivo; complétala en el detalle.");
-      router.push(hrefTarea[fila.idTarea], { scroll: false });
-      return;
-    }
-
-    setMovidas((previas) => ({ ...previas, [fila.idTarea]: destino }));
     iniciarTransicion(async () => {
+      moverOptimista({ idTarea: fila.idTarea, estado: destino });
       const resultado = await moverTareaAction(idGrupo, fila.idTarea, destino);
       if (!resultado.ok) {
-        setMovidas((previas) => {
-          const resto = { ...previas };
-          delete resto[fila.idTarea];
-          return resto;
-        });
         toast.error(resultado.error);
+        router.refresh(); // el servidor tiene otro estado (alguien más la movió): se vuelve a leer
       }
     });
   }
 
   return (
     <DndContext
+      id={idDnd}
       sensors={sensores}
       onDragStart={({ active }: DragStartEvent) => setArrastrando(Number(active.id))}
       onDragCancel={() => setArrastrando(null)}
       onDragEnd={alSoltar}
     >
-      <div className="flex gap-2 overflow-x-auto px-4 pt-3 [scrollbar-width:none] md:hidden" role="tablist" aria-label="Columnas del tablero">
+      <FilaDesplazable className="md:hidden" scrollerClassName="flex gap-2 px-4 pt-3" role="tablist" aria-label="Columnas del tablero">
         {ESTADOS_TAREA_ORDEN.map((estado, indice) => (
           <button
             key={estado}
@@ -222,21 +242,29 @@ export function TableroTareas({
             <span className="text-subtle-foreground">{actuales.filter((fila) => fila.estado === estado && !ocultas.includes(fila)).length}</span>
           </button>
         ))}
-      </div>
-      <div
-        ref={carril}
+      </FilaDesplazable>
+      <FilaDesplazable
+        id="carril-tablero"
+        centrarActivo={false}
+        fadeClassName="max-md:hidden"
         onScroll={(evento) => {
           const contenedor = evento.currentTarget;
           const ancho = contenedor.querySelector<HTMLElement>("[id^=columna-]")?.offsetWidth ?? 1;
           setColumnaVisible(Math.min(3, Math.round(contenedor.scrollLeft / (ancho + 12))));
         }}
-        className="snap-x snap-mandatory overflow-x-auto scroll-px-4 px-4 py-4 [scrollbar-width:none] sm:px-6 md:snap-none"
+        scrollerClassName="snap-x snap-mandatory scroll-px-4 px-4 py-4 sm:px-6 md:snap-none"
       >
         <div className="grid grid-cols-[repeat(4,calc(100vw-3rem))] gap-3 md:grid-cols-[repeat(4,minmax(240px,1fr))] md:gap-4">
           {ESTADOS_TAREA_ORDEN.map((estado) => {
             const delEstado = actuales.filter((fila) => fila.estado === estado && !ocultas.includes(fila));
             return (
-              <Columna key={estado} estado={estado} cantidad={delEstado.length} hrefNueva={estado === "pendiente" ? hrefNueva : undefined}>
+              <Columna
+                key={estado}
+                estado={estado}
+                cantidad={delEstado.length}
+                hrefNueva={estado === "pendiente" ? hrefNueva : undefined}
+                bloqueada={filaArrastrada !== null && filaArrastrada.estado !== estado && resolverSoltar(filaArrastrada, estado).tipo === "rechazar"}
+              >
                 {delEstado.map((fila) => (
                   <Tarjeta key={fila.idTarea} fila={fila} ahora={ahora} arrastrable={puedeMover} href={hrefTarea[fila.idTarea]} />
                 ))}
@@ -246,7 +274,7 @@ export function TableroTareas({
                   </p>
                 ) : null}
                 {estado === "completada" && ocultas.length > 0 ? (
-                  <Link href={hrefAnteriores} className="px-1 text-xs text-muted-foreground hover:text-foreground">
+                  <Link href={hrefAnteriores} className="px-1 text-xs text-muted-foreground hover:text-foreground max-md:flex max-md:min-h-11 max-md:items-center">
                     Ver {ocultas.length} completadas hace más de {DIAS_COMPLETADAS_EN_TABLERO} días
                   </Link>
                 ) : null}
@@ -254,7 +282,7 @@ export function TableroTareas({
             );
           })}
         </div>
-      </div>
+      </FilaDesplazable>
       <DragOverlay>
         {filaArrastrada ? (
           <article className="flex rotate-1 flex-col gap-2.5 rounded-lg border bg-card p-3 text-card-foreground shadow-lg">

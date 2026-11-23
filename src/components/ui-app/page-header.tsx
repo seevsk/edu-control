@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { ChevronLeft, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Migas, type MigaDePan } from "./barra-superior";
+import { FilaDesplazable } from "./fila-desplazable";
 
 export type { MigaDePan };
 
@@ -48,10 +49,10 @@ export function VolverMovil({ href, texto, className }: { href: string; texto: s
   );
 }
 
-/** Filtros en forma de chips (móvil): enlaces de 34 px con desplazamiento horizontal si no caben. */
+/** Filtros en forma de chips (móvil): se ven de 34 px pero su área táctil mide 44 px; se desplazan si no caben. */
 export function ChipsFiltro({ opciones, etiqueta, className }: { opciones: { href: string; texto: string; activa: boolean }[]; etiqueta: string; className?: string }) {
   return (
-    <nav aria-label={etiqueta} className={cn("flex gap-2 overflow-x-auto px-4 pt-1 pb-2 [scrollbar-width:none]", className)}>
+    <FilaDesplazable as="nav" aria-label={etiqueta} className={className} scrollerClassName="flex gap-2 px-4 pt-1.5 pb-2">
       {opciones.map((opcion) => (
         <Link
           key={opcion.href}
@@ -59,14 +60,14 @@ export function ChipsFiltro({ opciones, etiqueta, className }: { opciones: { hre
           scroll={false}
           aria-current={opcion.activa ? "page" : undefined}
           className={cn(
-            "flex h-[34px] shrink-0 items-center rounded-full border px-3.5 text-[13px] font-medium whitespace-nowrap transition-colors",
+            "relative flex h-[34px] shrink-0 items-center rounded-full max-md:after:absolute max-md:after:inset-x-0 max-md:after:-inset-y-[5px] max-md:after:content-[''] border px-3.5 text-[13px] font-medium whitespace-nowrap transition-colors",
             opcion.activa ? "border-foreground bg-foreground text-background" : "border-input text-muted-foreground hover:text-foreground",
           )}
         >
           {opcion.texto}
         </Link>
       ))}
-    </nav>
+    </FilaDesplazable>
   );
 }
 
@@ -122,7 +123,7 @@ export function PageHeader({
       </div>
       {extra}
       {pestanas?.length ? (
-        <nav aria-label="Secciones" className="-mx-4 mt-3.5 -mb-px flex gap-5 overflow-x-auto px-4 text-sm [scrollbar-width:none] sm:mx-0 sm:px-0 md:text-[13px]">
+        <FilaDesplazable as="nav" aria-label="Secciones" className="-mx-4 mt-3.5 -mb-px sm:mx-0" scrollerClassName="flex gap-5 px-4 text-sm sm:px-0 md:text-[13px]">
           {pestanas.map((pestana) => (
             <Link
               key={pestana.href}
@@ -137,7 +138,7 @@ export function PageHeader({
               {pestana.contador !== undefined ? <span className="ml-1.5 text-subtle-foreground">{pestana.contador}</span> : null}
             </Link>
           ))}
-        </nav>
+        </FilaDesplazable>
       ) : null}
     </header>
   );

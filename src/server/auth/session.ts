@@ -1,7 +1,9 @@
 import { SignJWT, jwtVerify } from "jose";
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { env } from "@/lib/env";
+import { prisma } from "@/server/db/client";
 import { SESSION_COOKIE_NAME } from "./constants";
 
 const DURACION_SEGUNDOS = 60 * 60 * 24 * 30; // 30 dias
@@ -43,9 +45,18 @@ export async function obtenerSesion(): Promise<SesionUsuario | null> {
   }
 }
 
+/** Una sola consulta por petición aunque varias funciones pidan la sesión. */
+const cuentaVigente = cache(async (idUsuario: number) => {
+  const usuario = await prisma.usuario.findUnique({ where: { idUsuario }, select: { eliminadoEn: true } });
+  return Boolean(usuario && !usuario.eliminadoEn);
+});
+
 export async function requerirSesion(): Promise<SesionUsuario> {
   const sesion = await obtenerSesion();
   if (!sesion) redirect("/login");
+  // Punto común de páginas y Server Actions: una cuenta eliminada o inexistente no sigue operando
+  // con su cookie (el proxy solo verifica la firma y no consulta la base).
+  if (!(await cuentaVigente(sesion.idUsuario))) redirect("/api/auth/sesion-invalida");
   return sesion;
 }
 

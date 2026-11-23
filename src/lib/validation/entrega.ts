@@ -12,6 +12,15 @@ export const entregaSchema = z.object({
     .trim()
     .max(2000, "El enlace es demasiado largo")
     .refine((valor) => valor === "" || /^https?:\/\//i.test(valor), "El enlace debe empezar con http:// o https://")
+    .refine((valor) => {
+      if (valor === "") return true;
+      try {
+        const url = new URL(valor);
+        return (url.protocol === "http:" || url.protocol === "https:") && url.hostname !== "";
+      } catch {
+        return false;
+      }
+    }, "El enlace no es una dirección válida")
     .optional(),
 });
 

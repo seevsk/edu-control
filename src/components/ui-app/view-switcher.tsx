@@ -17,7 +17,7 @@ export function ViewSwitcher({ vista, hrefLista, hrefTablero }: { vista: "lista"
           scroll={false}
           aria-current={vista === valor ? "true" : undefined}
           className={cn(
-            "flex h-7 items-center gap-1.5 px-2.5 text-[13px]",
+            "flex h-7 items-center gap-1.5 px-2.5 text-[13px] max-md:h-11 max-md:px-3.5",
             vista === valor ? "bg-background text-foreground shadow-xs dark:bg-accent dark:shadow-none" : "text-muted-foreground hover:text-foreground",
           )}
         >

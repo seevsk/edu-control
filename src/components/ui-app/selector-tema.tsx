@@ -18,7 +18,7 @@ export function SelectorTema({ id }: { id?: string }) {
   const montado = useSyncExternalStore(sinSuscripcion, () => true, () => false);
   return (
     <Select value={montado ? theme ?? "system" : undefined} onValueChange={setTheme}>
-      <SelectTrigger id={id} aria-label="Apariencia" className="h-9 w-[124px] text-sm">
+      <SelectTrigger id={id} aria-label="Apariencia" className="h-9 w-[124px] text-sm max-md:h-11 max-md:data-[size=default]:h-11">
         <SelectValue placeholder="Sistema" />
       </SelectTrigger>
       <SelectContent align="end">

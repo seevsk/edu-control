@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { requerirSesion } from "@/server/auth/session";
 import { obtenerCalendarioEntre } from "@/server/services/calendario";
 import { diasDeVistaMes, fechaEnZonaLimaISO, lunesDeSemanaISO, sumarDiasISO } from "@/lib/calendario";
+import { esFechaISOReal } from "@/lib/dates";
 import { Toast } from "@/components/toast";
 import { DialogoUrl } from "@/components/ui-app/dialogo-url";
 import { PaginaCompleta } from "@/components/ui-app/page-header";
@@ -13,8 +14,6 @@ import type { ModoCalendario } from "./_components/tipos-calendario";
 import { crearBloqueOcupadoAction } from "./actions";
 
 export const metadata: Metadata = { title: "Calendario" };
-
-const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 
 function esModo(valor: string | undefined): valor is ModoCalendario {
   return valor === "mes" || valor === "semana" || valor === "agenda";
@@ -29,9 +28,9 @@ export default async function CalendarioPage({
   const { modo: modoParam, fecha: fechaParam, semana, mes, error, toast, nuevoBloque } = await searchParams;
   const hoyISO = fechaEnZonaLimaISO(new Date());
   // Los enlaces anteriores usaban `semana=` y `mes=`; se siguen aceptando.
-  const fecha = fechaParam && FECHA.test(fechaParam)
+  const fecha = fechaParam && esFechaISOReal(fechaParam)
     ? fechaParam
-    : semana && FECHA.test(semana)
+    : semana && esFechaISOReal(semana)
       ? semana
       : mes && /^\d{4}-(0[1-9]|1[0-2])$/.test(mes)
         ? `${mes}-01`

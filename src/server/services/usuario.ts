@@ -43,7 +43,7 @@ export async function iniciarSesionConGoogle(claims: ClaimsGoogle) {
  */
 export async function requerirUsuarioValido(idUsuario: number) {
   const usuario = await prisma.usuario.findUnique({ where: { idUsuario } });
-  if (!usuario) {
+  if (!usuario || usuario.eliminadoEn) {
     redirect("/api/auth/sesion-invalida");
   }
   return usuario;

@@ -1,6 +1,8 @@
 import { prisma } from "@/server/db/client";
-import { cerrarSesion } from "@/server/auth/session";
 import { requerirUsuarioValido } from "@/server/services/usuario";
+import { ejecutarCambioDeGrupo } from "@/server/services/cambio-grupo";
+import { notificarSalidaDelGrupo, salirDelGrupoEnTransaccion } from "@/server/services/grupo";
+import { ErrorDeNegocio } from "@/lib/errores";
 import type { actualizarPerfilSchema } from "@/lib/validation/perfil";
 import type { z } from "zod";
 
@@ -116,26 +118,60 @@ export async function actualizarVisibilidad(idUsuario: number, visibleEnBusqueda
   await prisma.perfil.update({ where: { idUsuario }, data: { visibleEnBusqueda } });
 }
 
+/**
+ * Antes de anonimizar, la persona sale de sus grupos activos como en "salir del grupo" (retirado
+ * voluntario, tareas abiertas sin responsable) y sus invitaciones pendientes se cancelan: nadie
+ * las respondió, así que no figuran como rechazos. Si lidera un grupo activo con otro integrante
+ * que pueda liderar, se bloquea hasta que ceda el liderazgo. Es idempotente.
+ */
 export async function eliminarCuenta(idUsuario: number) {
-  const usuario = await prisma.usuario.findUniqueOrThrow({ where: { idUsuario } });
-  const marcaAnonima = `eliminado-${idUsuario}-${Date.now()}@educontrol.local`;
+  const salidas = await ejecutarCambioDeGrupo(async (tx) => {
+    const usuario = await tx.usuario.findUnique({ where: { idUsuario } });
+    if (!usuario || usuario.eliminadoEn) return null;
 
-  await prisma.$transaction([
-    prisma.bloqueOcupado.deleteMany({ where: { idUsuario } }),
-    prisma.perfil.delete({ where: { idUsuario } }),
-    prisma.usuario.update({
+    const membresias = await tx.grupoIntegrante.findMany({
+      where: { idUsuario, estadoInvitacion: "aceptada", grupo: { estado: "activo" } },
+      include: { grupo: { select: { idGrupo: true, nombre: true } } },
+    });
+    const sinLider = new Set<number>();
+    const bloqueantes: string[] = [];
+    for (const membresia of membresias) {
+      if (membresia.rol !== "lider") continue;
+      const otros = await tx.grupoIntegrante.count({
+        where: { idGrupo: membresia.idGrupo, idUsuario: { not: idUsuario }, estadoInvitacion: "aceptada", rol: { not: "observador" } },
+      });
+      if (otros > 0) bloqueantes.push(membresia.grupo.nombre);
+      else sinLider.add(membresia.idGrupo);
+    }
+    if (bloqueantes.length > 0) throw new ErrorDeNegocio(`Cede el liderazgo en: ${bloqueantes.join(", ")}`);
+
+    const salidas = [];
+    for (const membresia of membresias) {
+      salidas.push(await salirDelGrupoEnTransaccion(tx, idUsuario, membresia.idGrupo, { sinLider: sinLider.has(membresia.idGrupo) }));
+    }
+    await tx.grupoIntegrante.updateMany({
+      where: { idUsuario, estadoInvitacion: "pendiente" },
+      data: { estadoInvitacion: "cancelada" },
+    });
+
+    await tx.bloqueOcupado.deleteMany({ where: { idUsuario } });
+    await tx.perfil.deleteMany({ where: { idUsuario } });
+    await tx.usuario.update({
       where: { idUsuario },
       data: {
         eliminadoEn: new Date(),
         nombre: "Cuenta eliminada",
         apellidos: null,
-        correo: marcaAnonima,
+        correo: `eliminado-${idUsuario}-${Date.now()}@educontrol.local`,
         dominioCorreo: null,
         fotoUrl: null,
         googleId: `eliminado-${usuario.googleId}`,
       },
-    }),
-  ]);
+    });
+    return { persona: { nombre: usuario.nombre, apellidos: usuario.apellidos }, salidas };
+  });
 
-  await cerrarSesion();
+  if (salidas) {
+    for (const salida of salidas.salidas) await notificarSalidaDelGrupo(salidas.persona, idUsuario, salida);
+  }
 }

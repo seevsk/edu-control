@@ -42,6 +42,7 @@ async function verificar() {
     const grupoService = await import("../src/server/services/grupo");
     const tareaService = await import("../src/server/services/tarea");
     const entregaService = await import("../src/server/services/entrega");
+    const perfilService = await import("../src/server/services/perfil");
     const enviar = (actor: number, idTarea: number, archivos: { nombre: string; datos: Uint8Array<ArrayBuffer> }[] = []) =>
       entregaService.enviarEntrega(actor, { idGrupo, idTarea, titulo: "Entrega", descripcion: "Listo para revisar", enlace: "" }, archivos);
     const { crearNotificacion } = await import("../src/server/notifications/crear-notificacion");
@@ -126,6 +127,7 @@ async function verificar() {
         asunto: "Tarea en revisión",
         idGrupo,
       });
+      assert.ok(silenciada);
       assert.equal(silenciada.estadoCorreo, "no_aplica");
 
       await grupoService.actualizarPreferenciaCorreoActividad(ana, idGrupo, true);
@@ -137,6 +139,7 @@ async function verificar() {
         asunto: "Tarea en revisión",
         idGrupo,
       });
+      assert.ok(habilitada);
       assert.equal(
         (await db!.notificacion.findUniqueOrThrow({
           where: { idNotificacion: habilitada.idNotificacion },
@@ -186,9 +189,79 @@ async function verificar() {
         await assert.rejects(tareaService.reasignarTarea(lider, idGrupo, tarea.idTarea, String(asignado)), ErrorDeNegocio);
       }
     });
-    await caso("crear exige responsable y fecha, y una tarea desasignada no puede empezar", async () => {
+    const grupoLibre = await crearGrupo();
+    await caso("crear sin responsable es válido, no notifica y no puede empezar sin dueño", async () => {
       const { crearTareaSchema } = await import("../src/lib/validation/tarea");
       assert.equal(crearTareaSchema.safeParse({ titulo: "Incompleta", peso: 1 }).success, false);
+      assert.equal(crearTareaSchema.safeParse({ titulo: "Libre", peso: 1, fechaLimite: fechaLimitePrueba }).success, true);
+      assert.equal(crearTareaSchema.safeParse({ titulo: "Libre", peso: 1, idAsignado: "", fechaLimite: fechaLimitePrueba }).success, true);
+      const antes = await db!.notificacion.count({ where: { tipo: "tarea_asignada" } });
+      const libre = await tareaService.crearTarea(lider, grupoLibre, { titulo: "Sin dueño", peso: 1, idAsignado: "", fechaLimite: fechaLimitePrueba });
+      assert.deepEqual([libre.estado, libre.idAsignado], ["pendiente", null]);
+      assert.equal(await db!.notificacion.count({ where: { tipo: "tarea_asignada" } }), antes);
+      assert.equal(await db!.tareaHistorial.count({ where: { idTarea: libre.idTarea, accion: { in: ["reasignada", "vista"] } } }), 0);
+      for (const actor of [lider, ana]) {
+        await assert.rejects(tareaService.cambiarEstadoTarea(actor, grupoLibre, libre.idTarea, "en_progreso"), ErrorDeNegocio);
+      }
+      // Con responsable distinto del actor se notifica, como siempre.
+      await tareaService.crearTarea(lider, grupoLibre, { titulo: "Con dueño", peso: 1, idAsignado: String(ana), fechaLimite: fechaLimitePrueba });
+      assert.equal(await db!.notificacion.count({ where: { tipo: "tarea_asignada" } }), antes + 1);
+    });
+    await caso("tomar tarea: historial, vista, sin avisar al actor; otros estados y observadores rechazados", async () => {
+      const libre = await tareaService.crearTarea(lider, grupoLibre, { titulo: "Para tomar", peso: 2, fechaLimite: fechaLimitePrueba });
+      for (const actor of [observador, invitado, externo]) {
+        await assert.rejects(tareaService.tomarTarea(actor, grupoLibre, libre.idTarea), ErrorDeNegocio);
+      }
+      assert.equal((await db!.tarea.findUniqueOrThrow({ where: { idTarea: libre.idTarea } })).idAsignado, null);
+      const antes = await db!.notificacion.count({ where: { tipo: "tarea_asignada" } });
+      const tomada = await tareaService.tomarTarea(luis, grupoLibre, libre.idTarea);
+      assert.equal(tomada.idAsignado, luis);
+      assert.equal(await db!.notificacion.count({ where: { tipo: "tarea_asignada" } }), antes);
+      const historial = await db!.tareaHistorial.findMany({ where: { idTarea: libre.idTarea }, orderBy: { idHistorial: "asc" } });
+      assert.deepEqual(historial.map((h) => [h.accion, h.idUsuario, h.valorAnterior, h.valorNuevo]), [
+        ["creada", lider, null, null],
+        ["reasignada", luis, null, String(luis)],
+        ["vista", luis, null, null],
+      ]);
+      // Ya tiene dueño: nadie más puede tomarla, ni su dueño otra vez.
+      await assert.rejects(tareaService.tomarTarea(ana, grupoLibre, libre.idTarea), /Otra persona ya tomó esta tarea/);
+      await assert.rejects(tareaService.tomarTarea(luis, grupoLibre, libre.idTarea), ErrorDeNegocio);
+      // Solo las pendientes: una descartada sin responsable no se toma.
+      const descartada = await tareaService.crearTarea(lider, grupoLibre, { titulo: "Descartada libre", peso: 1, fechaLimite: fechaLimitePrueba });
+      await tareaService.cambiarEstadoTarea(lider, grupoLibre, descartada.idTarea, "descartada", "Ya no hace falta");
+      await assert.rejects(tareaService.tomarTarea(ana, grupoLibre, descartada.idTarea), ErrorDeNegocio);
+    });
+    await caso("dos tomas simultáneas: solo una gana y la otra ve que ya la tomaron", async () => {
+      const libre = await tareaService.crearTarea(lider, grupoLibre, { titulo: "Carrera", peso: 1, fechaLimite: fechaLimitePrueba });
+      const resultados = await Promise.allSettled([
+        tareaService.tomarTarea(ana, grupoLibre, libre.idTarea),
+        tareaService.tomarTarea(luis, grupoLibre, libre.idTarea),
+      ]);
+      assert.equal(resultados.filter((r) => r.status === "fulfilled").length, 1);
+      const perdedor = resultados.find((r) => r.status === "rejected") as PromiseRejectedResult;
+      assert.ok(perdedor.reason instanceof ErrorDeNegocio);
+      assert.match(perdedor.reason.message, /Otra persona ya tomó esta tarea/);
+      const final = await db!.tarea.findUniqueOrThrow({ where: { idTarea: libre.idTarea } });
+      assert.ok(final.idAsignado === ana || final.idAsignado === luis);
+      assert.equal(await db!.tareaHistorial.count({ where: { idTarea: libre.idTarea, accion: "reasignada" } }), 1);
+    });
+    await caso("la carga por integrante no cuenta tareas sin asignar y el avance sí", async () => {
+      const { calcularMetricasPorIntegrante, calcularAvanceGrupo } = await import("../src/lib/metricas");
+      const base = { estado: "pendiente", fechaLimite: null };
+      const tareas = [
+        { ...base, idTarea: 1, peso: 2, idAsignado: 1 },
+        { ...base, idTarea: 2, peso: 2, idAsignado: 2 },
+        { ...base, idTarea: 3, peso: 3, idAsignado: null },
+        { ...base, idTarea: 4, peso: 3, idAsignado: null, estado: "completada" },
+      ];
+      const [m1, m2] = calcularMetricasPorIntegrante(tareas, [1, 2]);
+      assert.equal(m1.carga, 0.5);
+      assert.equal(m2.carga, 0.5);
+      assert.equal(calcularMetricasPorIntegrante([{ ...base, idTarea: 5, peso: 3, idAsignado: null }], [1])[0].carga, 0);
+      assert.equal(calcularAvanceGrupo(tareas), 3 / 10);
+    });
+    await caso("crear sin fecha límite sigue siendo obligatorio y una tarea desasignada no puede empezar", async () => {
+      await assert.rejects(tareaService.crearTarea(lider, idGrupo, { titulo: "Sin fecha", peso: 1, idAsignado: "", fechaLimite: "" }), ErrorDeNegocio);
       const sinAsignar = await tareaService.crearTarea(ana, idGrupo, {
         titulo: "Pendiente de asignación", peso: 1, idAsignado: String(ana), fechaLimite: fechaLimitePrueba,
       });
@@ -219,6 +292,53 @@ async function verificar() {
         ),
         ErrorDeNegocio,
       );
+    });
+    await caso("la fecha de una tarea puede caer el mismo día que el límite del grupo (por día en Lima)", async () => {
+      const ahora = new Date("2026-11-02T17:00:00.000Z");
+      const finDelDia = new Date("2026-11-05T04:59:00.000Z"); // 4 nov 23:59 en Lima
+      const grupoAMediaTarde = new Date("2026-11-04T20:00:00.000Z"); // 4 nov 3:00pm en Lima
+      assert.doesNotThrow(() => tareaService.validarFechaLimiteTarea(finDelDia, grupoAMediaTarde, ahora));
+      assert.throws(
+        () => tareaService.validarFechaLimiteTarea(new Date("2026-11-06T04:59:00.000Z"), grupoAMediaTarde, ahora),
+        ErrorDeNegocio,
+      );
+    });
+    await caso("al aprobar, devolver o reenviar ninguna entrega anterior queda en revisión", async () => {
+      const t = await tareaService.crearTarea(ana, idGrupo, { titulo: "Entregas viejas", peso: 1, idAsignado: String(ana), fechaLimite: fechaLimitePrueba });
+      const enRevision = () => db!.entrega.findMany({ where: { idTarea: t.idTarea, resultado: "en_revision" }, orderBy: { idEntrega: "asc" } });
+      const vieja = () => db!.entrega.create({ data: { idTarea: t.idTarea, idAutor: ana, titulo: "Vieja", fechaEnvio: new Date("2020-01-01T00:00:00.000Z") } });
+      await tareaService.cambiarEstadoTarea(ana, idGrupo, t.idTarea, "en_progreso");
+      await vieja(); // dato heredado que quedó "en revisión"
+      await enviar(ana, t.idTarea);
+      const vigentes = await enRevision();
+      assert.equal(vigentes.length, 1, "enviar deja una sola entrega en revisión");
+      assert.equal(vigentes[0].titulo, "Entrega");
+      await vieja();
+      await tareaService.cambiarEstadoTarea(lider, idGrupo, t.idTarea, "en_progreso", "Falta la conclusión");
+      assert.equal((await enRevision()).length, 0, "devolver cierra todas");
+      await tareaService.cambiarEstadoTarea(ana, idGrupo, t.idTarea, "en_progreso").catch(() => undefined);
+      await vieja();
+      await enviar(ana, t.idTarea);
+      await vieja();
+      await tareaService.cambiarEstadoTarea(lider, idGrupo, t.idTarea, "completada");
+      assert.equal((await enRevision()).length, 0, "aprobar cierra todas");
+      assert.equal(await db!.entrega.count({ where: { idTarea: t.idTarea, resultado: "aprobada" } }), 1);
+    });
+    await caso("el motivo del historial usa el separador que aparece primero", async () => {
+      const { leerValorEstadoHistorial, valorHistorialConMotivo } = await import("../src/lib/tarea-historial");
+      const motivo = "Se pasó de plazo\n\nMotivo de descarte: otra cosa";
+      const leido = leerValorEstadoHistorial(valorHistorialConMotivo("en_progreso", "devolver", motivo));
+      assert.equal(leido.estado, "en_progreso");
+      assert.equal(leido.motivo, motivo);
+    });
+    await caso("el enlace de una entrega exige una URL con host", async () => {
+      const { entregaSchema } = await import("../src/lib/validation/entrega");
+      const base = { idGrupo: "1", idTarea: "1", titulo: "T" };
+      assert.equal(entregaSchema.safeParse({ ...base, enlace: "https://drive.google.com/x" }).success, true);
+      assert.equal(entregaSchema.safeParse({ ...base, enlace: "" }).success, true);
+      for (const malo of ["https://", "http:// espacio", "javascript:alert(1)"]) {
+        assert.equal(entregaSchema.safeParse({ ...base, enlace: malo }).success, false, malo);
+      }
     });
     await caso("dos cambios de estado simultáneos producen un único cambio y su historial", async () => {
       const resultados = await Promise.allSettled([
@@ -534,6 +654,311 @@ async function verificar() {
       await assert.rejects(grupoService.invitarIntegrante(lider, idGrupo, persona.idUsuario), ErrorDeNegocio);
       await assert.rejects(grupoService.cancelarInvitacion(lider, idGrupo, persona.idUsuario), ErrorDeNegocio);
     });
+    const nuevoUsuario = (nombreUsuario: string) => db!.usuario.create({ data: {
+      googleId: `prueba-${nombreUsuario}`, correo: `${nombreUsuario.toLowerCase()}@example.invalid`, nombre: nombreUsuario, perfil: { create: {} },
+    } });
+    const envejecerInvitaciones = () => db!.grupoIntegrante.updateMany({ data: { fechaInvitacion: new Date(Date.now() - 2 * 60 * 60 * 1000) } });
+    const filaDe = (idGrupoFila: number, idUsuarioFila: number) =>
+      db!.grupoIntegrante.findUniqueOrThrow({ where: { idGrupo_idUsuario: { idGrupo: idGrupoFila, idUsuario: idUsuarioFila } } });
+    await caso("se puede invitar como observador y el rol elegido se respeta al reinvitar", async () => {
+      const { cambiarRolIntegranteSchema } = await import("../src/lib/validation/grupo");
+      assert.equal(invitacionGrupoSchema.safeParse({ idGrupo: 1, idUsuario: 2 }).data?.rol, "miembro");
+      assert.equal(invitacionGrupoSchema.safeParse({ idGrupo: 1, idUsuario: 2, rol: "lider" }).success, false);
+      assert.equal(cambiarRolIntegranteSchema.safeParse({ idGrupo: 1, idUsuario: 2, rol: "lider" }).success, false);
+      const persona = await nuevoUsuario("ObservadorNuevo");
+      const grupo = await crearGrupo();
+      await envejecerInvitaciones();
+      await grupoService.invitarIntegrante(lider, grupo, persona.idUsuario, "observador");
+      assert.equal((await filaDe(grupo, persona.idUsuario)).rol, "observador");
+      await grupoService.responderInvitacion(persona.idUsuario, grupo, "rechazada");
+      await grupoService.invitarIntegrante(lider, grupo, persona.idUsuario);
+      assert.equal((await filaDe(grupo, persona.idUsuario)).rol, "miembro");
+      await grupoService.responderInvitacion(persona.idUsuario, grupo, "aceptada");
+
+      // Cambio de rol: al pasar a observador se desasignan sus tareas abiertas; el líder no cambia.
+      const tareaPersona = await tareaService.crearTarea(lider, grupo, { titulo: "De la persona", peso: 1, idAsignado: String(persona.idUsuario), fechaLimite: fechaLimitePrueba });
+      await assert.rejects(grupoService.cambiarRolIntegrante(ana, grupo, persona.idUsuario, "observador"), ErrorDeNegocio);
+      await assert.rejects(grupoService.cambiarRolIntegrante(lider, grupo, lider, "observador"), ErrorDeNegocio);
+      await assert.rejects(grupoService.cambiarRolIntegrante(lider, grupo, invitado, "observador"), ErrorDeNegocio);
+      await grupoService.cambiarRolIntegrante(lider, grupo, persona.idUsuario, "observador");
+      assert.equal((await filaDe(grupo, persona.idUsuario)).rol, "observador");
+      assert.equal((await db!.tarea.findUniqueOrThrow({ where: { idTarea: tareaPersona.idTarea } })).idAsignado, null);
+      await grupoService.cambiarRolIntegrante(lider, grupo, persona.idUsuario, "miembro");
+      assert.equal((await filaDe(grupo, persona.idUsuario)).rol, "miembro");
+    });
+    await caso("invitar por id exige un usuario visible; una fila previa permite reinvitar", async () => {
+      const oculto = await db!.usuario.create({ data: {
+        googleId: "prueba-Oculto", correo: "oculto@example.invalid", nombre: "Oculto", perfil: { create: { visibleEnBusqueda: false } },
+      } });
+      const sinPerfil = await db!.usuario.create({ data: { googleId: "prueba-SinPerfil", correo: "sinperfil@example.invalid", nombre: "SinPerfil" } });
+      const grupo = await crearGrupo();
+      await envejecerInvitaciones();
+      for (const idObjetivo of [oculto.idUsuario, sinPerfil.idUsuario, 2147483000]) {
+        await assert.rejects(grupoService.invitarIntegrante(lider, grupo, idObjetivo), (error: unknown) =>
+          error instanceof ErrorDeNegocio && error.message === "Usuario no encontrado");
+      }
+      assert.equal(await db!.grupoIntegrante.count({ where: { idGrupo: grupo, idUsuario: oculto.idUsuario } }), 0);
+      // Con una fila previa que lo permite (rechazó), se puede reinvitar aunque ahora esté oculto.
+      await db!.grupoIntegrante.create({ data: { idGrupo: grupo, idUsuario: oculto.idUsuario, rol: "miembro", estadoInvitacion: "rechazada" } });
+      await grupoService.invitarIntegrante(lider, grupo, oculto.idUsuario);
+      assert.equal((await filaDe(grupo, oculto.idUsuario)).estadoInvitacion, "pendiente");
+    });
+    await caso("el límite por hora cuenta las invitaciones de cada invitador, no la fila del creador", async () => {
+      const jefe = await nuevoUsuario("JefeLimite");
+      const objetivo = await nuevoUsuario("ObjetivoLimite");
+      const grupo = await grupoService.crearGrupo(jefe.idUsuario, { nombre: "Límite" });
+      // El propio creador no gasta cupo: su fila no es una invitación.
+      await grupoService.invitarIntegrante(jefe.idUsuario, grupo.idGrupo, objetivo.idUsuario);
+      assert.equal(await db!.grupoIntegrante.count({ where: { idInvitador: jefe.idUsuario } }), 1);
+      await db!.usuario.createMany({ data: Array.from({ length: 19 }, (_, i) => ({ googleId: `prueba-Lim${i}`, correo: `lim${i}@example.invalid`, nombre: `Lim${i}` })) });
+      const relleno = await db!.usuario.findMany({ where: { googleId: { startsWith: "prueba-Lim" } }, select: { idUsuario: true } });
+      await db!.grupoIntegrante.createMany({ data: relleno.map((u) => ({
+        idGrupo: grupo.idGrupo, idUsuario: u.idUsuario, rol: "miembro" as const, estadoInvitacion: "pendiente" as const, idInvitador: jefe.idUsuario,
+      })) });
+      const otro = await nuevoUsuario("OtroLimite");
+      await assert.rejects(grupoService.invitarIntegrante(jefe.idUsuario, grupo.idGrupo, otro.idUsuario), /límite de invitaciones/);
+      // Quien no invitó a nadie no se ve afectado aunque el grupo tenga muchas invitaciones.
+      await grupoService.invitarIntegrante(lider, await crearGrupo(), otro.idUsuario);
+    });
+    await caso("la fecha límite del grupo se edita con sus reglas", async () => {
+      const { actualizarGrupoSchema } = await import("../src/lib/validation/grupo");
+      const { fechaEnZonaLimaISO } = await import("../src/lib/calendario");
+      assert.equal(actualizarGrupoSchema.safeParse({ nombre: "G", estado: "activo", fechaLimite: "2099-02-31" }).success, false);
+      assert.equal(actualizarGrupoSchema.safeParse({ nombre: "G", estado: "activo", fechaLimite: "" }).success, true);
+      const grupo = await crearGrupo();
+      const base = { nombre: "Grupo de prueba", estado: "activo" as const };
+      await tareaService.crearTarea(ana, grupo, { titulo: "Cierre", peso: 1, idAsignado: String(ana), fechaLimite: fechaLimitePrueba });
+      await assert.rejects(grupoService.actualizarGrupo(ana, grupo, { ...base, fechaLimite: "2100-01-01" }), ErrorDeNegocio);
+      await assert.rejects(grupoService.actualizarGrupo(lider, grupo, { ...base, fechaLimite: "2020-01-01" }), /pasado/);
+      await assert.rejects(grupoService.actualizarGrupo(lider, grupo, { ...base, fechaLimite: "2099-06-01" }), /No puedes cerrar el grupo el \S+ \d+ de \S+.*\. La tarea ".+" vence el \S+ \d+ de \S+.*\. Elige esa fecha o una posterior/);
+      assert.equal((await db!.grupo.findUniqueOrThrow({ where: { idGrupo: grupo } })).fechaLimite, null);
+      await grupoService.actualizarGrupo(lider, grupo, { ...base, fechaLimite: "2099-12-30" });
+      const guardada = (await db!.grupo.findUniqueOrThrow({ where: { idGrupo: grupo } })).fechaLimite;
+      assert.equal(guardada?.toISOString(), "2099-12-31T04:59:00.000Z");
+      assert.equal(fechaEnZonaLimaISO(guardada!), "2099-12-30");
+      // Sin fecha en el formulario no cambia nada.
+      await grupoService.actualizarGrupo(lider, grupo, { ...base, fechaLimite: "" });
+      assert.equal((await db!.grupo.findUniqueOrThrow({ where: { idGrupo: grupo } })).fechaLimite?.toISOString(), guardada?.toISOString());
+    });
+    await caso("un grupo nuevo rechaza evaluaciones vencidas, ajenas o con id inválido", async () => {
+      const { crearGrupoSchema } = await import("../src/lib/validation/grupo");
+      const curso = await db!.curso.create({ data: { idUsuario: lider, nombre: "Curso de prueba" } });
+      const vencida = await db!.evaluacion.create({ data: { idCurso: curso.idCurso, nombre: "Vencida", fechaCierre: new Date(Date.now() - 24 * 60 * 60 * 1000) } });
+      const vigente = await db!.evaluacion.create({ data: { idCurso: curso.idCurso, nombre: "Vigente", fechaCierre: new Date("2099-12-30T04:59:00Z") } });
+      for (const valor of ["abc", "-1", "0", "1.5", "99999999999"]) {
+        assert.equal(crearGrupoSchema.safeParse({ nombre: "G", idEvaluacion: valor }).success, false, valor);
+      }
+      await assert.rejects(grupoService.crearGrupo(lider, { nombre: "G", idEvaluacion: String(vencida.idEvaluacion) }), /ya cerró/);
+      await assert.rejects(grupoService.crearGrupo(ana, { nombre: "G", idEvaluacion: String(vigente.idEvaluacion) }), ErrorDeNegocio);
+      const { listarEvaluacionesParaGrupo } = await import("../src/server/services/curso");
+      assert.deepEqual((await listarEvaluacionesParaGrupo(lider)).map((evaluacion) => evaluacion.nombre), ["Vigente"]);
+      const grupo = await grupoService.crearGrupo(lider, { nombre: "G", idEvaluacion: String(vigente.idEvaluacion) });
+      assert.equal(grupo.fechaLimite?.toISOString(), vigente.fechaCierre.toISOString());
+    });
+    await caso("importar un curso no duplica, enlaza lo propio y se rechaza a quien ya no está en el grupo", async () => {
+      const cursoService = await import("../src/server/services/curso");
+      const { horaATime, finDeDiaLimaAUtc } = await import("../src/lib/dates");
+      const { crearEvaluacionSchema, actualizarCursoSchema } = await import("../src/lib/validation/curso");
+      const hora = (valor: string) => horaATime(valor);
+      const fuente = await db!.curso.create({
+        data: {
+          idUsuario: lider, nombre: "Curso original", codigo: "IMP-101", docente: "Docente", modalidad: "presencial",
+          horarios: { create: [
+            { diaSemana: 1, horaInicio: hora("08:00"), horaFin: hora("10:00") },
+            { diaSemana: 3, horaInicio: hora("08:00"), horaFin: hora("10:00") },
+          ] },
+          evaluaciones: { create: [
+            { nombre: "Parcial", fechaCierre: new Date("2099-12-30T04:59:00Z") },
+            { nombre: "Final", fechaCierre: new Date("2099-12-31T04:59:00Z") },
+          ] },
+        },
+        include: { evaluaciones: true },
+      });
+      const grupo = await grupoService.crearGrupo(lider, { nombre: "Grupo importable", idEvaluacion: String(fuente.evaluaciones[0].idEvaluacion) });
+      const [importador, conCursoPropio] = [await nuevoUsuario("ImportaCurso"), await nuevoUsuario("ImportaSobrePropio")];
+      await db!.grupoIntegrante.createMany({ data: [importador, conCursoPropio].map((persona) => (
+        { idGrupo: grupo.idGrupo, idUsuario: persona.idUsuario, rol: "miembro" as const, estadoInvitacion: "aceptada" as const }
+      )) });
+
+      // Importar dos veces deja una sola copia con sus 2 sesiones y 2 evaluaciones.
+      const primera = await cursoService.importarCursoDesdeGrupo(importador.idUsuario, grupo.idGrupo);
+      const segunda = await cursoService.importarCursoDesdeGrupo(importador.idUsuario, grupo.idGrupo);
+      assert.equal(primera.idCurso, segunda.idCurso);
+      assert.equal(await db!.curso.count({ where: { idUsuario: importador.idUsuario } }), 1);
+      assert.equal(await db!.horarioCurso.count({ where: { idCurso: primera.idCurso } }), 2);
+      assert.equal(await db!.evaluacion.count({ where: { idCurso: primera.idCurso } }), 2);
+      await assert.rejects(cursoService.importarCursoDesdeGrupo(lider, grupo.idGrupo), ErrorDeNegocio);
+      assert.equal(await cursoService.cambiosPendientesDeCursoImportado(primera.idCurso), null);
+
+      // Sobre un curso propio con el mismo código: se enlaza y no duplica la sesión ni la evaluación que coinciden.
+      const propio = await db!.curso.create({
+        data: {
+          idUsuario: conCursoPropio.idUsuario, nombre: "Mi versión", codigo: "imp-101",
+          horarios: { create: [{ diaSemana: 1, horaInicio: hora("08:00"), horaFin: hora("10:00") }] },
+          evaluaciones: { create: [{ nombre: "parcial", fechaCierre: new Date("2099-11-30T04:59:00Z") }] },
+        },
+      });
+      const enlazado = await cursoService.importarCursoDesdeGrupo(conCursoPropio.idUsuario, grupo.idGrupo);
+      assert.equal(enlazado.idCurso, propio.idCurso);
+      assert.equal(enlazado.nombre, "Curso original");
+      assert.equal(await db!.horarioCurso.count({ where: { idCurso: propio.idCurso } }), 2);
+      assert.equal(await db!.evaluacion.count({ where: { idCurso: propio.idCurso } }), 2);
+      assert.equal((await db!.evaluacion.findFirstOrThrow({ where: { idCurso: propio.idCurso, nombre: "parcial" } })).fechaCierre.toISOString(), "2099-11-30T04:59:00.000Z");
+
+      // En una copia importada se ignoran nombre/docente/modalidad al editar, y el código no se puede vaciar.
+      assert.equal(actualizarCursoSchema.safeParse({ nombre: "X", codigo: "", activo: true }).success, false);
+      const editado = await cursoService.actualizarCurso(importador.idUsuario, primera.idCurso, { nombre: "Otro nombre", codigo: "MI-COD", docente: "Otro", modalidad: undefined, activo: true });
+      assert.deepEqual([editado.nombre, editado.docente, editado.modalidad, editado.codigo], ["Curso original", "Docente", "presencial", "MI-COD"]);
+
+      // Quien ya no está en el grupo no recibe actualizaciones ni propagación, ni puede traerlas.
+      await db!.horarioCurso.create({ data: { idCurso: fuente.idCurso, diaSemana: 5, horaInicio: hora("08:00"), horaFin: hora("10:00") } });
+      assert.equal((await cursoService.cambiosPendientesDeCursoImportado(primera.idCurso))?.sesionesNuevas, 1);
+      await db!.grupoIntegrante.update({
+        where: { idGrupo_idUsuario: { idGrupo: grupo.idGrupo, idUsuario: importador.idUsuario } },
+        data: { estadoInvitacion: "retirado", fechaRetiro: new Date() },
+      });
+      assert.equal(await cursoService.cambiosPendientesDeCursoImportado(primera.idCurso), null);
+      await assert.rejects(cursoService.sincronizarCursoImportado(importador.idUsuario, primera.idCurso), ErrorDeNegocio);
+      await cursoService.actualizarCurso(lider, fuente.idCurso, { nombre: "Renombrado", codigo: "IMP-101", docente: "Docente", modalidad: "presencial", activo: true });
+      assert.equal((await db!.curso.findUniqueOrThrow({ where: { idCurso: primera.idCurso } })).nombre, "Curso original");
+      assert.equal((await db!.curso.findUniqueOrThrow({ where: { idCurso: propio.idCurso } })).nombre, "Renombrado");
+
+      // Fechas imposibles: el esquema las rechaza y la conversión no las acepta.
+      for (const fechaCierre of ["2026-02-31", "2026-13-45"]) {
+        assert.equal(crearEvaluacionSchema.safeParse({ nombre: "E", fechaCierre, requiereEntrega: true }).success, false, fechaCierre);
+        assert.throws(() => finDeDiaLimaAUtc(fechaCierre), ErrorDeNegocio);
+      }
+      assert.equal(crearEvaluacionSchema.safeParse({ nombre: "E", fechaCierre: "2026-02-28", requiereEntrega: true }).success, true);
+    });
+    await caso("el historial de la Bandeja omite canceladas y conserva la salida de quien creó el grupo", async () => {
+      const { obtenerBandeja, obtenerDetalleInvitacion } = await import("../src/server/services/notificacion");
+      const persona = await nuevoUsuario("CanceladaBandeja");
+      const grupo = await crearGrupo();
+      await envejecerInvitaciones();
+      await grupoService.invitarIntegrante(lider, grupo, persona.idUsuario);
+      assert.ok(await obtenerDetalleInvitacion(persona.idUsuario, grupo));
+      await grupoService.cancelarInvitacion(lider, grupo, persona.idUsuario);
+      assert.equal((await obtenerBandeja(persona.idUsuario)).historialInvitaciones.length, 0);
+      assert.equal(await obtenerDetalleInvitacion(persona.idUsuario, grupo), null);
+
+      // El creador que sale sí ve su salida; mientras sigue dentro, su propio grupo no aparece.
+      assert.ok(!(await obtenerBandeja(lider)).historialInvitaciones.some((registro) => registro.idGrupo === grupo));
+      await grupoService.salirDelGrupo(lider, grupo, luis);
+      for (const registros of [(await obtenerBandeja(lider)).historialInvitaciones, await grupoService.listarHistorialInvitaciones(lider)]) {
+        assert.ok(registros.some((registro) => registro.idGrupo === grupo));
+      }
+    });
+    const motivoLargo = "Falta revisar el informe completo";
+    const entregar = (actor: number, grupo: number, idTarea: number) =>
+      entregaService.enviarEntrega(actor, { idGrupo: grupo, idTarea, titulo: "Entrega", descripcion: "Listo para revisar", enlace: "" }, []);
+    const leerTarea = (idTarea: number) => db!.tarea.findUniqueOrThrow({ where: { idTarea }, include: { historial: true, entregas: true } });
+    await caso("al salir, las tareas en progreso vuelven a pendiente y las de revisión conservan a su autor", async () => {
+      const grupo = await crearGrupo();
+      const crear = (titulo: string) => tareaService.crearTarea(ana, grupo, { titulo, peso: 1, idAsignado: String(ana), fechaLimite: fechaLimitePrueba });
+      const pendiente = await crear("Pendiente");
+      const enProgreso = await crear("En progreso");
+      const enRevision = await crear("En revisión");
+      const aprobable = await crear("Aprobable");
+      await tareaService.cambiarEstadoTarea(ana, grupo, enProgreso.idTarea, "en_progreso");
+      for (const tarea of [enRevision, aprobable]) {
+        await tareaService.cambiarEstadoTarea(ana, grupo, tarea.idTarea, "en_progreso");
+        await entregar(ana, grupo, tarea.idTarea);
+      }
+      await grupoService.salirDelGrupo(ana, grupo);
+
+      const p = await leerTarea(pendiente.idTarea);
+      assert.deepEqual([p.estado, p.idAsignado], ["pendiente", null]);
+      const e = await leerTarea(enProgreso.idTarea);
+      assert.deepEqual([e.estado, e.idAsignado, e.fechaTerminada], ["pendiente", null, null]);
+      assert.ok(e.historial.some((cambio) => cambio.accion === "reasignada" && cambio.valorAnterior === String(ana) && cambio.valorNuevo === null));
+      assert.ok(e.historial.some((cambio) => cambio.accion === "estado" && cambio.valorAnterior === "en_progreso" && cambio.valorNuevo === "pendiente"));
+      const r = await leerTarea(enRevision.idTarea);
+      assert.deepEqual([r.estado, r.idAsignado, r.entregas.map((entrega) => entrega.resultado)], ["en_revision", ana, ["en_revision"]]);
+
+      // Devolver una tarea cuyo autor ya salió la deja pendiente y sin responsable, nunca en progreso sin dueño.
+      await tareaService.cambiarEstadoTarea(lider, grupo, enRevision.idTarea, "en_progreso", motivoLargo);
+      const devuelta = await leerTarea(enRevision.idTarea);
+      assert.deepEqual([devuelta.estado, devuelta.idAsignado, devuelta.entregas.map((entrega) => entrega.resultado)], ["pendiente", null, ["devuelta"]]);
+      assert.ok(devuelta.historial.some((cambio) => cambio.accion === "reasignada" && cambio.valorAnterior === String(ana) && cambio.valorNuevo === null));
+      await tareaService.reasignarTarea(lider, grupo, enRevision.idTarea, String(luis));
+
+      // Aprobarla es posible, no avisa a quien salió, y reabrirla la deja pendiente sin responsable.
+      const avisosAntes = await db!.notificacion.count({ where: { idUsuario: ana, tipo: "tarea_completada" } });
+      await tareaService.cambiarEstadoTarea(lider, grupo, aprobable.idTarea, "completada");
+      const aprobada = await leerTarea(aprobable.idTarea);
+      assert.deepEqual([aprobada.estado, aprobada.idAsignado, aprobada.entregas.map((entrega) => entrega.resultado)], ["completada", ana, ["aprobada"]]);
+      assert.equal(await db!.notificacion.count({ where: { idUsuario: ana, tipo: "tarea_completada" } }), avisosAntes);
+      await tareaService.cambiarEstadoTarea(lider, grupo, aprobable.idTarea, "en_progreso", motivoLargo);
+      const reabierta = await leerTarea(aprobable.idTarea);
+      assert.deepEqual([reabierta.estado, reabierta.idAsignado], ["pendiente", null]);
+    });
+    await caso("eliminar la cuenta se bloquea si lidera un grupo activo con otros integrantes", async () => {
+      const lider2 = await nuevoUsuario("LiderBloqueado");
+      const grupoA = await grupoService.crearGrupo(lider2.idUsuario, { nombre: "Grupo A" });
+      const grupoB = await grupoService.crearGrupo(lider2.idUsuario, { nombre: "Grupo B" });
+      for (const grupo of [grupoA, grupoB]) {
+        await db!.grupoIntegrante.create({ data: { idGrupo: grupo.idGrupo, idUsuario: ana, rol: "miembro", estadoInvitacion: "aceptada" } });
+      }
+      await assert.rejects(
+        perfilService.eliminarCuenta(lider2.idUsuario),
+        (error) => error instanceof ErrorDeNegocio && error.message === "Cede el liderazgo en: Grupo A, Grupo B",
+      );
+      assert.equal((await db!.usuario.findUniqueOrThrow({ where: { idUsuario: lider2.idUsuario } })).eliminadoEn, null);
+      assert.equal(await db!.perfil.count({ where: { idUsuario: lider2.idUsuario } }), 1);
+      assert.equal((await db!.grupoIntegrante.findUniqueOrThrow({ where: { idGrupo_idUsuario: { idGrupo: grupoA.idGrupo, idUsuario: lider2.idUsuario } } })).estadoInvitacion, "aceptada");
+    });
+    await caso("eliminar la cuenta sale de los grupos, libera tareas, cancela invitaciones y es idempotente", async () => {
+      const saliente = await nuevoUsuario("Saliente");
+      const idSaliente = saliente.idUsuario;
+      const grupo = await crearGrupo();
+      const otro = await crearGrupo();
+      await db!.grupoIntegrante.create({ data: { idGrupo: grupo, idUsuario: idSaliente, rol: "miembro", estadoInvitacion: "aceptada" } });
+      await db!.grupoIntegrante.create({ data: { idGrupo: otro, idUsuario: idSaliente, rol: "miembro", estadoInvitacion: "pendiente", idInvitador: lider } });
+      const tarea = await tareaService.crearTarea(lider, grupo, { titulo: "Del saliente", peso: 1, idAsignado: String(idSaliente), fechaLimite: fechaLimitePrueba });
+      await tareaService.cambiarEstadoTarea(lider, grupo, tarea.idTarea, "en_progreso");
+      await db!.bloqueOcupado.create({ data: { idUsuario: idSaliente, tipo: "personal", diaSemana: 1, horaInicio: new Date("1970-01-01T10:00:00Z"), horaFin: new Date("1970-01-01T11:00:00Z") } });
+
+      // Un lider sin otros integrantes que puedan liderar no bloquea: el grupo queda como esta.
+      const solitario = await nuevoUsuario("Solitario");
+      const grupoSolo = await grupoService.crearGrupo(solitario.idUsuario, { nombre: "Solo" });
+      await perfilService.eliminarCuenta(solitario.idUsuario);
+      assert.ok((await db!.usuario.findUniqueOrThrow({ where: { idUsuario: solitario.idUsuario } })).eliminadoEn);
+      assert.equal((await db!.grupo.findUniqueOrThrow({ where: { idGrupo: grupoSolo.idGrupo } })).estado, "activo");
+
+      await perfilService.eliminarCuenta(idSaliente);
+      await perfilService.eliminarCuenta(idSaliente);
+      const eliminado = await db!.usuario.findUniqueOrThrow({ where: { idUsuario: idSaliente } });
+      assert.ok(eliminado.eliminadoEn);
+      assert.equal(eliminado.nombre, "Cuenta eliminada");
+      assert.equal(await db!.perfil.count({ where: { idUsuario: idSaliente } }), 0);
+      assert.equal(await db!.bloqueOcupado.count({ where: { idUsuario: idSaliente } }), 0);
+      const membresia = await db!.grupoIntegrante.findUniqueOrThrow({ where: { idGrupo_idUsuario: { idGrupo: grupo, idUsuario: idSaliente } } });
+      assert.deepEqual([membresia.estadoInvitacion, membresia.retiroVoluntario, membresia.fechaRetiro !== null], ["retirado", true, true]);
+      assert.equal((await db!.grupoIntegrante.findUniqueOrThrow({ where: { idGrupo_idUsuario: { idGrupo: otro, idUsuario: idSaliente } } })).estadoInvitacion, "cancelada");
+      const liberada = await leerTarea(tarea.idTarea);
+      assert.deepEqual([liberada.estado, liberada.idAsignado], ["pendiente", null]);
+
+      // Una cuenta eliminada no recibe avisos.
+      const avisos = await db!.notificacion.count({ where: { idUsuario: idSaliente } });
+      assert.equal(await crearNotificacion({ idUsuario: idSaliente, tipo: "tarea_asignada", mensaje: "Hola", enlace: "/", asunto: "Hola" }), null);
+      assert.equal(await db!.notificacion.count({ where: { idUsuario: idSaliente } }), avisos);
+    });
+    await caso("finalizar un grupo cancela sus invitaciones pendientes", async () => {
+      const grupo = await crearGrupo();
+      await grupoService.actualizarGrupo(lider, grupo, { nombre: "Grupo cerrado", estado: "finalizado" });
+      const fila = await db!.grupoIntegrante.findUniqueOrThrow({ where: { idGrupo_idUsuario: { idGrupo: grupo, idUsuario: invitado } } });
+      assert.equal(fila.estadoInvitacion, "cancelada");
+    });
+    await caso("no se avisa la respuesta a una invitación a quien ya salió del grupo", async () => {
+      const grupo = await crearGrupo();
+      const persona = await nuevoUsuario("Respondedor");
+      await db!.grupoIntegrante.updateMany({ data: { fechaInvitacion: new Date(Date.now() - 2 * 60 * 60 * 1000) } });
+      await grupoService.invitarIntegrante(lider, grupo, persona.idUsuario);
+      const antes = await db!.notificacion.count({ where: { idUsuario: lider, tipo: "invitacion_respondida" } });
+      await grupoService.salirDelGrupo(lider, grupo, luis);
+      await grupoService.responderInvitacion(persona.idUsuario, grupo, "aceptada");
+      assert.equal(await db!.notificacion.count({ where: { idUsuario: lider, tipo: "invitacion_respondida" } }), antes);
+    });
     const abierta = await tareaService.crearTarea(ana, idGrupo, { titulo: "Consulta posterior", peso: 1, idAsignado: String(ana), fechaLimite: fechaLimitePrueba });
     await caso("solo el líder puede finalizar el grupo", async () => {
       await assert.rejects(grupoService.actualizarGrupo(ana, idGrupo, { nombre: "Grupo", estado: "finalizado" }), ErrorDeNegocio);
@@ -564,7 +989,7 @@ async function verificar() {
       assert.deepEqual(await db!.grupo.findUniqueOrThrow({ where: { idGrupo } }), antes);
       assert.equal(await db!.tareaHistorial.count(), historial);
       assert.equal(await db!.notificacion.count(), notificaciones);
-      assert.equal((await db!.grupoIntegrante.findUniqueOrThrow({ where: { idGrupo_idUsuario: { idGrupo, idUsuario: invitado } } })).estadoInvitacion, "pendiente");
+      assert.equal((await db!.grupoIntegrante.findUniqueOrThrow({ where: { idGrupo_idUsuario: { idGrupo, idUsuario: invitado } } })).estadoInvitacion, "cancelada");
     });
     await caso("finalizado conserva el acceso de lectura al grupo, tareas e historial", async () => {
       assert.equal((await grupoService.obtenerGrupoDelUsuario(observador, idGrupo)).grupo.estado, "finalizado");
@@ -595,6 +1020,53 @@ async function verificar() {
         true,
       );
       assert.equal(responderInvitacionSchema.safeParse({ idGrupo, respuesta: "rechazada" }).success, true);
+    });
+    // Búsqueda de personas: nombre completo, sin tildes, visibilidad, compañeros primero y comodines.
+    const crearPersonaBusqueda = (clave: string, nombre: string, apellidos: string, perfil: { visibleEnBusqueda?: boolean } = {}, eliminado = false) =>
+      db!.usuario.create({ data: {
+        googleId: `busca-${clave}`, correo: `busca-${clave}@example.invalid`, nombre, apellidos,
+        eliminadoEn: eliminado ? new Date() : null, perfil: { create: perfil },
+      } });
+    const buscados = async (consulta: string) => (await grupoService.buscarUsuarios(lider, consulta)).map((u) => u.idUsuario);
+    const joseZq = await crearPersonaBusqueda("jose", "José", "Pérezzq");
+    await crearPersonaBusqueda("oculto", "Joselin", "Pérezzq", { visibleEnBusqueda: false });
+    await crearPersonaBusqueda("baja", "Joseba", "Pérezzq", {}, true);
+    await caso("la búsqueda entiende nombre completo y no distingue tildes ni mayúsculas", async () => {
+      assert.deepEqual(await buscados("José Pérezzq"), [joseZq.idUsuario]);
+      assert.deepEqual(await buscados("jose perezzq"), [joseZq.idUsuario]);
+      assert.deepEqual(await buscados("PEREZZQ jose"), [joseZq.idUsuario]);
+      assert.deepEqual(await buscados("jose otro"), []);
+    });
+    await caso("la búsqueda excluye ocultos, eliminados y al propio usuario, y nunca los trae por texto parcial", async () => {
+      assert.deepEqual(await buscados("perezzq"), [joseZq.idUsuario]);
+      assert.equal((await buscados("lider")).includes(lider), false);
+    });
+    await caso("la búsqueda por correo exige coincidencia exacta", async () => {
+      assert.deepEqual(await buscados("busca-jose@example.invalid"), [joseZq.idUsuario]);
+      assert.deepEqual(await buscados("BUSCA-JOSE@example.invalid"), [joseZq.idUsuario]);
+      assert.deepEqual(await buscados("busca-jose@example"), []);
+    });
+    await caso("los % y _ del texto no actúan como comodín", async () => {
+      assert.deepEqual(await buscados("%%%"), []);
+      assert.deepEqual(await buscados("jos_"), []);
+      assert.deepEqual(await buscados("pe%zzq"), []);
+      assert.deepEqual(await buscados("100%"), []);
+    });
+    await caso("los compañeros de grupo salen primero aunque haya más coincidencias que el límite", async () => {
+      const otros = [];
+      for (let i = 0; i < 10; i++) otros.push(await crearPersonaBusqueda(`ord-a${i}`, `Aaa${i}`, "Ordenzq"));
+      const companero = await crearPersonaBusqueda("ord-z", "Zzz", "Ordenzq");
+      const grupoCompaneros = await grupoService.crearGrupo(lider, { nombre: "Grupo de búsqueda" });
+      await db!.grupoIntegrante.create({ data: { idGrupo: grupoCompaneros.idGrupo, idUsuario: companero.idUsuario, rol: "miembro", estadoInvitacion: "aceptada" } });
+      const encontrados = await buscados("ordenzq");
+      assert.equal(encontrados.length, 8);
+      assert.equal(encontrados[0], companero.idUsuario);
+      // Quien solo tiene una invitación pendiente no es compañero.
+      await db!.grupoIntegrante.create({ data: { idGrupo: grupoCompaneros.idGrupo, idUsuario: otros[9].idUsuario, rol: "miembro", estadoInvitacion: "pendiente" } });
+      assert.equal((await buscados("ordenzq"))[0], companero.idUsuario);
+      const personas = await grupoService.buscarPersonas(lider, "ordenzq");
+      assert.equal(personas[0].idUsuario, companero.idUsuario);
+      assert.equal("correo" in personas[0], false);
     });
     console.log(`${casos} casos de integración correctos`);
   } finally {

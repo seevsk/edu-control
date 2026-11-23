@@ -1,6 +1,6 @@
 import "./configurar-zod";
 import { z } from "zod";
-import { idRegistroSchema } from "./tarea";
+import { esFechaISOReal, idRegistroSchema } from "./tarea";
 
 const enlaceHttp = z
   .string()
@@ -12,7 +12,10 @@ const enlaceHttp = z
 export const crearGrupoSchema = z.object({
   nombre: z.string().trim().min(1, "El nombre es obligatorio").max(120),
   descripcion: z.string().trim().max(500).optional().or(z.literal("")),
-  idEvaluacion: z.string().optional().or(z.literal("")),
+  idEvaluacion: z.string()
+    .regex(/^[1-9]\d*$/, "La evaluación elegida no es válida")
+    .refine((valor) => Number(valor) <= 2147483647, "La evaluación elegida no es válida")
+    .optional().or(z.literal("")),
   enlaceTrabajo: enlaceHttp.optional().or(z.literal("")),
 });
 
@@ -21,6 +24,8 @@ export const actualizarGrupoSchema = z.object({
   descripcion: z.string().trim().max(500).optional().or(z.literal("")),
   enlaceTrabajo: enlaceHttp.optional().or(z.literal("")),
   estado: z.enum(["activo", "finalizado"]),
+  // Día de cierre (23:59 Lima). Vacío = sin cambios.
+  fechaLimite: z.string().refine(esFechaISOReal, "La fecha límite no es válida").optional().or(z.literal("")),
 });
 
 export const actualizarPreferenciaCorreoActividadSchema = z.object({
@@ -34,6 +39,13 @@ export const buscarUsuariosSchema = z.object({
 export const invitacionGrupoSchema = z.object({
   idGrupo: idRegistroSchema,
   idUsuario: idRegistroSchema,
+  rol: z.enum(["miembro", "observador"]).default("miembro"),
+});
+
+export const cambiarRolIntegranteSchema = z.object({
+  idGrupo: idRegistroSchema,
+  idUsuario: idRegistroSchema,
+  rol: z.enum(["miembro", "observador"]),
 });
 
 export const responderInvitacionSchema = z.discriminatedUnion("respuesta", [

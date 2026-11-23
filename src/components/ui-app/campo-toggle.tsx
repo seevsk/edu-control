@@ -31,7 +31,7 @@ export function CampoToggle({
         className="w-fit"
       >
         {opciones.map((opcion) => (
-          <ToggleGroupItem key={opcion.valor || VACIO} value={opcion.valor || VACIO} className="h-8 px-3 text-[13px] data-[state=on]:bg-background data-[state=on]:shadow-xs dark:data-[state=on]:bg-accent">
+          <ToggleGroupItem key={opcion.valor || VACIO} value={opcion.valor || VACIO} className="h-8 max-md:h-11 px-3 text-[13px] data-[state=on]:bg-background data-[state=on]:shadow-xs dark:data-[state=on]:bg-accent">
             {opcion.texto}
           </ToggleGroupItem>
         ))}

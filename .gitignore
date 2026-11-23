@@ -43,6 +43,9 @@ dev-server.log
 *.tsbuildinfo
 next-env.d.ts
 
+# vista previa de correos (npm run correos:previsualizar)
+/.correos-preview/
+
 # prisma client generado
 /generated/
 

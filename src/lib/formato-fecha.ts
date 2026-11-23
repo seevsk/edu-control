@@ -138,6 +138,13 @@ export function fechaCompleta(fecha: Date): string {
   return `${DIAS_LARGOS[p.diaSemana - 1]} ${p.dia} de ${MESES_LARGOS[p.mes - 1]} de ${p.anio}, ${formatoHora(p.hora, p.minuto)}`;
 }
 
+/** Día escrito completo, sin hora, para mensajes: "jueves 26 de noviembre" (con año si no es el actual). */
+export function diaCompleto(fecha: Date, ahora = new Date()): string {
+  const p = partesLima(fecha);
+  const base = `${DIAS_LARGOS[p.diaSemana - 1]} ${p.dia} de ${MESES_LARGOS[p.mes - 1]}`;
+  return p.anio === partesLima(ahora).anio ? base : `${base} de ${p.anio}`;
+}
+
 /** "9 – 15 nov 2026" o "28 oct – 3 nov 2026". */
 export function rangoDias(desde: Date, hasta: Date): string {
   const a = partesLima(desde);

@@ -95,7 +95,6 @@ export function BuscarPagina({ inicial }: { inicial: string }) {
           <ul className="border-t border-border-subtle">{otras.map((persona) => <Fila key={persona.idUsuario} persona={persona} />)}</ul>
         </section>
       ) : null}
-      {visibles.length ? <p className="px-4 py-4 text-xs text-subtle-foreground md:px-6">Solo aparecen quienes permiten ser encontrados.</p> : null}
     </div>
   );
 }

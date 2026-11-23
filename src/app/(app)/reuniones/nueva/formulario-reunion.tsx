@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import type { Intervalo } from "@/lib/disponibilidad";
 import { SubmitButton } from "@/components/submit-button";
 import { Switch } from "@/components/ui/switch";
+import { FilaDesplazable } from "@/components/ui-app/fila-desplazable";
 import { crearReunionAction } from "../actions";
 
 export type Sugerencia = { fecha: string; inicio: string; fin: string; etiqueta: string; faltan: string | null };
@@ -141,7 +142,7 @@ export function FormularioReunion({
           {sugerencias.length > 0 ? (
             <fieldset>
               <legend className="mb-2 text-[13px] font-medium">Huecos en común</legend>
-              <div className={cn("flex gap-1.5", modoHoja ? "-mx-4 overflow-x-auto px-4 pb-0.5 [scrollbar-width:none]" : "flex-wrap")}>
+              <FilaDesplazable className={modoHoja ? "-mx-4" : "contents"} scrollerClassName={cn("flex gap-1.5", modoHoja ? "px-4 pb-0.5" : "flex-wrap overflow-visible")} fadeClassName={modoHoja ? undefined : "hidden"}>
                 {sugerencias.map((s) => {
                   const elegida = s.fecha === fecha && s.inicio === inicio && s.fin === fin;
                   return (
@@ -164,7 +165,7 @@ export function FormularioReunion({
                     </button>
                   );
                 })}
-              </div>
+              </FilaDesplazable>
             </fieldset>
           ) : null}
 

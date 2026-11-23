@@ -1,3 +1,4 @@
+import { env } from "@/lib/env";
 import { NextResponse } from "next/server";
 import { obtenerSesion } from "@/server/auth/session";
 import { entregaSchema } from "@/lib/validation/entrega";
@@ -17,7 +18,15 @@ function error(mensaje: string, estado: number) {
 export async function POST(request: Request) {
   // Defensa extra contra envios desde otros sitios (la cookie ya es SameSite, pero esto es barato).
   const origen = request.headers.get("origin");
-  if (origen && new URL(origen).host !== new URL(request.url).host) return error("Solicitud no permitida", 403);
+  if (origen) {
+    let hostOrigen: string | null = null;
+    try {
+      hostOrigen = new URL(origen).host; // "null" (origen opaco) lanza
+    } catch {}
+    // Detrás de un proxy (Render) el host de request.url puede no ser el público: vale también APP_URL.
+    const permitidos = new Set([new URL(request.url).host, new URL(env.APP_URL).host]);
+    if (!hostOrigen || !permitidos.has(hostOrigen)) return error("Solicitud no permitida", 403);
+  }
 
   const sesion = await obtenerSesion();
   if (!sesion) return error("Tu sesión expiró. Vuelve a entrar", 401);
@@ -48,7 +57,7 @@ export async function POST(request: Request) {
   const archivos = await Promise.all(
     formData
       .getAll("archivos")
-      .filter((valor): valor is File => valor instanceof File && valor.size > 0)
+      .filter((valor): valor is File => valor instanceof File && valor.name !== "")
       .map(async (archivo) => ({ nombre: archivo.name, datos: new Uint8Array(await archivo.arrayBuffer()) })),
   );
 

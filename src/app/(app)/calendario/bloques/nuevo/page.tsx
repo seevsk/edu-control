@@ -19,7 +19,7 @@ export default async function NuevoBloquePage({
   return (
     <div className="animate-page-in mx-auto flex max-w-2xl flex-col gap-5">
       <div>
-        <Link href={`/calendario${consulta}`} className="text-sm text-primary hover:underline">
+        <Link href={`/calendario${consulta}`} className="text-sm text-primary hover:underline max-md:-ml-2 max-md:flex max-md:min-h-11 max-md:w-fit max-md:items-center max-md:px-2">
           Calendario
         </Link>
         <h1 className="mt-1 text-xl font-semibold">Agregar tiempo ocupado</h1>

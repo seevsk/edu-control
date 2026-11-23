@@ -4,7 +4,7 @@ import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ETIQUETA_ESTADO_TAREA, type EstadoTarea } from "@/lib/estado-tarea";
 import { StatusIcon } from "./status-icon";
-import { DueChip } from "./due-chip";
+import { DueChip, EtiquetaAtraso } from "./due-chip";
 import { UserAvatar } from "./user-avatar";
 
 export interface FilaTarea {
@@ -17,6 +17,8 @@ export interface FilaTarea {
   nota?: string;
   /** Archivos de la entrega vigente (clip en el tablero y la lista). */
   adjuntos?: number;
+  /** Completada después de su fecha límite vigente (calculado en el servidor). */
+  conAtraso?: boolean;
   /** Linea secundaria opcional (grupo, curso). */
   detalle?: ReactNode;
 }
@@ -43,6 +45,7 @@ export function TaskRow({ tarea, href, ahora, alta = false, conAvatar = true }: 
           {tarea.nota ? <span className="text-[13px] text-estado-en-revision sm:hidden">{tarea.nota}</span> : null}
         </span>
         {tarea.nota ? <span className="hidden shrink-0 text-xs text-estado-en-revision sm:inline">{tarea.nota}</span> : null}
+        {tarea.conAtraso ? <EtiquetaAtraso /> : null}
         <DueChip fecha={tarea.fechaLimite} cerrada={cerrada} ahora={ahora} />
         {conAvatar ? <UserAvatar usuario={tarea.asignado} /> : null}
       </Link>
