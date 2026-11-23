@@ -1,12 +1,9 @@
+import { env } from "@/lib/env";
 import { prisma } from "@/server/db/client";
 import { emailSender } from "@/server/email";
+import type { ContenidoCorreo } from "@/server/email/contenido";
+import { construirCorreo } from "./correo";
 import { EVENTOS_NOTIFICACION, type TipoNotificacionConfigurado } from "./eventos";
-
-/** Texto del enlace del correo para los avisos de videollamada (el resto usa el genérico). */
-const TEXTO_ENLACE: Partial<Record<TipoNotificacionConfigurado, string>> = {
-  reunion_iniciada: "Unirse a la reunión",
-  reunion_finalizada: "Ver detalle",
-};
 
 type TipoActividad = {
   [K in TipoNotificacionConfigurado]: (typeof EVENTOS_NOTIFICACION)[K]["actividad"] extends true ? K : never;
@@ -18,6 +15,8 @@ export type DatosNotificacion = {
   mensaje: string;
   enlace: string;
   asunto: string;
+  /** Contenido del correo (plantillas de templates.ts); sin él se arma uno básico con el mensaje. */
+  correo?: ContenidoCorreo;
 } & (
   | { tipo: TipoActividad; idGrupo: number }
   | { tipo: Exclude<TipoNotificacionConfigurado, TipoActividad>; idGrupo?: number }
@@ -82,13 +81,11 @@ async function crearNotificacionInterna(datos: DatosNotificacion) {
     let enviado = false;
     try {
       if (destino.correo.trim()) {
+        const correo = construirCorreo(datos, env.APP_URL);
         const resultado = await emailSender.enviar({
           idNotificacion: notificacion.idNotificacion,
           destinatario: destino.correo,
-          asunto: datos.asunto,
-          cuerpo: datos.mensaje,
-          enlace: datos.enlace,
-          textoEnlace: TEXTO_ENLACE[datos.tipo],
+          ...correo,
         });
         enviado = resultado.ok;
       }

@@ -14,7 +14,6 @@ function crearEmailSender(): EmailSender {
   return new ResendEmailSender({
     apiKey: env.RESEND_API_KEY,
     emailFrom: env.EMAIL_FROM,
-    appUrl: env.APP_URL,
   });
 }
 

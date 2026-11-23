@@ -357,6 +357,7 @@ Reglas de arquitectura:
 - **Envío de correo detrás de una interfaz `EmailSender`** con dos implementaciones:
   - `ConsoleEmailSender` (desarrollo): imprime el correo en consola.
   - `ResendEmailSender` (demo/producción): usa el `id_notificacion` como clave de idempotencia para que un reintento no duplique el correo.
+- **Diseño de los correos (2026-11-22):** cada plantilla de `templates.ts` arma, además de `mensaje` (que no cambia de formato: la Bandeja lo interpreta), un `correo` estructurado (preheader, titular, párrafos, detalles, cita, CTA, motivo) que `src/server/email/layout.ts` convierte en HTML para clientes de correo (tablas, estilos inline, sin SVG, modo oscuro progresivo, texto escapado) y en texto plano; `EmailSender` envía ambos. El logo es un PNG público generado con `next/og` en `/correo-logo.png` (`src/app/correo-logo.png/route.tsx`). Los correos de actividad enlazan a Integrantes del grupo para silenciarlos. Vista previa y verificación sin enviar: `npm run correos:previsualizar` (genera `.correos-preview/index.html`, ignorada por git).
 - Límites de Resend en el plan gratuito: tope diario de envíos para toda la app y necesidad de verificar un dominio propio para escribir a terceros. Por eso el correo se reserva para lo que exige acción de alguien.
 
 ### 8.7 Reuniones (confirmado)

@@ -255,6 +255,16 @@ export async function crearReunion(idUsuario: number, idGrupo: number, datos: z.
   const cuando = `${etiquetaFechaLarga(datos.fecha).toLowerCase()}, ${etiquetaMinutos(
     Number(datos.horaInicio.slice(0, 2)) * 60 + Number(datos.horaInicio.slice(3)),
   )}`;
+  const organizador = await prisma.usuario
+    .findUnique({ where: { idUsuario }, select: { nombre: true, apellidos: true } })
+    .catch(() => null);
+  const contextoCorreo = {
+    organizador: organizador ? nombreDe(organizador) : null,
+    inicio,
+    fin,
+    videollamada: datos.videollamada,
+    lugar: datosReunion.lugar,
+  };
   await notificarVarios(
     participantes
       .filter((participante) => participante.idUsuario !== idUsuario)
@@ -262,7 +272,7 @@ export async function crearReunion(idUsuario: number, idGrupo: number, datos: z.
         idUsuario: participante.idUsuario,
         tipo: "reunion_programada" as const,
         idGrupo,
-        ...plantillasNotificacion.reunionProgramada(datos.titulo, grupo.nombre, idGrupo, reunion.idReunion, cuando),
+        ...plantillasNotificacion.reunionProgramada(datos.titulo, grupo.nombre, idGrupo, reunion.idReunion, cuando, contextoCorreo),
       })),
   );
 
