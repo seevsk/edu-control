@@ -351,7 +351,9 @@ export async function invitarIntegrante(
   await crearNotificacion({
     idUsuario: idUsuarioInvitado,
     tipo: "invitacion_grupo",
-    ...plantillasNotificacion.invitacionGrupo(grupo.nombre, idGrupo, invitador ? nombreCorto(invitador.nombre, invitador.apellidos) : null),
+    ...plantillasNotificacion.invitacionGrupo(grupo.nombre, idGrupo, invitador ? nombreCorto(invitador.nombre, invitador.apellidos) : null, {
+      rol: integrante.rol,
+    }),
   });
 
   return integrante;

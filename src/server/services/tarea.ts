@@ -3,6 +3,7 @@ import { crearNotificacion, notificarVarios } from "@/server/notifications/crear
 import { plantillasNotificacion } from "@/server/notifications/templates";
 import { finDeDiaLimaAUtc } from "@/lib/dates";
 import { diaYMes } from "@/lib/formato-fecha";
+import { nombreCorto } from "@/lib/nombres";
 import { fechaEnZonaLimaISO } from "@/lib/calendario";
 import { ErrorDeNegocio } from "@/lib/errores";
 import {
@@ -51,6 +52,27 @@ async function esAsignable(idGrupo: number, idUsuario: number, tx: Prisma.Transa
 async function validarAsignable(idGrupo: number, idUsuario: number, tx: Prisma.TransactionClient) {
   if (!(await esAsignable(idGrupo, idUsuario, tx))) {
     throw new ErrorDeNegocio("Esa persona no puede ser asignada en este grupo");
+  }
+}
+
+/**
+ * Nombre de quien actuo y del grupo, para el contenido del correo. Se lee fuera de la transaccion
+ * y nunca falla: sin datos, la plantilla usa un texto generico.
+ */
+async function contextoAviso(idActor: number | null, idGrupo: number) {
+  try {
+    const [actor, grupo] = await Promise.all([
+      idActor === null
+        ? null
+        : prisma.usuario.findUnique({ where: { idUsuario: idActor }, select: { nombre: true, apellidos: true } }),
+      prisma.grupo.findUnique({ where: { idGrupo }, select: { nombre: true } }),
+    ]);
+    return {
+      actor: actor?.nombre ? nombreCorto(actor.nombre, actor.apellidos) : null,
+      grupo: grupo?.nombre ?? null,
+    };
+  } catch {
+    return { actor: null, grupo: null };
   }
 }
 
@@ -306,7 +328,11 @@ export async function crearTarea(
       idUsuario: idAsignado,
       tipo: "tarea_asignada",
       idGrupo,
-      ...plantillasNotificacion.tareaAsignada(tarea.titulo, idGrupo, tarea.idTarea),
+      ...plantillasNotificacion.tareaAsignada(tarea.titulo, idGrupo, tarea.idTarea, {
+        ...(await contextoAviso(idActor, idGrupo)),
+        fechaLimite: tarea.fechaLimite,
+        peso: tarea.peso,
+      }),
     });
   }
 
@@ -409,7 +435,10 @@ export async function editarTarea(
       idUsuario: tarea.idAsignado,
       tipo: "tarea_reprogramada",
       idGrupo,
-      ...plantillasNotificacion.tareaReprogramada(tarea.titulo, idGrupo, idTarea, diaYMes(tarea.fechaLimite)),
+      ...plantillasNotificacion.tareaReprogramada(tarea.titulo, idGrupo, idTarea, diaYMes(tarea.fechaLimite), {
+        ...(await contextoAviso(idActor, idGrupo)),
+        fechaLimite: tarea.fechaLimite,
+      }),
     });
   }
   return tarea;
@@ -504,7 +533,11 @@ export async function reasignarTarea(
       idUsuario: nuevoIdAsignado,
       tipo: "tarea_asignada",
       idGrupo,
-      ...plantillasNotificacion.tareaAsignada(tarea.titulo, idGrupo, tarea.idTarea),
+      ...plantillasNotificacion.tareaAsignada(tarea.titulo, idGrupo, tarea.idTarea, {
+        ...(await contextoAviso(idActor, idGrupo)),
+        fechaLimite: tarea.fechaLimite,
+        peso: tarea.peso,
+      }),
     });
   }
 
@@ -516,6 +549,7 @@ export async function notificarTareaEnRevision(idGrupo: number, idTarea: number,
   const destinos = await prisma.grupoIntegrante.findMany({
     where: { idGrupo, estadoInvitacion: "aceptada", rol: { not: "observador" } },
   });
+  const contexto = await contextoAviso(idAsignado, idGrupo);
   await notificarVarios(
     destinos
       .filter((destino) => destino.idUsuario !== idAsignado)
@@ -523,7 +557,7 @@ export async function notificarTareaEnRevision(idGrupo: number, idTarea: number,
         idUsuario: destino.idUsuario,
         tipo: "tarea_en_revision" as const,
         idGrupo,
-        ...plantillasNotificacion.tareaEnRevision(titulo, idGrupo, idTarea),
+        ...plantillasNotificacion.tareaEnRevision(titulo, idGrupo, idTarea, contexto),
       })),
   );
 }
@@ -532,12 +566,13 @@ async function notificarAutoaprobacion(idGrupo: number, idTarea: number, titulo:
   const destinos = await prisma.grupoIntegrante.findMany({
     where: { idGrupo, estadoInvitacion: "aceptada", rol: { not: "observador" }, idUsuario: { not: idLider } },
   });
+  const contexto = await contextoAviso(idLider, idGrupo);
   await notificarVarios(
     destinos.map((destino) => ({
       idUsuario: destino.idUsuario,
       tipo: "tarea_completada" as const,
       idGrupo,
-      ...plantillasNotificacion.tareaAutoaprobada(titulo, idGrupo, idTarea),
+      ...plantillasNotificacion.tareaAutoaprobada(titulo, idGrupo, idTarea, contexto),
     })),
   );
 }
@@ -646,33 +681,35 @@ export async function cambiarEstadoTarea(
   }
   // Quien ya salió del grupo (dejó la tarea en revisión) no recibe avisos.
   if (!asignado || asignado === idActor || !asignadoPuedeRecibir) return;
+  if (!accion && nuevoEstado !== "completada") return;
+  const contexto = { ...(await contextoAviso(idActor, idGrupo)), fechaLimite: tarea.fechaLimite, peso: tarea.peso };
   if (accion === "devolver") {
     await crearNotificacion({
       idUsuario: asignado,
       tipo: "tarea_devuelta",
       idGrupo,
-      ...plantillasNotificacion.tareaDevuelta(tarea.titulo, idGrupo, idTarea, motivoValidado),
+      ...plantillasNotificacion.tareaDevuelta(tarea.titulo, idGrupo, idTarea, motivoValidado, contexto),
     });
   } else if (accion === "reabrir") {
     await crearNotificacion({
       idUsuario: asignado,
       tipo: "tarea_reabierta",
       idGrupo,
-      ...plantillasNotificacion.tareaReabierta(tarea.titulo, idGrupo, idTarea, motivoValidado),
+      ...plantillasNotificacion.tareaReabierta(tarea.titulo, idGrupo, idTarea, motivoValidado, contexto),
     });
   } else if (accion === "descartar") {
     await crearNotificacion({
       idUsuario: asignado,
       tipo: "tarea_descartada",
       idGrupo,
-      ...plantillasNotificacion.tareaDescartada(tarea.titulo, idGrupo, idTarea, motivoValidado),
+      ...plantillasNotificacion.tareaDescartada(tarea.titulo, idGrupo, idTarea, motivoValidado, contexto),
     });
   } else if (nuevoEstado === "completada") {
     await crearNotificacion({
       idUsuario: asignado,
       tipo: "tarea_completada",
       idGrupo,
-      ...plantillasNotificacion.tareaCompletada(tarea.titulo, idGrupo, idTarea),
+      ...plantillasNotificacion.tareaCompletada(tarea.titulo, idGrupo, idTarea, contexto),
     });
   }
 }

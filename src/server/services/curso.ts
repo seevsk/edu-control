@@ -524,7 +524,11 @@ export async function agregarEvaluacion(
     await crearNotificacion({
       idUsuario,
       tipo: "evaluacion_creada",
-      ...plantillasNotificacion.evaluacionCreada(evaluacion.nombre, curso.nombre, idCurso, evaluacion.idEvaluacion, `el ${fechaCompleta(evaluacion.fechaCierre)}`),
+      ...plantillasNotificacion.evaluacionCreada(evaluacion.nombre, curso.nombre, idCurso, evaluacion.idEvaluacion, `el ${fechaCompleta(evaluacion.fechaCierre)}`, {
+        fechaApertura: evaluacion.fechaApertura,
+        fechaCierre: evaluacion.fechaCierre,
+        requiereEntrega: evaluacion.requiereEntrega,
+      }),
     });
   } catch (error) {
     console.error("No se pudo crear la notificación de evaluación creada", error);
